@@ -122,9 +122,7 @@ sub create_from_file
 {
     my($class, $file) = @_;
     my $txt = read_file($file);
-    my $json = JSON::XS->new; ## TODO temporary fix until Gary fixes encoding
-    $json->utf8(0);
-    my $self = $json->decode($txt);
+    my $self = decode_json($txt);
     return bless $self, $class;
 }
 

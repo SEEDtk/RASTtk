@@ -9,6 +9,9 @@
 # http://www.theseed.org/LICENSE.TXT.
 #
 
+#
+# This is a SAS component.
+#
 package FBasicLocation;
 
     use strict;

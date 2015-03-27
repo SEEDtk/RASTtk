@@ -317,16 +317,30 @@ our @EXPORT_OK = qw(
         );
 
 
-=pod
+=head2 input_file_handle
 
-  Helper function for defining an input filehandle:
-     filehandle is passed through
-     string is taken as file name to be openend
-     undef or "" defaults to STDOUT
+Helper function for defining an input filehandle:
+
+=over 4
+
+=item 1
+
+filehandle is passed through
+
+=item 2
+
+string is taken as file name to be openend
+
+=item 3
+
+undef or "" defaults to STDOUT
+
+=back
 
     ( \*FH, $name, $close [, $file] ) = input_filehandle( $file );
 
 =cut
+
 sub input_filehandle
 {
     my $file = shift;
@@ -357,19 +371,21 @@ sub input_filehandle
 }
 
 
-=pod
+=head2 read_fasta_seqs
 
-  Read fasta sequences from a filehandle (legacy interface; use read_fasta)
-  Save the contents in a list of refs to arrays:  (id, description, seq)
+Read fasta sequences from a filehandle (legacy interface; use read_fasta)
+Save the contents in a list of refs to arrays:  (id, description, seq)
 
      @seq_entries = read_fasta_seqs( \*FILEHANDLE )
+
 =cut
+
 sub read_fasta_seqs { read_fasta( @_ ) }
 
 
-=pod
+=head2 read_fasta
 
-  Read fasta sequences.  Save the contents in a list of refs to arrays:
+Read fasta sequences.  Save the contents in a list of refs to arrays:
 
      $seq_entry = [ id, description, seq ]
 
@@ -383,6 +399,7 @@ sub read_fasta_seqs { read_fasta( @_ ) }
     \@seq_entries = read_fasta( \$string )      #  reference to file as string
 
 =cut
+
 sub read_fasta
 {
     my $dataR = ( $_[0] && ref $_[0] eq 'SCALAR' ) ?  $_[0] : slurp( @_ );
@@ -414,21 +431,25 @@ sub read_fasta
     wantarray ? @seqs : \@seqs;
 }
 
-=pod
+=head2 slurp
 
-  A fast file reader:
+A fast file reader:
 
      $dataR = slurp( )               #  \*STDIN
      $dataR = slurp( \*FILEHANDLE )  #  an open file handle
      $dataR = slurp(  $filename )    #  a file name
      $dataR = slurp( "<$filename" )  #  file with explicit direction
 
-  Note:  It is faster to read lines by reading the file and splitting
-         than by reading the lines sequentially.  If space is not an
-         issue, this is the way to go.  If space is an issue, then lines
-         or records should be processed one-by-one (rather than loading
-         the whole input into a string or array).
+=head3 Note
+
+It is faster to read lines by reading the file and splitting
+than by reading the lines sequentially.  If space is not an
+issue, this is the way to go.  If space is an issue, then lines
+or records should be processed one-by-one (rather than loading
+the whole input into a string or array).
+
 =cut
+
 sub slurp
 {
     my ( $fh, $close );
@@ -462,10 +483,12 @@ sub slurp
 }
 
 
-=pod
+=head2 read_fasta_0
 
-  Previous, 50% slower fasta reader:
+Previous, 50% slower fasta reader:
+
 =cut
+
 sub read_fasta_0
 {
     my ( $fh, $name, $close, $unused ) = input_filehandle( $_[0] );
@@ -492,11 +515,11 @@ sub read_fasta_0
 }
 
 
-=pod
+=head2 read_next_fasta_seq
 
-  Read one fasta sequence at a time from a file.  This is half as fast a
-  read_fasta(), but can handle an arbitrarily large file.  State information
-  is retained in hashes, so any number of streams can be interlaced.
+Read one fasta sequence at a time from a file.  This is half as fast a
+read_fasta(), but can handle an arbitrarily large file.  State information
+is retained in hashes, so any number of streams can be interlaced.
 
       @entry = read_next_fasta_seq( \*FILEHANDLE )
      \@entry = read_next_fasta_seq( \*FILEHANDLE )
@@ -507,9 +530,11 @@ sub read_fasta_0
 
       @entry = ( $id, $description, $seq )
 
-  When reading at the end of file, () is returned.
-  With a filename, reading past this will reopen the file at the beginning.
+When reading at the end of file, () is returned.
+With a filename, reading past this will reopen the file at the beginning.
+
 =cut
+
 #  Reading always overshoots, so save next id and description
 
 {   #  Use bare block to scope the header hash
@@ -593,25 +618,30 @@ sub read_fasta_0
 }
 
 
-=pod
+=head2 read_clustal_file
 
-  Read a clustal alignment from a file.
-  Save the contents in a list of refs to arrays:  (id, description, seq)
+Read a clustal alignment from a file.
+Save the contents in a list of refs to arrays:  (id, description, seq)
 
      @seq_entries = read_clustal_file( $filename )
+
 =cut
+
 sub read_clustal_file { read_clustal( @_ ) }
 
 
-=pod
+=head2 read_clustal
 
-  Read a clustal alignment.
-  Save the contents in a list of refs to arrays:  (id, description, seq)
+Read a clustal alignment.
+
+Save the contents in a list of refs to arrays:  (id, description, seq)
 
      @seq_entries = read_clustal( )              # STDIN
      @seq_entries = read_clustal( \*FILEHANDLE )
      @seq_entries = read_clustal(  $filename )
+
 =cut
+
 sub read_clustal {
     my ( $fh, undef, $close, $unused ) = input_filehandle( shift );
     $unused && die "Bad reference type (" . ref( $unused ) . ") passed to read_clustal_file\n";
@@ -634,13 +664,15 @@ sub read_clustal {
 }
 
 
-=pod
+=head2 parse_fasta_title
 
-  Parse a fasta file header to id and definition parts
+Parse a fasta file header to id and definition parts
 
      ($id, $def) = parse_fasta_title( $title )
      ($id, $def) = split_fasta_title( $title )
+
 =cut
+
 sub parse_fasta_title
 {
     my $title = shift;
@@ -654,11 +686,11 @@ sub parse_fasta_title
 sub split_fasta_title { parse_fasta_title( @_ ) }
 
 
-=pod
+=head2 nr_def_as_id_def_org
 
-  Some functions to split fasta file def lines into [id, definition, organism]
-  These forms DO NOT want a > at the beinging of the line (it will become part
-  of the id).
+Some functions to split fasta file def lines into [id, definition, organism]
+These forms DO NOT want a > at the beinging of the line (it will become part
+of the id).
 
      @id_def_org = nr_def_as_id_def_org( $nr_seq_title )
      @id_def_org = split_id_def_org( @seq_titles );
@@ -673,9 +705,12 @@ sub nr_def_as_id_def_org
 }
 
 
-#
-#  @id_def_org = split_id_def_org( @id_def_org_lines );
-#
+=head2 split_id_def_org
+
+  @id_def_org = split_id_def_org( @id_def_org_lines );
+
+=cut
+
 sub split_id_def_org
 {
     map { ! defined( $_ )                           ? ()
@@ -733,16 +768,30 @@ sub split_id_def_org_2
     m/^(\S+)\s+(\S.*)$/ ? [ $1, $2, '' ] : [ $_, '', '' ];
 }
 
-=pod
+=head2 output_filehandle
 
-  Helper function for defining an output filehandle:
-     filehandle is passed through
-     string is taken as file name to be openend
-     undef or "" defaults to STDOUT
+Helper function for defining an output filehandle:
+
+=over 4
+
+=item 1
+
+filehandle is passed through
+
+=item 2
+
+string is taken as file name to be openend
+
+=item 3
+
+undef or "" defaults to STDOUT
+
+=back
 
     ( \*FH, $close [, $file] ) = output_filehandle( $file );
 
 =cut
+
 sub output_filehandle
 {
     my $file = shift;
@@ -767,19 +816,41 @@ sub output_filehandle
 }
 
 
-=pod
+=head2 print_seq_list_as_fasta
 
-  Legacy function for printing fasta sequence set:
+Legacy function for printing fasta sequence set:
 
      print_seq_list_as_fasta( \*FILEHANDLE, @seq_entry_list );
+
 =cut
+
 sub print_seq_list_as_fasta { print_alignment_as_fasta( @_ ) }
 
 
-=pod
+=head2 print_alignment_as_fasta
 
-  Print list of sequence entries in fasta format.
-  Missing, undef or "" filename defaults to STDOUT.
+Print list of sequence entries in fasta format.
+Missing, undef or "" filename defaults to STDOUT.
+
+     print_alignment_as_fasta(                @seq_entry_list ); # STDOUT
+     print_alignment_as_fasta(               \@seq_entry_list ); # STDOUT
+     print_alignment_as_fasta( \*FILEHANDLE,  @seq_entry_list );
+     print_alignment_as_fasta( \*FILEHANDLE, \@seq_entry_list );
+     print_alignment_as_fasta(  $filename,    @seq_entry_list );
+     print_alignment_as_fasta(  $filename,   \@seq_entry_list );
+
+=cut
+
+sub print_alignment_as_fasta
+{
+
+    return &write_fasta(@_);
+}
+
+=head2 write_fasta
+
+Print list of sequence entries in fasta format.
+Missing, undef or "" filename defaults to STDOUT.
 
      write_fasta(                @seq_entry_list ); # STDOUT
      write_fasta(               \@seq_entry_list ); # STDOUT
@@ -788,18 +859,7 @@ sub print_seq_list_as_fasta { print_alignment_as_fasta( @_ ) }
      write_fasta(  $filename,    @seq_entry_list );
      write_fasta(  $filename,   \@seq_entry_list );
 
-     print_alignment_as_fasta(                @seq_entry_list ); # STDOUT
-     print_alignment_as_fasta(               \@seq_entry_list ); # STDOUT
-     print_alignment_as_fasta( \*FILEHANDLE,  @seq_entry_list );
-     print_alignment_as_fasta( \*FILEHANDLE, \@seq_entry_list );
-     print_alignment_as_fasta(  $filename,    @seq_entry_list );
-     print_alignment_as_fasta(  $filename,   \@seq_entry_list );
 =cut
-sub print_alignment_as_fasta
-{
-
-    return &write_fasta(@_);
-}
 
 sub write_fasta
 {
@@ -818,10 +878,10 @@ sub write_fasta
 }
 
 
-=pod
+=print_alignment_as_phylip
 
-  Print list of sequence entries in phylip format.
-  Missing, undef or "" filename defaults to STDOUT.
+Print list of sequence entries in phylip format.
+Missing, undef or "" filename defaults to STDOUT.
 
      print_alignment_as_phylip(                @seq_entry_list ); # STDOUT
      print_alignment_as_phylip(               \@seq_entry_list ); # STDOUT
@@ -829,7 +889,9 @@ sub write_fasta
      print_alignment_as_phylip( \*FILEHANDLE, \@seq_entry_list );
      print_alignment_as_phylip(  $filename,    @seq_entry_list );
      print_alignment_as_phylip(  $filename,   \@seq_entry_list );
+
 =cut
+
 sub print_alignment_as_phylip {
     my ( $fh, $close, $unused ) = output_filehandle( shift );
     ( unshift @_, $unused ) if $unused;
@@ -878,10 +940,10 @@ sub print_alignment_as_phylip {
 }
 
 
-=pod
+=head2 print_alignment_as_nexus
 
-  Print list of sequence entries in nexus format.
-  Missing, undef or "" filename defaults to STDOUT.
+Print list of sequence entries in nexus format.
+Missing, undef or "" filename defaults to STDOUT.
 
      print_alignment_as_nexus(               [ \%label_hash, ]  @seq_entry_list );
      print_alignment_as_nexus(               [ \%label_hash, ] \@seq_entry_list );
@@ -889,7 +951,9 @@ sub print_alignment_as_phylip {
      print_alignment_as_nexus( \*FILEHANDLE, [ \%label_hash, ] \@seq_entry_list );
      print_alignment_as_nexus(  $filename,   [ \%label_hash, ]  @seq_entry_list );
      print_alignment_as_nexus(  $filename,   [ \%label_hash, ] \@seq_entry_list );
+
 =cut
+
 sub print_alignment_as_nexus {
     my ( $fh, $close, $unused ) = output_filehandle( shift );
     ( unshift @_, $unused ) if $unused;
@@ -964,24 +1028,24 @@ END_TAIL
 }
 
 
-=pod
+=head2 print_seq_as_fasta
 
-  Print one sequence in fasta format to an open file.
+Print one sequence in fasta format to an open file.
 
      print_seq_as_fasta( \*FILEHANDLE, $id, $desc, $seq );
      print_seq_as_fasta(               $id, $desc, $seq );
      print_seq_as_fasta( \*FILEHANDLE, $id,        $seq );
      print_seq_as_fasta(               $id,        $seq );
 
-=cut
-#  print_seq_as_fasta() is meant more as a internal support routine than an
-#  external interface.  To print a single sequence to a named file use:
-#
-#     print_alignment_as_fasta( $filename, [ $id, $desc, $seq ] );
-#     print_alignment_as_fasta( $filename, [ $id,        $seq ] );
-=pod
+
+print_seq_as_fasta() is meant more as a internal support routine than an
+external interface.  To print a single sequence to a named file use:
+
+     print_alignment_as_fasta( $filename, [ $id, $desc, $seq ] );
+     print_alignment_as_fasta( $filename, [ $id,        $seq ] );
 
 =cut
+
 sub print_seq_as_fasta
 {
     my $fh = ( ref $_[0] eq 'GLOB' ) ? shift : \*STDOUT;
@@ -993,12 +1057,14 @@ sub print_seq_as_fasta
 }
 
 
-=pod
+=head2 print_gb_locus
 
-  Print one sequence in GenBank flat file format:
+Print one sequence in GenBank flat file format:
 
      print_gb_locus( \*FILEHANDLE, $locus, $def, $accession, $seq )
+
 =cut
+
 sub print_gb_locus {
     my ($fh, $loc, $def, $acc, $seq) = @_;
     my ($len, $i, $imax);
@@ -1022,15 +1088,17 @@ sub print_gb_locus {
 }
 
 
-=pod
+=head2 wrap_text
 
-  Return a string with text wrapped to defined line lengths:
+Return a string with text wrapped to defined line lengths:
 
      $wrapped_text = wrap_text( $str )                  # default len   =  80
      $wrapped_text = wrap_text( $str, $len )            # default ind   =   0
      $wrapped_text = wrap_text( $str, $len, $indent )   # default ind_n = ind
      $wrapped_text = wrap_text( $str, $len, $indent_1, $indent_n )
+
 =cut
+
 sub wrap_text {
     my ($str, $len, $ind, $indn) = @_;
 
@@ -1071,20 +1139,21 @@ sub wrap_text {
 }
 
 
-=pod
+=head2 index_seq_list
 
-  Build an index from seq_id to pointer to sequence entry: (id, desc, seq)
+Build an index from seq_id to pointer to sequence entry: (id, desc, seq)
 
      my \%seq_ind  = index_seq_list(  @seq_list );
      my \%seq_ind  = index_seq_list( \@seq_list );
 
-  Usage example:
+Usage example:
 
   my  @seq_list   = read_fasta_seqs(\*STDIN);  # list of pointers to entries
   my \%seq_ind    = index_seq_list(@seq_list); # hash from names to pointers
   my  @chosen_seq = @{%seq_ind{"contig1"}};    # extract one entry
 
 =cut
+
 sub index_seq_list {
     ( ref( $_[0] )      ne 'ARRAY' ) ? {}
   : ( ref( $_[0]->[0] ) ne 'ARRAY' ) ? { map { $_->[0] => $_ } @_ }
@@ -1092,7 +1161,7 @@ sub index_seq_list {
 }
 
 
-=pod
+=head2 seq access methods
 
   Three routines to access all or part of sequence entry by id:
 
@@ -1102,6 +1171,7 @@ sub index_seq_list {
      $seq       = seq_data_by_id(  \%seq_index, $seq_id );
 
 =cut
+
 sub seq_entry_by_id {
     (my $ind_ref = shift)  || die "No index supplied to seq_entry_by_id\n";
     (my $id      = shift)  || die "No id supplied to seq_entry_by_id\n";
@@ -1123,17 +1193,19 @@ sub seq_data_by_id {
 }
 
 
-=pod
+=head2 pack_alignment
 
-  Remove columns of alignment gaps from sequences:
+Remove columns of alignment gaps from sequences:
 
    @packed_seqs = pack_alignment(  @seqs )
    @packed_seqs = pack_alignment( \@seqs )
   \@packed_seqs = pack_alignment(  @seqs )
   \@packed_seqs = pack_alignment( \@seqs )
 
-  Gap characters are defined below as '-', '~', '.', and ' '.
+Gap characters are defined below as '-', '~', '.', and ' '.
+
 =cut
+
 sub pack_alignment
 {
     $_[0] && ( ref( $_[0] ) eq 'ARRAY' ) && @{$_[0]} && defined( $_[0]->[0] )
@@ -1159,15 +1231,16 @@ sub pack_alignment
 }
 
 
-=pod
+=head2 alignment_gap_mask
 
-  Produce a packing mask for columns of alignment gaps in sequences.  Gap
-  columns are 0x00 characters, and all others are 0xFF.
+Produce a packing mask for columns of alignment gaps in sequences.  Gap
+columns are 0x00 characters, and all others are 0xFF.
 
    $mask = alignment_gap_mask(  @seqs )
    $mask = alignment_gap_mask( \@seqs )
 
 =cut
+
 sub alignment_gap_mask
 {
     $_[0] && ( ref( $_[0] ) eq 'ARRAY' ) && @{$_[0]} && defined( $_[0]->[0] )
@@ -1183,10 +1256,10 @@ sub alignment_gap_mask
 }
 
 
-=pod
+=head2 pack_alignment_by_mask
 
-  Pack a sequence alignment according to a mask, removing positions where
-  mask has 0x00 (or '-') characters
+Pack a sequence alignment according to a mask, removing positions where
+mask has 0x00 (or '-') characters
 
    @packed = pack_alignment_by_mask( $mask,  @align )
    @packed = pack_alignment_by_mask( $mask, \@align )
@@ -1194,6 +1267,7 @@ sub alignment_gap_mask
   \@packed = pack_alignment_by_mask( $mask, \@align )
 
 =cut
+
 sub pack_alignment_by_mask
 {
     my $mask = shift;
@@ -1217,9 +1291,9 @@ sub pack_alignment_by_mask
 }
 
 
-=pod
+=head2 weight_alignment_by_mask
 
-  Weight a sequence alignment according to a mask of digits, 0-9.
+Weight a sequence alignment according to a mask of digits, 0-9.
 
    @packed = weight_alignment_by_mask( $mask,  @align )
    @packed = weight_alignment_by_mask( $mask, \@align )
@@ -1227,6 +1301,7 @@ sub pack_alignment_by_mask
   \@packed = weight_alignment_by_mask( $mask, \@align )
 
 =cut
+
 sub weight_alignment_by_mask
 {
     my $mask = shift;
@@ -1270,14 +1345,15 @@ sub weight_seq_by_mask_0
 }
 
 
-=pod
+=head2 gap_mask
 
-  Make a mask in which gap characters ('-', '~', '.', and ' ') are converted
-  to 0x00, and all other characters to 0xFF.
+Make a mask in which gap characters ('-', '~', '.', and ' ') are converted
+to 0x00, and all other characters to 0xFF.
 
       $mask = gap_mask( $seq )
 
 =cut
+
 sub gap_mask
 {
     my $mask = shift;
@@ -1289,25 +1365,26 @@ sub gap_mask
 }
 
 
-=pod
+=head2 expand_sequence_by_mask
 
-  Expand sequences with the local gap character in a manner that reverses the
-  pack by mask function.
+Expand sequences with the local gap character in a manner that reverses the
+pack by mask function.
 
       $expanded = expand_sequence_by_mask( $seq, $mask )
 
-  The columns to be added can be marked by '-' or "\000" in the mask.
+The columns to be added can be marked by '-' or "\000" in the mask.
 
-  Code note:
+=head3 Code Note
 
-  The function attempts to match the local gap character in the sequence.
-  $c0 and $c1 are the previous and next characters in the sequence being
-  expanded.  (($c0,$c1)=($c1,shift @s1))[0] updates the values and evaluates
-  to what was the next character, and becomes the new previous character.
-  The following really does print w, x, y, and z, one per line:
+The function attempts to match the local gap character in the sequence.
+$c0 and $c1 are the previous and next characters in the sequence being
+expanded.  (($c0,$c1)=($c1,shift @s1))[0] updates the values and evaluates
+to what was the next character, and becomes the new previous character.
+The following really does print w, x, y, and z, one per line:
 
      ( $a, $b, @c ) = ("", split //, "wxyz");
      while ( defined $b ) { print( (($a,$b)=($b,shift @c))[0], "\n" ) }
+
 =cut
 
 sub expand_sequence_by_mask
@@ -1326,10 +1403,10 @@ sub expand_sequence_by_mask
 }
 
 
-=pod
+=head2 pack_sequences
 
-  Remove all alignment gaps from sequences. This function minimally rewrites
-  sequence entries, saving memory if nothing else.
+Remove all alignment gaps from sequences. This function minimally rewrites
+sequence entries, saving memory if nothing else.
 
    @packed_seqs = pack_sequences(  @seqs )  # Also handles single sequence
    @packed_seqs = pack_sequences( \@seqs )
@@ -1337,6 +1414,7 @@ sub expand_sequence_by_mask
   \@packed_seqs = pack_sequences( \@seqs )
 
 =cut
+
 sub pack_sequences
 {
     $_[0] && ( ref( $_[0] ) eq 'ARRAY' ) && @{$_[0]} && defined( $_[0]->[0] )
@@ -1349,19 +1427,26 @@ sub pack_sequences
 }
 
 
-=pod
-
-  Some simple sequence manipulations:
+=head2 Simple Sequence Manipulation
 
      @entry  = subseq_DNA_entry( @seq_entry, $from, $to [, $fix_id] );
     \@entry  = subseq_DNA_entry( @seq_entry, $from, $to [, $fix_id] );
+
      @entry  = subseq_RNA_entry( @seq_entry, $from, $to [, $fix_id] );
     \@entry  = subseq_RNA_entry( @seq_entry, $from, $to [, $fix_id] );
+
      @entry  = complement_DNA_entry( @seq_entry [, $fix_id] );
+
      @entry  = complement_RNA_entry( @seq_entry [, $fix_id] );
+
+     $AAsub  = aa_subseq($AAseq, $from, $to);
+
      $DNAseq = complement_DNA_seq( $NA_seq );
+
      $RNAseq = complement_RNA_seq( $NA_seq );
+
      $DNAseq = to_DNA_seq( $NA_seq );
+
      $RNAseq = to_RNA_seq( $NA_seq );
 
 =cut
@@ -1570,6 +1655,15 @@ sub to_RNA_seq {
 }
 
 
+=head2 Sequence Cleaning Utilities
+
+    $seqx = pack_seq($seq);
+    $cleaned = clean_ae_sequence($seq);
+    $utf8 = to7bit($seq);
+    $ascii = to8bit($seq);
+
+=cut
+
 sub pack_seq {
     my $seq = shift;
     $seq =~ tr/A-Za-z*//cd;
@@ -1611,17 +1705,20 @@ sub to8bit {
 
 
 
-=pod
+=head2 Protein Translation Utilities
 
-  Translate nucleotides to one letter protein:
+Translate nucleotides to one letter protein:
 
      $seq = translate_seq( $seq [, $met_start] )
+
+Translate a single triplet with "universal" genetic code.
+
      $aa  = translate_codon( $triplet )
      $aa  = translate_DNA_codon( $triplet )     # Does not rely on DNA
      $aa  = translate_uc_DNA_codon( $triplet )  # Does not rely on uc or DNA
 
-  User-supplied genetic code must be upper case index and match the
-  DNA versus RNA type of sequence
+User-supplied genetic code must be upper case index and match the
+DNA versus RNA type of sequence
 
      $seq = translate_seq_with_user_code( $seq, $gen_code_hash [, $met_start] )
 
@@ -1955,16 +2052,6 @@ $genetic_code_with_U{ uga } = 'u';
 );
 
 
-=pod
-
-  Translate nucleotides to one letter protein.  Respects case of the
-  nucleotide sequence.
-
-      $aa = translate_seq( $nt, $met_start )
-      $aa = translate_seq( $nt )
-
-=cut
-
 sub translate_seq
 {
     my $seq = shift;
@@ -2133,16 +2220,29 @@ sub translate_seq_with_user_code
 }
 
 
-=pod
+=head3 translate_codon_with_user_code
 
-  Translate with user-supplied genetic code hash.  No error check on the code.
-  Should only be called through translate_seq_with_user_code.
+Translate with user-supplied genetic code hash.  No error check on the code.
+Should only be called through translate_seq_with_user_code.
 
      $aa = translate_codon_with_user_code( $triplet, \%code, \%ambig_table )
 
-   $triplet      speaks for itself
-  \%code         ref to the hash with the codon translations
-  \%ambig_table  ref to hash with lists of nucleotides for each ambig code
+=over 4
+
+=item $triplet
+
+speaks for itself
+
+=item \%code
+
+ref to the hash with the codon translations
+
+=item \%ambig_table
+
+ref to hash with lists of nucleotides for each ambig code
+
+=back
+
 =cut
 
 sub translate_codon_with_user_code
@@ -2196,13 +2296,15 @@ sub translate_codon_with_user_code
 }
 
 
-=pod
+=head2 read_intervals
 
-  Read a list of intervals from a file.
-  Allow id_start_end, or id \s start \s end formats
+Read a list of intervals from a file.
+Allow id_start_end, or id \s start \s end formats
 
      @intervals = read_intervals( \*FILEHANDLE )
+
 =cut
+
 sub read_intervals {
     my $fh = shift;
     my @intervals = ();
@@ -2223,23 +2325,27 @@ sub read_intervals {
 }
 
 
-=pod
+=head2 standardize_intervals
 
-  Convert a list of intervals to read [ id, left_end, right_end ].
+Convert a list of intervals to read [ id, left_end, right_end ].
 
      @intervals = standardize_intervals( @interval_refs )
+
 =cut
+
 sub standardize_intervals {
     map { ( $_->[1] < $_->[2] ) ? $_ : [ $_->[0], $_->[2], $_->[1] ] } @_;
 }
 
 
-=pod
+=head2 join_intervals
 
-  Take the union of a list of intervals
+Take the union of a list of intervals
 
      @joined = join_intervals( @interval_refs )
+
 =cut
+
 sub join_intervals {
     my @ordered = sort { $a->[0] cmp $b->[0]   # first by id
                       || $a->[1] <=> $b->[1]   # next by left end
@@ -2276,13 +2382,15 @@ sub join_intervals {
 }
 
 
-=pod
+=head2 locations_2_intervals
 
-  Split location strings to oriented intervals.
+Split location strings to oriented intervals.
 
      @intervals = locations_2_intervals( @locations )
      $interval  = locations_2_intervals( $location  )
+
 =cut
+
 sub locations_2_intervals {
     my @intervals = map { /^(\S+)_(\d+)_(\d+)(\s.*)?$/
                        || /^(\S+)_(\d+)-(\d+)(\s.*)?$/
@@ -2296,13 +2404,15 @@ sub locations_2_intervals {
 }
 
 
-=pod
+=head2 read_oriented_intervals
 
-  Read a list of oriented intervals from a file.
-  Allow id_start_end, or id \s start \s end formats
+Read a list of oriented intervals from a file.
+Allow id_start_end, or id \s start \s end formats
 
      @intervals = read_oriented_intervals( \*FILEHANDLE )
+
 =cut
+
 sub read_oriented_intervals {
     my $fh = shift;
     my @intervals = ();
@@ -2322,23 +2432,27 @@ sub read_oriented_intervals {
 }
 
 
-=pod
+=head2 reverse_intervals
 
-  Reverse the orientation of a list of intervals
+Reverse the orientation of a list of intervals
 
      @reversed = reverse_intervals( @interval_refs )
+
 =cut
+
 sub reverse_intervals {
     map { [ $_->[0], $_->[2], $_->[1] ] } @_;
 }
 
 
-=pod
+=head2 gb_location_2_seed
 
-  Convert GenBank locations to SEED locations
+Convert GenBank locations to SEED locations
 
      @seed_locs = gb_location_2_seed( $contig, @gb_locs )
+
 =cut
+
 sub gb_location_2_seed
 {
     my $contig = shift @_;
@@ -2387,11 +2501,9 @@ sub gb_loc_2_seed_2
 }
 
 
-=pod
+=head2 read_qual
 
-  Read qual.
-
-  Save the contents in a list of refs to arrays: [ $id, $descript, \@qual ]
+Save the contents in a list of refs to arrays: [ $id, $descript, \@qual ]
 
      @seq_entries = read_qual( )               #  STDIN
     \@seq_entries = read_qual( )               #  STDIN
@@ -2399,7 +2511,9 @@ sub gb_loc_2_seed_2
     \@seq_entries = read_qual( \*FILEHANDLE )
      @seq_entries = read_qual(  $filename )
     \@seq_entries = read_qual(  $filename )
+
 =cut
+
 sub read_qual {
     my ( $fh, $name, $close, $unused ) = input_filehandle( $_[0] );
     $unused && die "Bad reference type (" . ref( $unused ) . ") passed to read_qual\n";
@@ -2424,20 +2538,20 @@ sub read_qual {
 }
 
 
-=pod
+=head2 fraction_nt_diff
 
-  Fraction difference for an alignment of two nucleotide sequences in terms of
-  number of differing residues, number of gaps, and number of gap opennings.
+Fraction difference for an alignment of two nucleotide sequences in terms of
+number of differing residues, number of gaps, and number of gap opennings.
 
      $fraction_diff = fraction_nt_diff( $seq1, $seq2, \%options )
 
-  or
+or
 
      $fraction_diff = fraction_nt_diff( $seq1, $seq2 )
      $fraction_diff = fraction_nt_diff( $seq1, $seq2, $gap_wgt )
      $fraction_diff = fraction_nt_diff( $seq1, $seq2, $open_wgt, $extend_wgt )
 
-  Options:
+Options:
 
       gap      => $gap_wgt          # Gap open and extend weight (D = 0.5)
       open     => $open_wgt         # Gap openning weight (D = gap_wgt)
@@ -2446,18 +2560,20 @@ sub read_qual {
       t_open   => $term_open_wgt    # Terminal gap open weight (D = open_wgt)
       t_extend => $term_extend_wgt  # Terminal gap extend weight (D = extend_wgt)
 
-  Default gap open and gap extend weights are 1/2.  Beware that
+Default gap open and gap extend weights are 1/2.  Beware that
 
      $fraction_diff = fraction_nt_diff( $seq1, $seq2, 1 )
 
-  and
+and
 
      $fraction_diff = fraction_nt_diff( $seq1, $seq2, 1, 0 )
 
-  are different.  The first has equal openning and extension weights, whereas
-  the second has an openning weight of 1, and and extension weight of 0 (it
-  only penalizes the number of runs of gaps).
+are different.  The first has equal openning and extension weights, whereas
+the second has an openning weight of 1, and and extension weight of 0 (it
+only penalizes the number of runs of gaps).
+
 =cut
+
 sub fraction_nt_diff
 {
     my ( $npos, $nid, $ndif, $ngap, $nopen, $tgap, $topen ) = interpret_nt_align( @_[0,1] );
@@ -2495,12 +2611,12 @@ sub fraction_nt_diff
 }
 
 
-=pod
+=head2 interpret_nt_align
 
-  Interpret an alignment of two nucleotide sequences in terms of: useful
-  aligned positions (unambiguous, and not a common gap), number of identical
-  residues, number of differing residues, number of gaps, and number of gap
-  opennings.
+Interpret an alignment of two nucleotide sequences in terms of: useful
+aligned positions (unambiguous, and not a common gap), number of identical
+residues, number of differing residues, number of gaps, and number of gap
+opennings.
 
      ( $npos, $nid, $ndif, $ngap, $nopen, $tgap, $topen ) = interpret_nt_align( $seq1, $seq2 )
 
@@ -2512,8 +2628,8 @@ sub fraction_nt_diff
   $tgap  = number of gaps in runs adjacent to a terminus
   $topen = number of alignment ends with gaps
 
-  Some of the methods might seem overly complex, but are necessary for cases
-  in which the gaps switch strands in the alignment:
+Some of the methods might seem overly complex, but are necessary for cases
+in which the gaps switch strands in the alignment:
 
      seq1  ---ACGTGAC--TTGCAGAG
      seq2  TTT---TGACGG--GCAGGG
@@ -2527,10 +2643,12 @@ sub fraction_nt_diff
      tgap  =  3
      topen =  1
 
-  Although there are 4 gap opennings, there are only 2 runs in the mask,
-  and the terminal run is length 6, not 3.  (Why handle these?  Because
-  pairs of sequences from a multiple sequence alignment can look like this.)
+Although there are 4 gap opennings, there are only 2 runs in the mask,
+and the terminal run is length 6, not 3.  (Why handle these?  Because
+pairs of sequences from a multiple sequence alignment can look like this.)
+
 =cut
+
 sub interpret_nt_align
 {
     #  Remove alignment columns that are not informative:
@@ -2583,12 +2701,12 @@ sub useful_nt_align
 }
 
 
-=pod
+=head2 interpret_aa_align
 
-  Interpret an alignment of two protein sequences in terms of: useful
-  aligned positions (unambiguous, and not a common gap), number of identical
-  residues, number of differing residues, number of gaps, and number of gap
-  opennings.
+Interpret an alignment of two protein sequences in terms of: useful
+aligned positions (unambiguous, and not a common gap), number of identical
+residues, number of differing residues, number of gaps, and number of gap
+openings.
 
      ( $nmat, $nid, $ndif, $ngap, $nopen, $tgap, $topen ) = interpret_aa_align( $seq1, $seq2 )
 
@@ -2601,6 +2719,7 @@ sub useful_nt_align
   $topen = number of alignment ends with gaps
 
 =cut
+
 sub interpret_aa_align
 {
     #  Remove alignment columns that are not informative:
@@ -2658,13 +2777,14 @@ sub useful_aa_align
 }
 
 
-=pod
+=head2 oligomer_similarity
 
-  Return the fraction identity for oligomers over a range of lengths
+Return the fraction identity for oligomers over a range of lengths
 
      @sims = oligomer_similarity( $seq1, $seq2, \%opts )
 
 =cut
+
 sub oligomer_similarity
 {
     my ( $seq1, $seq2, $opts ) = @_;
@@ -2715,9 +2835,7 @@ sub oligomer_similarity
 }
 
 
-=pod
-
-  Guess type of a sequence:
+=head2 Guess Type of a Sequence
 
      $type = guess_seq_type(  $sequence )
      $bool = is_dna(  $sequence )   # not RNA or prot
@@ -2727,7 +2845,9 @@ sub oligomer_similarity
 
   $sequence can be a string, a reference to a string, or an id_def_seq triple.
   $type will be a keyword: 'DNA', 'RNA' or 'protein', or '' in case of error.
+
 =cut
+
 sub guess_seq_type
 {
     local $_ = ( !      $_[0]               ) ?   undef
@@ -2754,15 +2874,16 @@ sub is_na   { local $_ = guess_seq_type( $_[0] ); /^.NA$/ }
 sub is_prot { local $_ = guess_seq_type( $_[0] ); /^prot/ }
 
 
-=pod
+=head2 Is (Array Of) Sequence Triple
 
-  Verify the structure of an [ id, desc, sequence ] triple and
-  the structure of an array of sequence triples
+Verify the structure of an [ id, desc, sequence ] triple and
+the structure of an array of sequence triples
 
      $bool = is_sequence_triple( $triple )
      $bool = is_array_of_sequence_triples( \@triples )
 
 =cut
+
 sub is_sequence_triple
 {
     local $_ = shift;
