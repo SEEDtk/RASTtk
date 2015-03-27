@@ -755,7 +755,7 @@ Read an entire file into memory. In a scalar context, the file is returned
 as a single text string with line delimiters included. In a list context, the
 file is returned as a list of lines, each line terminated by a line
 delimiter. (For a method that automatically strips the line delimiters,
-use C<Tracer::GetFile>.)
+use C<StringUtils::GetFile>.)
 
 =over 4
 

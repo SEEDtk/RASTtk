@@ -428,7 +428,7 @@ sub Max {
 
 =head3 Pad
 
-    my $paddedString = Tracer::Pad($string, $len, $left, $padChar);
+    my $paddedString = StringUtils::Pad($string, $len, $left, $padChar);
 
 Pad a string to a specified length. The pad character will be a
 space, and the padding will be on the right side unless specified
