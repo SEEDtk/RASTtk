@@ -63,6 +63,8 @@ is C<1>.
 For example, C<100226.1:NC_003888_3766170+612> indicates contig C<NC_003888> in
 genome C<100226.1> (I<Streptomyces coelicolor A3(2)>) beginning at location
 3766170 and proceeding forward on the plus strand for 612 bases.
+
+
 =head2 Public Methods
 
 =head3 abbrev
