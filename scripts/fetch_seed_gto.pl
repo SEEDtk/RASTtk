@@ -15,9 +15,17 @@
 # Genomes at veronika@thefig.info or download a copy from
 # http://www.theseed.org/LICENSE.TXT.
 #
-#   fetch_seed_gto -s seed-to-get-it-from -g genome_ID > gto.file
-#   fetch_seed_gto -s seed-to-get-it-from -g genome_ID -o outfile
-#
+
+=head1 Create a GenomeTypeObject from a SEED Genome
+
+   fetch_seed_gto -s seed-to-get-it-from -g genome_ID > gto.file
+   fetch_seed_gto -s seed-to-get-it-from -g genome_ID -o outfile
+
+This script uses the C<genome_object> web service of the specified SEED to load a L<GenomeTypeObject>
+into memory. Because a web service is used, it does not need local machine access to the SEED in question.
+
+=cut
+
 use strict;
 use warnings;
 use SeedURLs;

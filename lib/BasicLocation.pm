@@ -763,6 +763,269 @@ sub Merge {
     $self->Combine($other);
 }
 
+=head2 Virtual Methods
+
+=head3 Left
+
+    my $leftPoint = $loc->Left;
+
+Return the offset of the leftmost point of the location.
+
+=head3 Right
+
+    my $rightPoint = $loc->Right;
+
+Return the offset of the rightmost point of the location.
+
+=head3 Compare
+
+    my ($distance, $cmp) = $loc->Compare($point);
+
+Determine the relative location of the specified point on the contig. Returns a distance,
+which indicates the location relative to the leftmost point of the contig, and a comparison
+number, which is negative if the point is to the left of the location, zero if the point is
+inside the location, and positive if the point is to the right of the location.
+
+=head3 Split
+
+    my $newLocation = $loc->Split($offset);
+
+Split this location into two smaller ones at the specified offset from the left endpoint. The
+new location split off of it will be returned. If the offset is at either end of the location,
+no split will occur and an underfined value will be returned.
+
+=over 4
+
+=item offset
+
+Offset into the location from the left endpoint of the point at which it should be split.
+
+=item RETURN
+
+The new location split off of this one, or an undefined value if no split was necessary.
+
+=back
+
+=head3 Peel
+
+    my $peel = $loc->Peel($length);
+
+Peel a specified number of positions off the beginning of the location. Peeling splits
+a location at a specified offset from the beginning, while splitting takes it at a
+specified offset from the left point. If the specified length is equal to or longer
+than the location's length, an undefined value will be returned.
+
+=over 4
+
+=item length
+
+Number of positions to split from the location.
+
+=item RETURN
+
+Returns a new location formed by splitting positions off of the existing location, which is
+shortened accordingly. If the specified length is longer than the location's length, an
+undefined value is returned and the location is not modified.
+
+=back
+
+=head3 Reverse
+
+    $loc->Reverse;
+
+Change the polarity of the location. The location will have the same nucleotide range, but
+the direction will be changed.
+
+=head3 PointIndex
+
+    my $index = $loc->PointIndex($point);
+
+Return the index of the specified point in this location. The value returned is the distance
+from the beginning. If the specified point is not in the location, an undefined value is returned.
+
+=over 4
+
+=item point
+
+Offset into the contig of the point in question.
+
+=item RETURN
+
+Returns the distance of the point from the beginning of the location, or an undefined value if the
+point is outside the location.
+
+=back
+
+=head3 PointOffset
+
+    my $offset = $loc->PointOffset($index);
+
+Return the offset into the contig of the point at the specified position in the location. A position
+of 0 will return the beginning point, a position of 1 returns the point next to that, and a position
+1 less than the length will return the ending point.
+
+=over 4
+
+=item index
+
+Index into the location of the relevant point.
+
+=item RETURN
+
+Returns an offset into the contig of the specified point in the location.
+
+=back
+
+=head3 SetBegin
+
+    $loc->SetBegin($newBegin);
+
+Change the begin point of this location without changing the endpoint.
+
+=over 4
+
+=item newBegin
+
+Proposed new beginning point.
+
+=back
+
+=head3 SetEnd
+
+    $loc->SetEnd($newEnd);
+
+Change the endpoint of this location without changing the begin point.
+
+=over 4
+
+=item newEnd
+
+Proposed new ending point.
+
+=back
+
+=head3 Widen
+
+    my  = $loc->Widen($distance, $max);
+
+Add the specified distance to each end of the location, taking care not to
+extend past either end of the contig. The contig length must be provided
+to insure we don't fall off the far end; otherwise, only the leftward
+expansion is limited.
+
+=over 4
+
+=item distance
+
+Number of positions to add to both ends of the location.
+
+=item max (optional)
+
+Maximum possible value for the right end of the location.
+
+=back
+
+=head3 Upstream
+
+    my $newLoc = $loc->Upstream($distance, $max);
+
+Return a new location upstream of the given location, taking care not to
+extend past either end of the contig.
+
+=over 4
+
+=item distance
+
+Number of positions to add to the front (upstream) of the location.
+
+=item max (optional)
+
+Maximum possible value for the right end of the location.
+
+=item RETURN
+
+Returns a new location object whose last position is next to the first
+position of this location.
+
+=back
+
+=head3 Truncate
+
+    $loc->Truncate($len);
+
+Truncate the location to a new length. If the length is larger than the location length, then
+the location is not changed.
+
+=over 4
+
+=item len
+
+Proposed new length for the location.
+
+=back
+
+=head3 Adjacent
+
+    my $okFlag = $loc->Adjacent($other);
+
+Return TRUE if the other location is adjacent to this one, else FALSE. The other
+location must have the same direction and start immediately after this location's
+endpoint.
+
+=over 4
+
+=item other
+
+BasicLocation object for the other location.
+
+=item RETURN
+
+Returns TRUE if the other location is an extension of this one, else FALSE.
+
+=back
+
+=head3 Combine
+
+    $loc->Combine($other);
+
+Combine another location with this one. The result will contain all bases in both
+original locations. Both locations must have the same contig ID and direction.
+
+=over 4
+
+=item other
+
+Other location to combine with this one.
+
+=back
+
+=head3 NumDirection
+
+    my $multiplier = $loc->NumDirection();
+
+Return C<1> if this is a forward location, C<-1> if it is a backward location.
+
+=head3 Lengthen
+
+    my  = $loc->Lengthen($distance, $max);
+
+Add the specified distance to the end of the location, taking care not to
+extend past either end of the contig. The contig length must be provided
+to insure we don't fall off the far end; otherwise, only the leftward
+expansion is limited.
+
+=over 4
+
+=item distance
+
+Number of positions to add to the end of the location.
+
+=item max (optional)
+
+Maximum possible value for the right end of the location.
+
+=back
+
 =head3 ExtendUpstream
 
     $loc->ExtendUpstream($distance, $max);
