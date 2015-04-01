@@ -49,7 +49,7 @@ Note that even though they are called "offsets", location indices are 1-based.
 Note also that the possibility of an underscore in the contig ID makes the parsing a little
 tricky.
 
-The Sprout uses a slightly different format designed to allow for the possibility of
+The databases use a slightly different format designed to allow for the possibility of
 zero-length regions. Instead of a starting and ending position, we specify the start position,
 the direction (C<+> or C<->), and the length. The Sprout versions of the two example locations
 above are C<RED_1+400> (corresponds to C<RED_1_400>), and C<NC_000913_500-100> (corresponds
@@ -60,47 +60,12 @@ and it is constantly necessary to ask if the location is forward or backward. Th
 object seeks to resolve these differences by providing a single interface that can be
 used regardless of the format or direction.
 
-It is frequently useful to keep additional data about a basic location while it is being passed
-around. The basic location object is a PERL hash, and this additional data is kept in the object
-by adding hash keys. The internal values used by the object have keys preceded by an
-underscore, so any keys not beginning with underscores are considered to be additional
-values. The additional values are called I<augments>.
-
-When a basic location is in its string form, the augments can be tacked on using parentheses
-enclosing a comma-delimited list of assignments. For example, say we want to describe
-the first 400 base pairs in the contig B<RED>, and include the fact that it is the second
-segment of feature B<fig|12345.1.peg.2>. We could use the key C<fid> for the feature ID and
-C<idx> for the segment index (0-based), in which case the location string would be
-
-    RED_1+400(fid=fig|12345.1.peg.2,idx=1)
-
-When this location string is converted to a location object in the variable C<$loc>, we
-would have
-
-    $loc->{fig} eq 'fig|12345.1.peg.2'
-    $loc->{idx} == 1
-
-Spaces can be added for readability. The above augmented location string can also be
-coded as
-
-    RED_1+400(fid = fig|12345.1.peg.2, idx = 1)
-
-A basic location is frequently part of a full location. Full locations are described by the
-B<FullLocation> object. A full location is a list of basic locations associated with a genome
-and a FIG-like object. If the parent full location is known, we can access the basic location's
-raw DNA. To construct a basic location that is part of a full location, we add the parent full
-location and the basic location's index to the constructor. In the constructor below,
-C<$parent> points to the parent full location.
-
-    my $secondLocation = BasicLocation->new("RED_450+100", $parent, 1);
-
-=cut
 
 =head2 Public Methods
 
 =head3 new
 
-    my $loc = BasicLocation->new($locString, $parentLocation, $idx);
+    my $loc = BasicLocation->new($locString);
 
 Construct a basic location from a location string. A location string has the form
 I<contigID>C<_>I<begin>I<dir>I<len> where I<begin> is the starting position,
@@ -110,30 +75,11 @@ location beginning at position 4000 of contig C<1999.1_NC123> and ending at
 position 4199. Similarly, C<1999.1_NC123_2000-400> describes a location in the
 same contig starting at position 2000 and ending at position 1601.
 
-Augments can be specified as part of the location string using parentheses and
-a comma-delimited list of assignments. For example, the following constructor
-creates a location augmented by a feature ID called C<fid> and an index value
-called C<idx>.
-
-    my $loc = BasicLocation->new("NC_000913_499_400(fid = fig|83333.1.peg.10, idx => 2)");
-
-All fields internal to the location object have names beginning with an
-underscore (C<_>), so as long as the value name begins with a letter,
-there should be no conflict.
-
 =over 4
 
 =item locString
 
 Location string, as described above.
-
-=item parentLocation (optional)
-
-Full location that this basic location is part of (if any).
-
-=item idx (optional)
-
-Index of this basic location in the parent full location.
 
 =back
 
@@ -150,6 +96,20 @@ Location whose data is to be copied.
 =item contigID (optional)
 
 ID of the new contig to be plugged in.
+
+=back
+
+    my $loc = BasicLocation->new($tuple);
+
+Construct a location from a database location tuple. A database location specification
+consists of a contig ID, a leftmost location, a direction, and a length.
+
+=over 4
+
+=item tuple
+
+A 4-tuple consisting of (0) a contig ID, (1) the leftmost point of the location,
+(2) the direction (C<+> or C<->), and (3) the length.
 
 =back
 
@@ -179,18 +139,6 @@ a length.
 Length of the location. If the direction is an underscore (C<_>), it will be the endpoint
 instead of the length.
 
-=item augments (optional)
-
-Reference to a hash containing any augment values for the location.
-
-=item parentLocation (optional)
-
-Full location that this basic location is part of (if any).
-
-=item idx (optional)
-
-Index of this basic location in the parent full location.
-
 =back
 
 =cut
@@ -201,42 +149,26 @@ sub new {
     require BBasicLocation;
     require FBasicLocation;
     # Declare the data variables.
-    my ($contigID, $beg, $dir, $len, $end, $parent, $idx, $augments, $augmentString);
+    my ($contigID, $beg, $dir, $len, $end);
     # Determine the signature type.
     if (@p >= 4) {
         # Here we have specific incoming data.
-        ($contigID, $beg, $dir, $len, $augments, $parent, $idx) = @p;
+        ($contigID, $beg, $dir, $len) = @p;
     } elsif (UNIVERSAL::isa($p[0],__PACKAGE__)) {
         # Here we have a source location and possibly a new contig ID.
         $contigID = (defined $p[1] ? $p[1] : $p[0]->{_contigID});
         ($beg, $dir, $len) = ($p[0]->{_beg}, $p[0]->{_dir}, $p[0]->{_len});
-        if (exists $p[0]->{_parent}) {
-            ($parent, $idx) = ($p[0]->{_parent}, $p[0]->{_idx});
-        }
-        # Get the augments (if any) from the source location. We want these
-        # copied to the new location.
-        $augments = { };
-        for my $key (keys %{$p[0]}) {
-            if (substr($key, 0, 1) ne '_') {
-                $augments->{$key} = $p[0]->{$key};
-            }
+    } elsif (ref $p[0] eq 'ARRAY') {
+        # Here we have a database location tuple.
+        ($contigID, $beg, $dir, $len) = @{$p[0]};
+        # Adjust the beginning if this is on the - strand.
+        if ($dir eq '-') {
+            $beg = $beg + $len - 1;
         }
     } else {
-        # Here we have a source string and possibly augments. We first parse
-        # the source string.
-        $p[0] =~ /^(.+)_(\d+)(\+|\-|_)(\d+)($|\(.*\)$)/;
-        ($contigID, $beg, $dir, $len, $augmentString) = ($1, $2, $3, $4, $5);
-        # Check for augments.
-        if ($augmentString) {
-            # Here we have an augment string. First, we strip the enclosing
-            # parentheses.
-            $augmentString = substr $augmentString, 1, length($augmentString) - 2;
-            # Now we parse out the assignments and put them in a hash.
-            my %augmentHash = map { split /\s*,\s*/, $_ } split /\s*=\s*/, $augmentString;
-            $augments = \%augmentHash;
-        }
-        # Pull in the parent location and index, if applicable.
-        ($parent, $idx) = ($p[1], $p[2]);
+        # Here we have a source string.
+        $p[0] =~ /^(.+)_(\d+)(\+|\-|_)(\d+)$/;
+        ($contigID, $beg, $dir, $len) = ($1, $2, $3, $4);
     }
     # Determine the format.
     if ($dir eq '_') {
@@ -255,14 +187,7 @@ sub new {
     }
     # Create the return structure.
     my $retVal = { _contigID => $contigID, _beg => $beg, _dir => $dir,
-                   _end => $end, _len => $len, _parent => $parent,
-                   _idx => $idx };
-    # Add the augments.
-    if ($augments) {
-        for my $key (keys %{$augments}) {
-            $retVal->{$key} = $augments->{$key};
-        }
-    }
+                   _end => $end, _len => $len };
     # Bless the location with the appropriate package name.
     if ($dir eq '+') {
         bless $retVal, "FBasicLocation";
@@ -428,38 +353,6 @@ sub SeedString {
     return $self->{_contigID} . "_" . $self->{_beg} . "_" . $self->{_end};
 }
 
-=head3 AugmentString
-
-    my $string = $loc->AugmentString;
-
-Return a Sprout-format string representation of this location with augment data
-included. The augment data will be appended as a comma-delimited list of assignments
-enclosed in parentheses, the exact format expected by the single-argument location object
-constructor L</new>.
-
-=cut
-
-sub AugmentString {
-    # Get this instance.
-    my ($self) = @_;
-    # Get the pure location string.
-    my $retVal = $self->String;
-    # Create the augment string. We build it from all the key-value pairs in the hash
-    # for which the key does not being with an underscore.
-    my @augmentStrings = ();
-    for my $key (sort keys %{$self}) {
-        if (substr($key,0,1) ne "_") {
-            push @augmentStrings, "$key = " . $self->{$key};
-        }
-    }
-    # If any augments were found, we concatenate them to the result string.
-    if (@augmentStrings > 0) {
-        $retVal .= "(" . join(", ", @augmentStrings) . ")";
-    }
-    # Return the result.
-    return $retVal;
-}
-
 =head3 IfValid
 
     my $distance = $loc->IfValid($distance);
@@ -586,35 +479,6 @@ sub Matches {
     }
     # Return the result.
     return $retVal;
-}
-
-=head3 Attach
-
-    my  = $loc->Attach($parent, $idx);
-
-Point this basic location to a parent full location. The basic location will B<not> be
-inserted into the full location's data structures.
-
-=over 4
-
-=item parent
-
-Parent full location to which this location should be attached.
-
-=item idx
-
-Index of this location in the full location.
-
-=back
-
-=cut
-
-sub Attach {
-    # Get the parameters.
-    my ($self, $parent, $idx) = @_;
-    # Save the parent location and index in our data structures.
-    $self->{_idx} = $idx;
-    $self->{_parent} = $parent;
 }
 
 =head3 FixContig

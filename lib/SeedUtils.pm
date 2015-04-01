@@ -2076,7 +2076,7 @@ sub strip_func {
         return($func);
 }
 
-=head2 strip_func_comment
+=head3 strip_func_comment
 
     my ($stripped, $comment) = strip_func_comment($func);
 
@@ -2417,7 +2417,7 @@ sub map_to_families
 }
 
 
-=head2 write_encoded_object
+=head3 write_encoded_object
 
   write_encoded_object( $json,  $filename   [, \%options] )
   write_encoded_object( $json, \*FILEHANDLE [, \%options] )

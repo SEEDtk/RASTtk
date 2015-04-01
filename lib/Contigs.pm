@@ -29,7 +29,9 @@ package Contigs;
 This object contains the contigs for a specific genome. it provides methods for extracting
 DNA and exporting the contigs in different forms.
 
-The object is a subclass of L<Contigs> that gets the contig data from the L<Shrub> database.
+Although it is designed with the idea of managing a genome in mind, in fact any set of DNA
+sequences, even a single sequence, can be managed with this object. All that is required is
+that each sequence be given an ID.
 
 =over 4
 
@@ -49,6 +51,10 @@ Reference to a hash mapping each contig ID to its sequence.
 
 Reference to a hash mapping each contig ID to its length.
 
+=item genetic_code
+
+Genetic code for translating to proteins in these contigs.
+
 =back
 
 =head2 Special Methods
@@ -56,14 +62,43 @@ Reference to a hash mapping each contig ID to its length.
 =head3 new
 
     my $contigObj = Contigs->new($contigFile, %options);
+    my $contigObj = Contigs->new($ih, %options);
+    my $contigObj = Contigs->new(\$fastaString, %options);
+    my $contigObj = Contigs->new(undef, %options);
+    my $contigObj = Contigs->new(\@triples, %options);
 
-Create a contig object from a FASTA file.
+Create a contig object from a FASTA file or a list of triples.
 
 =over 4
 
-=item contigFile
+=item source
 
-Name of a FASTA file containing the contig DNA.
+The source can be any one of the following.
+
+=over 8
+
+=item *
+
+The name of a FASTA file containing the contig DNA.
+
+=item *
+
+An open file handle for the input FASTA file.
+
+=item *
+
+An undefined value (indicating the FASTA file is to be read from the standard input).
+
+=item *
+
+A string reference, indicating that the contents of a FASTA file are stored in the string.
+
+=item *
+
+A reference to an array of 3-tuples, each consisting of (0) a contig ID, (1) a comment, and
+(2) the contig's DNA sequence.
+
+=back
 
 =item options
 
@@ -75,7 +110,7 @@ A hash of options, containing zero or more of the following keys.
 
 ID of the relevant genome. If omitted, the default is C<unknown>.
 
-=item geneticCode
+=item genetic_code
 
 Genetic code of the contigs. If omitted, the default is C<11>.
 
@@ -87,9 +122,13 @@ Genetic code of the contigs. If omitted, the default is C<11>.
 
 sub new {
     # Get the parameters.
-    my ($class, $contigFile, $genomeID) = @_;
+    my ($class, $source, %options) = @_;
+    # Get the options.
+    my $genetic_code = $options{genetic_code} // 11;
+    my $genomeID = $options{genomeID} // 'unknown';
     # Read the specified FASTA file.
-    my $triplesList = gjoseqlib::read_fasta($contigFile);
+    ## TODO if source is an array ref, use it, otherwise, read_fasta it.
+    my $triplesList = gjoseqlib::read_fasta($source);
     # Use the triplets we just read to build the object.
     my %comments = map { $_->[0] => $_->[1] } @$triplesList;
     my %seqs = map { $_->[0] => $_->[2] } @$triplesList;
@@ -99,6 +138,7 @@ sub new {
         comments => \%comments,
         seqs => \%seqs,
         lens => \%lens,
+        genetic_code => $genetic_code,
     };
     # Bless and return it.
     bless $retVal, $class;
@@ -119,8 +159,8 @@ genome.
 
 =item locs
 
-A list of locations. These can be in the form of location strings or L<BasicLocation>
-objects.
+A list of locations. These can be in the form of location strings, database
+location 4-tuples, or L<BasicLocation> objects.
 
 =item RETURN
 
@@ -198,13 +238,23 @@ Reference to a hash of options describing the kmer. This includes the following 
 
 =item k
 
-Result length of the kmer. The default is C<30>.
+Length of the kmer. The default is C<30>.
 
 =item style
 
-Style of the kmer. The default is C<normal>, which is a normal kmer taken from the
-nucleotides at the current position. There is also C<2of3>, which constructs the
-kmer from the first two of every three nucleotides.
+Style of the kmer.
+
+=over 12
+
+=item normal
+
+Normal kmer taken from the nucleotides at the current position.
+
+=item 2of3
+
+The kmer is constructed from the first two of every three nucleotides.
+In this case, the output kmer will be 2/3 the length specified in the
+C<k> option.
 
 =back
 
@@ -235,8 +285,7 @@ sub kmer {
     my $style = $options->{style} // 'normal';
     # Create the kmer location.
     my $dir = ($revflag ? '-' : '+');
-    my $klen = (($style eq '2of3') ? ($k >> 1) + $k : $k);
-    my $kloc = BasicLocation->new($contigID, $pos, $dir, $klen);
+    my $kloc = BasicLocation->new($contigID, $pos, $dir, $k);
     # Verify that we're inside the contig.
     if ($kloc->Left > 0 && $kloc->Right <= $self->{lens}{$contigID}) {
         # Get the DNA.
@@ -280,7 +329,8 @@ scalar reference or computed from a list of locations.
 
 =item locs
 
-List of locations. These can be location strings or B<BasicLocation> objects.
+List of locations. These can be location strings, database location 4-tuples,
+or B<BasicLocation> objects.
 
 =item options
 
@@ -321,7 +371,13 @@ sub xlate {
         if (ref $locs[$#locs] eq 'HASH') {
             $options = pop @locs;
         }
-        ## TODO translate the protein
+        # Compute the fix flag and the genetic code.
+        my $fixFlag = $options->{fix} // 0;
+        my $code = $options->{code} // SeedUtils::genetic_code($self->{genetic_code});
+        # Extract the DNA.
+        my $dna = $self->dna(@locs);
+        # Perform the translation.
+        $retVal = SeedUtils::translate($dna, $code, $fixFlag);
     }
     # Return the protein sequence.
     return $retVal;
