@@ -126,9 +126,15 @@ sub new {
     # Get the options.
     my $genetic_code = $options{genetic_code} // 11;
     my $genomeID = $options{genomeID} // 'unknown';
-    # Read the specified FASTA file.
-    ## TODO if source is an array ref, use it, otherwise, read_fasta it.
-    my $triplesList = gjoseqlib::read_fasta($source);
+    # Determine how to get the list of contig triples.
+    my $triplesList;
+    if (ref $source eq 'ARRAY') {
+        # The parameter is already a list of triples.
+        $triplesList = $source;
+    } else {
+        # Here we have a FASTA source.
+        $triplesList = gjoseqlib::read_fasta($source);
+    }
     # Use the triplets we just read to build the object.
     my %comments = map { $_->[0] => $_->[1] } @$triplesList;
     my %seqs = map { $_->[0] => $_->[2] } @$triplesList;
@@ -147,6 +153,50 @@ sub new {
 
 
 =head2 Query Methods
+
+=head3 ids
+
+    my @ids = $contigs->ids();
+
+Return a list of the contig IDs for the contigs in this object.
+
+=cut
+
+sub ids {
+    # Get the parameters.
+    my ($self) = @_;
+    # Return the list of contig IDs.
+    return sort keys %{$self->{seqs}};
+}
+
+=head3 len
+
+    my $len = $contigs->len($contigID);
+
+Return the length of the specified contig.
+
+=over 4
+
+=item contigID
+
+ID of the desired contig.
+
+=item RETURN
+
+Returns the length of the specified contig, or 0 if the contig does not exist
+in this object.
+
+=back
+
+=cut
+
+sub len {
+    # Get the parameters.
+    my ($self, $contigID) = @_;
+    # Return the contig length.
+    return ($self->{lens}{$contigID} // 0);
+}
+
 
 =head3 dna
 
@@ -187,9 +237,11 @@ sub dna {
             push @retVal, '-' x $loc->Length;
         } else {
             # Yes. Extract the dna.
-            my $dna = substr($seqH->{$contigID}, $loc->Left, $loc->Length);
+            my $dna = substr($seqH->{$contigID}, $loc->Left - 1, $loc->Length);
             # If the direction is negative, reverse complement it.
-            SeedUtils::rev_comp(\$dna);
+            if ($loc->Dir eq '-') {
+                SeedUtils::rev_comp(\$dna);
+            }
             # Keep the result.
             push @retVal, $dna;
         }
@@ -255,6 +307,8 @@ Normal kmer taken from the nucleotides at the current position.
 The kmer is constructed from the first two of every three nucleotides.
 In this case, the output kmer will be 2/3 the length specified in the
 C<k> option.
+
+=back
 
 =back
 
