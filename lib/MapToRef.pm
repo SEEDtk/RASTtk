@@ -28,36 +28,10 @@ use gjoseqlib;
 
 =head1 project reference genome to a close strain
 
-    fast_project -r RererenceGenomeDir -g SkeletalGenomeDir [ options ]
-
-project a reference genome to call features
-
-
-=head2 Parameters
-
-## describe positional parameters
-
-The command-line options are those found in L<Shrub/script_options> and
-L<ScriptUtils/ih_options> plus the following.
-
-=over 4
-
-=item -r ReferenceGenomeDir
-
-a path to a SEED genome directory for the reference genome
-
-=item -g SkeletalGenomeDir
-
-a path to a skeletal SEED genome directory that must include
-
-    contigs
-    GENETIC_CODE (if not 11)
-
-=back
+This library provides utility methods used for projecting features from a
+reference genome to a closely-related genome.
 
 =cut
-
-## method documentation and code
 
 sub build_mapping {
     my ( $k, $r_tuples, $g_tuples ) = @_;
@@ -309,10 +283,56 @@ sub seq_of {
     }
 }
 
+=head3 build_features
+
+    my $featureList = MapToRef::build_features($map, \@gContigs, \@features, $gCode);
+
+Compute the projected features for a target set of contigs using a map of pinned correspondences.
+For each feature in the reference genome, we use the map to determine if there is a corresponding
+DNA sequence in the target genome. If we find one, we presume the found region in the target genome
+is an instance of the reference feature, and we project a feature at the new location. The output
+of this method is a list of those features.
+
+=over 4
+
+=item map
+
+The map is a list of location correspondences in the two genomes (reference and target)
+computed using kmers. Each entry in the list is a pair of 3-tuples. Each 3-tuple consists of
+(0) a contig ID, (1) a strand, and (2) a 0-based position in the contig. The first 3-tuple
+is for the reference genome and the second for the target genome. The existence of a pair
+indicates a correspondence (pin) between the two positions.
+
+=item g_tuples
+
+A list of 3-tuples representing the contigs for the target genome. Each 3-tuple consists of
+(0) a contig ID, (1) a comment (not used), and (2) the DNA sequence.
+
+=item features
+
+A list of features from the reference genome. For each feature, we have a 4-tuple consisting of
+(0) the ID, (1) the type, (2) the location tuple, and (3) the functional assignment. Each location
+tuple consists of (0) the contig ID, (1) the 1-based start position, (2) the strand, and (3) the
+length.
+
+=item genetic_code
+
+The genetic code of the target genome.
+
+=item RETURN
+
+This method returns a list of proposed features for the target genome. Each feature is represented as
+a 5-tuple containing (0) the type, (1) the location tuple, (2) the functional assignment, (3) the ID
+of the source feature in the representative genome, and (4) the sequence. For a peg, the sequence will be
+a protein sequence.
+
+=back
+
+=cut
+
+
 sub build_features {
     my ( $map, $g_tuples, $features, $genetic_code ) = @_;
-
-    #my ( $map, $refD, $genomeD, $g_tuples, $genetic_code ) = @_;
 
     my %g_seqs = map { ( $_->[0] => $_->[2] ) } @$g_tuples;
 

@@ -39,13 +39,10 @@ that each sequence be given an ID.
 
 ID of the relevant genome.
 
-=item comments
+=item triples
 
-Reference to a hash mapping each contig ID to its comment.
-
-=item seqs
-
-Reference to a hash mapping each contig ID to its sequence.
+Reference to a hash mapping each contig ID to a 3-tuple consisting of (0) the contig ID, (1) the comment,
+and (2) the DNA sequence.
 
 =item lens
 
@@ -66,6 +63,7 @@ Genetic code for translating to proteins in these contigs.
     my $contigObj = Contigs->new(\$fastaString, %options);
     my $contigObj = Contigs->new(undef, %options);
     my $contigObj = Contigs->new(\@triples, %options);
+    my $contigObj = Contigs->new($gto, %options);
 
 Create a contig object from a FASTA file or a list of triples.
 
@@ -97,6 +95,10 @@ A string reference, indicating that the contents of a FASTA file are stored in t
 
 A reference to an array of 3-tuples, each consisting of (0) a contig ID, (1) a comment, and
 (2) the contig's DNA sequence.
+
+=item *
+
+A L<GenomeTypeObject> containing contig information.
 
 =back
 
@@ -136,13 +138,11 @@ sub new {
         $triplesList = gjoseqlib::read_fasta($source);
     }
     # Use the triplets we just read to build the object.
-    my %comments = map { $_->[0] => $_->[1] } @$triplesList;
-    my %seqs = map { $_->[0] => $_->[2] } @$triplesList;
+    my %triples = map { $_->[0] => $_ } @$triplesList;
     my %lens = map { $_->[0] => length($_->[2]) } @$triplesList;
     my $retVal = {
         genome => $genomeID,
-        comments => \%comments,
-        seqs => \%seqs,
+        triples => \%triples,
         lens => \%lens,
         genetic_code => $genetic_code,
     };
@@ -166,7 +166,7 @@ sub ids {
     # Get the parameters.
     my ($self) = @_;
     # Return the list of contig IDs.
-    return sort keys %{$self->{seqs}};
+    return sort keys %{$self->{triples}};
 }
 
 =head3 len
@@ -231,13 +231,13 @@ sub dna {
         # Get the contig ID.
         my $contigID = $loc->Contig;
         # Does the contig exist?
-        my $seqH = $self->{seqs};
+        my $seqH = $self->{triples};
         if (! exists $seqH->{$contigID}) {
             # No. Return a bunch of hyphens.
             push @retVal, '-' x $loc->Length;
         } else {
             # Yes. Extract the dna.
-            my $dna = substr($seqH->{$contigID}, $loc->Left - 1, $loc->Length);
+            my $dna = substr($seqH->{$contigID}[2], $loc->Left - 1, $loc->Length);
             # If the direction is negative, reverse complement it.
             if ($loc->Dir eq '-') {
                 SeedUtils::rev_comp(\$dna);
@@ -437,4 +437,19 @@ sub xlate {
     return $retVal;
 }
 
+
+=head3 tuples
+
+    my @tuples = $contigs->tuples;
+
+Return a list of 3-tuples representing these contigs. Each 3-tuple will consist of (0) the contig
+ID, (1) the comment, and (2) the dna sequence.
+
+=cut
+
+sub tuples {
+    # Get the parameters.
+    my ($self) = @_;
+    return map { $self->{triples}{$_} } sort keys %{$self->{triples}};
+}
 1;
