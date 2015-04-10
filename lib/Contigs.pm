@@ -133,6 +133,9 @@ sub new {
     if (ref $source eq 'ARRAY') {
         # The parameter is already a list of triples.
         $triplesList = $source;
+    } elsif (ref $source eq 'GenomeTypeObject') {
+        # The parameter is a GenomeTypeObject.
+        $triplesList = [$source->contigs];
     } else {
         # Here we have a FASTA source.
         $triplesList = gjoseqlib::read_fasta($source);
