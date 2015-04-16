@@ -28,6 +28,7 @@ use MapToRef;
 use GenomeTypeObject;
 use gjoseqlib;
 use Time::HiRes qw(gettimeofday);
+use File::Slurp;
 
 =head1 Project Features from a Reference Genome to a Close Strain
 
@@ -69,7 +70,12 @@ The name of the SEED containing the reference genome. The default is the core SE
 
 =item reference
 
-The ID of the reference genome. This genome must exist in the named SEED.
+The ID of the reference genome that. This genome must exist in the named SEED.
+
+=item refFile
+
+The name of a file containing the reference genome as a L<GenomeTypeObject> in JSON
+format. This parameter will override C<reference>.
 
 =item kmersize
 
@@ -97,72 +103,81 @@ The ID of the target genome. This is only necessary if the target genome is in F
 
 =cut
 
-## TODO test in FASTA mode
-
 # Get the names of the SEEDs we support.
 my $seeds = SeedURLs::names();
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts(
         '',
         ScriptUtils::ih_options(),
-        [ 'seed|s=s',   "name of a SEED ($seeds), or a SEED URL", { default => 'core' } ],
-        [ 'reference|r=s', 'Id of the Reference Genome', { required => 1 } ],
+        [ 'seed|s=s',      "name of a SEED ($seeds), or a SEED URL", { default => 'core' } ],
+        [ 'reference|r=s', 'Id of the Reference Genome'],
+        [ 'refFile|f=s',   'file containing the reference genome'],
         [ 'kmersize|k=i',  'Number of base pairs per kmer', { default => 30 }],
         [ 'annotator|a=s', 'string to use for the annotator name in new features'],
         [ 'idprefix=s',    'prefix to use for new IDs, including genome ID or other identifying information'],
         [ 'format|fmt=s',  'format of the input file-- "gto" or "fasta"', { default => 'gto' }],
         [ 'gid|g=s',       'ID of the target genome', { default => 'new_genome' }],
 );
-
-my $seed    = $opt->seed;
-
-my $where = SeedURLs::url( $seed );
-if ( ! $where )
-{
-    die "Specified seed $seed not found.";
+my $ref_text;
+if ($opt->reffile) {
+    $ref_text = File::Slurp::read_file($opt->reffile);
 } else {
+    my $seed    = $opt->seed;
 
-    my $refId    = $opt->reference;
+    my $where = SeedURLs::url( $seed );
+    if ( ! $where )
+    {
+        die "Specified seed $seed not found.";
+    } else {
 
-    my $ref_text = LWP::Simple::get( "$where/genome_object.cgi?genome=$refId" );
-
-    my $json  = JSON::XS->new;
-    my $ref_gto = $json->decode($ref_text);
-    $ref_gto = GenomeTypeObject->initialize($ref_gto);
-
-    my $k        = $opt->kmersize;
-
-    my $genetic_code = $ref_gto->{genetic_code};
-    my $ih       = ScriptUtils::IH($opt->input);
-    my $g_gto;
-    if ($opt->format eq 'gto') {
-        # Create the GTO from a JSON input file.
-        $g_gto = GenomeTypeObject->create_from_file($ih);
-        $g_gto->setup_id_allocation();
-    } elsif ($opt->format eq 'fasta') {
-        # Create a new, blank GTO.
-        $g_gto = GenomeTypeObject->new();
-        $g_gto->set_metadata(id => $opt->gid, genetic_code => $genetic_code);
-        # Read the contigs from a FASTA file.
-        my @contigs = read_fasta($ih);
-        $g_gto->add_contigs(\@contigs);
+        my $refId    = $opt->reference;
+        if (! $refId) {
+            die "No reference genome specified.";
+        } else {
+            $ref_text = LWP::Simple::get( "$where/genome_object.cgi?genome=$refId" );
+        }
     }
-    $genetic_code = $g_gto->{genetic_code};
-    my @ref_tuples = map { [$_->{id},'',$_->{dna}] } $ref_gto->contigs;
-    my @g_tuples   = map { [$_->{id},'',$_->{dna}] } $g_gto->contigs;
-
-    my $map = &MapToRef::build_mapping($k, \@ref_tuples, \@g_tuples );
-    my @ref_features =  map { my $loc = $_->{location};
-                                (@$loc == 1) ? [$_->{id}, $_->{type}, $loc->[0], $_->{function} ] : () }
-                            $ref_gto->features;
-
-    my $gFeatures = &MapToRef::build_features($map, \@g_tuples, \@ref_features, $genetic_code);
-    # Add the features to the output genome.
-    my ($count,$num_pegs) = add_features_to_gto($g_gto, $gFeatures, $opt);
-    print STDERR "$count features added to genome.\n";
-    print STDERR "$num_pegs pegs added to genome.\n";
-    $g_gto->destroy_to_file(\*STDOUT);
 }
+my $json  = JSON::XS->new;
+my $ref_gto = $json->decode($ref_text);
+
+$ref_gto = GenomeTypeObject->initialize($ref_gto);
+
+
+my $k        = $opt->kmersize;
+
+my $genetic_code = $ref_gto->{genetic_code};
+my $ih       = ScriptUtils::IH($opt->input);
+my $g_gto;
+if ($opt->format eq 'gto') {
+    # Create the GTO from a JSON input file.
+    $g_gto = GenomeTypeObject->create_from_file($ih);
+    $g_gto->setup_id_allocation();
+} elsif ($opt->format eq 'fasta') {
+    # Create a new, blank GTO.
+    $g_gto = GenomeTypeObject->new();
+    $g_gto->set_metadata({id => $opt->gid, genetic_code => $genetic_code});
+    # Read the contigs from a FASTA file.
+    my @contigs = map { {id => $_->[0], dna => $_->[2]} } read_fasta($ih);
+    $g_gto->add_contigs(\@contigs);
+}
+$genetic_code = $g_gto->{genetic_code};
+my @ref_tuples = map { [$_->{id},'',$_->{dna}] } $ref_gto->contigs;
+my @g_tuples   = map { [$_->{id},'',$_->{dna}] } $g_gto->contigs;
+
+my $map = &MapToRef::build_mapping($k, \@ref_tuples, \@g_tuples );
+my @ref_features =  map { my $loc = $_->{location};
+                            (@$loc == 1) ? [$_->{id}, $_->{type}, $loc->[0], $_->{function} ] : () }
+                        $ref_gto->features;
+
+my $gFeatures = &MapToRef::build_features($map, \@g_tuples, \@ref_features, $genetic_code);
+# Add the features to the output genome.
+my ($count,$num_pegs) = add_features_to_gto($g_gto, $gFeatures, $opt);
+print STDERR "$count features added to genome.\n";
+print STDERR "$num_pegs pegs added to genome.\n";
+$g_gto->destroy_to_file(\*STDOUT);
+
+
 
 =head2 Internal Subroutines
 
