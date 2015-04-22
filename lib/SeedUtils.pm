@@ -297,7 +297,6 @@ then the return is TRUE if I<$x> >= I$<$y> >= I<$z>.
 
 #: Return Type $;
 sub between {
-    shift if UNIVERSAL::isa($_[0],__PACKAGE__);
     my($x,$y,$z) = @_;
 
     if ($x < $z) {
