@@ -441,6 +441,12 @@ sub add_feature {
     return $feature;
 }
 
+=head2 $obj->write_protein_translations_to_file($filename)
+
+Write the protein translations to a FASTA file.
+
+=cut
+
 sub write_protein_translations_to_file
 {
     my($self, $filename) = @_;
@@ -455,6 +461,26 @@ sub write_protein_translations_to_file
         {
             write_fasta($fh, [$feature->{id}, undef, $trans]);
         }
+    }
+    close($fh);
+}
+
+=head2 $obj->write_contigs_to_file($filename)
+
+Write the contigs to a FASTA file.
+
+=cut
+
+sub write_contigs_to_file
+{
+    my ($self, $filename) = @_;
+
+    my $fh;
+    open($fh, ">", $filename) or die "Cannot write $filename: $!";
+
+    for my $ctg (@{$self->{contigs}})
+    {
+        write_fasta($fh, [$ctg->{id}, undef, $ctg->{dna}]);
     }
     close($fh);
 }

@@ -113,7 +113,7 @@ A 4-tuple consisting of (0) a contig ID, (1) the leftmost point of the location,
 
 =back
 
-    my $loc = BasicLocation->new($contigID, $beg, $dir, $len, $augments, $parentLocation, $idx);
+    my $loc = BasicLocation->new($contigID, $beg, $dir, $len);
 
 Construct a location from specific data elements, in particular the contig ID, the starting
 offset, the direction, and the length.
