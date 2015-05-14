@@ -1,5 +1,9 @@
 package gjoseqlib;
 
+#
+# This is a SAS component.
+#
+
 =head1 Sequence-IO Utilities
 
 A sequence entry is ( $id, $def, $seq )
