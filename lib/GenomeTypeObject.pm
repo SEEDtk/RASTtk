@@ -155,6 +155,7 @@ object as defined in the GenomeAnnotation typespec:
   string source_id;
   int ncbi_taxonomy_id;
   string taxonomy;
+  string owner;
  } genome_metadata
 
 =cut
@@ -163,7 +164,7 @@ sub set_metadata
 {
     my($self, $meta) = @_;
 
-    my @keys = qw(id scientific_name domain genetic_code source source_id taxonomy ncbi_taxonomy_id);
+    my @keys = qw(id scientific_name domain genetic_code source source_id taxonomy ncbi_taxonomy_id owner);
     for my $k (@keys)
     {
         if (exists($meta->{$k}))
@@ -374,6 +375,7 @@ sub add_feature {
     my $id_client   = $parms->{-id_client};
     my $id_prefix   = $parms->{-id_prefix};
     my $type        = $parms->{-type}       or die "No feature-type -type";
+    my $id_type	    = $parms->{-id_type};
     my $location    = $parms->{-location}   or die "No feature location -location";
     my $function    = $parms->{-function};
     my $annotator   = $parms->{-annotator}  || q(Nobody);
@@ -393,7 +395,18 @@ sub add_feature {
         {
             $id_client = $self->{_id_client};
         }
-        my $typed_prefix = "$id_prefix.$type";
+
+	# 
+	# If our id prefix is a bare \d+\.\d+ genome ID, prefix the
+	# id prefix with fig| to create SEED style identifiers.
+	#
+
+	if ($id_prefix =~ /^\d+\.\d+$/)
+	{
+	    $id_prefix = "fig|" . $id_prefix;
+	}
+
+        my $typed_prefix = "$id_prefix." . (defined($id_type) ? $id_type : $type);
         my $next_num     = $id_client->allocate_id_range($typed_prefix, 1);
         # print STDERR Dumper($typed_prefix, $next_num);
 
