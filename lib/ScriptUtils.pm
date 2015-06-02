@@ -238,5 +238,52 @@ sub GetBatch {
     return @retVal;
 }
 
+=head3 GetColumn
+
+    my $id = ScriptThing::GetColumn($line, $column);
+
+Get the specified column from a tab-delimited input line.
+
+=over 4
+
+=item line
+
+A tab-delimited line of text.
+
+=item column
+
+The index (1-based) of the column whose value is desired. If undefined or 0,
+then the last column will be extracted.
+
+=item RETURN
+
+Returns the value of the desired column. Note that if it is the last column, no
+trimming of new-line characters will take place.
+
+=back
+
+=cut
+
+sub GetColumn {
+    # Get the parameters.
+    my ($line, $column) = @_;
+    # Declare the return variable.
+    my $retVal;
+    # Are we looking for a specific column or the last one?
+    if ($column) {
+        # We want a specific column.
+        my @cols = split /\t/, $line;
+        $retVal = $cols[$column - 1];
+    } else {
+        # We want the last column.
+        if ($line =~ /.*\t(.+)$/) {
+            $retVal = $1;
+        } else {
+            $retVal = $line;
+        }
+    }
+    # Return the result.
+    return $retVal;
+}
 
 1;
