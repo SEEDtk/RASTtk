@@ -168,4 +168,75 @@ sub Opts {
     return $retVal;
 }
 
+=head3 GetBatch
+
+    my @lines = ScriptUtils::GetBatch($ih, $size);
+
+Get a batch of work to do. The specified input stream will be read, and a
+list of IDs pulled out, along with the contents of the input lines on
+which the IDs were found. The input stream can be an open file handle or a
+list of singleton values to return.
+
+=over 4
+
+=item ih
+
+Open input file handle, or alternatively a reference to a list of values to return.
+If a list is specified, the items will be removed from the list as they are returned.
+
+=item size (optional)
+
+Maximum permissible batch size. If omitted, the default is C<1000>.
+
+=item column (optional)
+
+Index (1-based) of the column containing the IDs. The default is the last
+column.
+
+=item RETURN
+
+Returns a list of 2-tuples; each 2-tuple consists of an ID followed by the text
+of the input line containing the ID (with the trailing new-line removed).
+
+=back
+
+=cut
+
+sub GetBatch {
+    # Get the parameters.
+    my ($ih, $size, $column) = @_;
+    # Declare the return variable.
+    my @retVal;
+    # Compute the batch size.
+    my $linesLeft = $size || 1000;
+    # Determine the mode in which we're operating.
+    if (ref $ih eq 'ARRAY') {
+        # Here we have a list reference. Loop through it until we run out or fill
+        # the batch.
+        while ($linesLeft-- > 0 && @$ih > 0) {
+            # Get the next list entry.
+            my $id = shift @$ih;
+            # Put it in the return list as the desired ID and the line it appeared on.
+            push @retVal, [$id, $id];
+        }
+    } else {
+        # Loop through the input until we run out or fill the batch.
+        while ($linesLeft-- > 0 && ! eof $ih) {
+            # Get the next input line.
+            my $line = <$ih>;
+            chomp $line;
+            # Only proceed if it's nonblank.
+            if ($line =~ /\S/) {
+                # We'll put our desired column in here.
+                my $id = GetColumn($line, $column);
+                # Put it in the return list.
+                push @retVal, [$id, $line];
+            }
+        }
+    }
+    # Return the result.
+    return @retVal;
+}
+
+
 1;
