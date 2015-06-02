@@ -152,6 +152,21 @@ sub abbrev {
     }
 }
 
+=head3 probably_active
+
+    my $activeFlag = SeedUtils::probably_active($vc);
+
+Return TRUE if the specified variant code is most likely for an active variant, else FALSE.
+
+=cut
+
+sub probably_active {
+    my($vc) = @_;
+
+    return $vc !~ /^(inactive|-1|\*-1|0|\*0)$/;
+}
+
+
 =head3 abbrev_set
 
     my $abbrevH = SeedUtils::abbrev_set($genome_names);
