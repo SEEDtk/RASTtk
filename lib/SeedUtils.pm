@@ -2562,7 +2562,7 @@ sub read_encoded_object
     }
     elsif ( ! defined $encoded_file || $encoded_file eq '' )
     {
-        $handle = \*STDOUT;
+        $handle = \*STDIN;
     }
     else
     {
