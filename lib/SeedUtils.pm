@@ -152,37 +152,6 @@ sub abbrev {
     }
 }
 
-=head3 fields_of
-
-    my @fields = SeedUtils::fields_of($ih);
-
-Extract the fields from a tab-delimited input line. The input line is read from an open file handle.
-
-=over 4
-
-=item ih
-
-Open input file handle.
-
-=item RETURN
-
-Returns a list consisting of the tab-delimited fields found in the record read, or an empty list if we are at end-of-file.
-
-=back
-
-=cut
-
-sub fields_of {
-    my ($ih) = @_;
-    my @retVal;
-    if (! eof $ih) {
-        my $line = <$ih>;
-        chomp $line;
-        @retVal = split /\t/, $line;
-    }
-    return @retVal;
-}
-
 =head3 probably_active
 
     my $activeFlag = SeedUtils::probably_active($vc);
@@ -2148,6 +2117,31 @@ sub strip_func_comment {
     }
 }
 
+=head3 canonical_function
+
+    $clean_function = canonical_function($function);
+
+Functions with leading space, trailing space, tabs, etc. need to be cleaned.
+
+=cut
+
+#  Functions with leading space, trailing space, tabs, etc. need to be cleaned
+#
+#      $function = canonical_function( $function );
+#
+sub canonical_function
+{
+    return undef if ! defined $_[0];
+
+    local $_ = shift;
+    s/^\s+//;     # no leading space
+    s/\s+$//;     # no trailing space
+    s/\s+/ /sg;   # whitespace of any form becomes a single space character
+    s/\s;/;/g;    # no space before semicolon
+    $_;
+}
+
+
 =head3 verify_db
 
     verify_db($db, $type);
@@ -2562,7 +2556,7 @@ sub read_encoded_object
     }
     elsif ( ! defined $encoded_file || $encoded_file eq '' )
     {
-        $handle = \*STDIN;
+        $handle = \*STDOUT;
     }
     else
     {
@@ -2580,43 +2574,6 @@ sub read_encoded_object
     }
 
     return $obj;
-}
-
-=head3 read_ids
-
-    my @ids = SeedUtils::read_ids($fileName);
-
-Read a list of IDs from a tab-delimited file. The IDs are taken from the first column of each record.
-
-=over 4
-
-=item fileName
-
-Name of the file from which to read the IDs.
-
-=item RETURN
-
-Returns a list of the IDs read.
-
-=back
-
-=cut
-
-sub read_ids {
-    my ($fileName) = @_;
-    # Open the file.
-    open(my $ih, "<", $fileName) || die "Could not open $fileName: $!";
-    # This will contain the return list.
-    my @retVal;
-    # Loop through it.
-    while (! eof $ih) {
-        my $line = <$ih>;
-        chomp $line;
-        my ($id) = split /\t/, $line;
-        push @retVal, $id;
-    }
-    # Return the list of IDs.
-    return @retVal;
 }
 
 1;
