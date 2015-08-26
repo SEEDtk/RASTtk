@@ -56,7 +56,7 @@ the C<prepare_for_return()> method which strips these indexes out of the data ob
 use strict;
 use warnings;
 use SeedUtils;
-require SeedAware;
+use SeedAware;
 use File::Temp;
 use File::Slurp;
 use JSON::XS;
