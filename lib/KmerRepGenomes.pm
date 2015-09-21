@@ -199,6 +199,7 @@ sub FindGenomes {
     my $objects = SeedUtils::read_encoded_object($self->{fileName});
     my $kmerHash = $objects->{kmers};
     my $gHash = $objects->{genomes};
+    print "Kmer database read from $self->{fileName}.\n";
     # Count the contigs processed.
     my $contigCount = 0;
     # Open the FASTA file.
@@ -206,8 +207,9 @@ sub FindGenomes {
     if (ref $fastaFile eq 'GLOB') {
         $ih = $fastaFile;
     } else {
-        open(my $ih, "<", $fastaFile) || die "Could not open fasta file $fastaFile: $!";
+        open($ih, "<", $fastaFile) || die "Could not open fasta file $fastaFile: $!";
     }
+    print "Processing FASTA input.\n";
     # Loop through the contigs.
     my @seqs;
     while (! eof $ih) {
