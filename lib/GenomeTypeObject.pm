@@ -423,10 +423,10 @@ sub hostname
 {
     my($self) = @_;
 
-    return $self->{hostname} if $self->{hostname};
-    $self->{hostname} = SeedAware::run_gathering_output( 'hostname' );
-    chomp $self->{hostname};
-    return $self->{hostname};
+    return $self->{_hostname} if $self->{_hostname};
+    $self->{_hostname} = SeedAware::run_gathering_output( 'hostname' );
+    chomp $self->{_hostname};
+    return $self->{_hostname};
 }
 
 
@@ -465,9 +465,22 @@ sub update_feature_index
 
     if ( keys %$feature_index != @{$self->features} )
     {
-        my $nftr = $self->features;
+        my $nftr = @{$self->features};
         my $nind = keys %$feature_index;
-        die "Number of features ($nftr) not equal to index size ($nind). Duplicate ids?";
+
+	my %seen;
+	$seen{$_->{id}}++ foreach @{$self->features};
+	my @dups = grep { $seen{$_} > 1 } keys %seen;
+	my $n = 10;
+	my $extra;
+	if (@dups > $n)
+	{
+	    $#dups = $n-1;
+	    $extra = "...";
+	}
+	my $ndups = @dups;
+
+        die "Number of features ($nftr) not equal to index size ($nind). $ndups duplicate ids: \n@dups$extra";
     }
 
     return $feature_index;
@@ -1401,14 +1414,9 @@ sub seed_location_to_location_list
     return wantarray ? @locs : \@locs;
 }
 
-#
-# Renumber the features such that they are in order along the contigs.
-#
-# We use the order of the contigs in the contigs to set the overall ordering.
-#
-sub renumber_features
+sub sorted_features
 {
-    my($self, $user, $event_id) = @_;
+    my($self) = @_;
 
     my %contig_order;
     my $i = 0;
@@ -1419,32 +1427,52 @@ sub renumber_features
 
 
     my @f = sort {
-        my($ac, $apos) = sort_position($a);
-        my($bc, $bpos) = sort_position($b);
-        ($a->{type} cmp $b->{type}) or
-        ($contig_order{$ac} <=> $contig_order{$bc}) or
-        $apos <=> $bpos } @{$self->{features}};
+        my($ac, $apos, $atype) = sort_position($a);
+        my($bc, $bpos, $btype) = sort_position($b);
+	($contig_order{$ac} <=> $contig_order{$bc}) or
+	    $apos <=> $bpos or
+		($atype cmp $btype) 
+		} @{$self->{features}};
+    return wantarray ? @f : \@f;
+}
 
+
+#
+# Renumber the features such that they are in order along the contigs.
+#
+# We use the order of the contigs in the contigs to set the overall ordering.
+#
+sub renumber_features
+{
+    my($self, $user, $event_id) = @_;
+
+    my @f = $self->sorted_features();
     my $nf = [];
 
-    my $id = 1;
-    my $last_type = '';
+    my %next_id;
+
     for my $f (@f)
     {
         my $loc = join(",",map { my($contig,$beg,$strand,$len) = @$_;
                                  "$contig\_$beg$strand$len"
                                } @{$f->{location}});
 
-        my($c, $left) = sort_position($f);
+        my($c, $left, $type) = sort_position($f);
 
-        if ($f->{type} ne $last_type)
-        {
-            $id = 1;
-            $last_type = $f->{type};
-        }
+	my $id;
+	if (exists $next_id{$type})
+	{
+	    $id = $next_id{$type}++;
+	}
+	else
+	{
+	    $id = 1;
+	    $next_id{$type} = 2;
+	}
+	    
         if ($f->{id} =~ /(.*\.)(\d+)$/)
         {
-            my $new_id = $1 . $id++;
+            my $new_id = $1 . $id;
 
             my $annotation = ["Feature renumbered from $f->{id} to $new_id", $user, scalar gettimeofday, $event_id];
             push(@{$f->{annotations}}, $annotation);
@@ -1488,7 +1516,8 @@ sub sort_position
         }
         $min = (defined($min) && $min < $left) ? $min : $left;
     }
-    return ($contig, $min);
+    my ($type) = $f->{id} =~ /\.([^.]+)\.\d+$/;
+    return ($contig, $min, $type || $f->{type});
 }
 
 
@@ -1551,6 +1580,46 @@ sub mid_point
     my @cont_mid_dir_len = ( $contig, 0.5 * ($min+$max), $dir, $max-$min+1 );
 
     wantarray ? @cont_mid_dir_len : \@cont_mid_dir_len;
+}
+
+sub bounds
+{
+    my( $f ) = @_;
+
+    my ( $contig, $min, $max, $dir );
+
+    for my $l (@{$f->{location}})
+    {
+        my( $c, $beg, $str, $len ) = @$l;
+        $len ||= 1;
+
+        if    ( ! defined $contig ) { $contig = $c }
+        elsif ( $contig ne $c )     { next }
+
+        if    ( ! defined $dir )    { $dir = $str }
+        elsif ( $dir ne $str )      { next }
+
+        if ($str eq '+')
+        {
+            if    ( ! defined $min ) { $min = $beg }
+            elsif ( $beg < $min )    { last }
+
+            my $right = $beg + $len - 1;
+            if ( ! defined $max || $right >= $max ) { $max = $right }
+        }
+        else
+        {
+            if    ( ! defined $max ) { $max = $beg }
+            elsif ( $beg > $max )    { last }
+
+            my $left = $beg - $len + 1;
+            if ( ! defined $min || $left <= $min ) { $min = $left }
+        }
+    }
+
+    my @bounds = ( $contig, $min, $max, $dir, $max-$min+1 );
+
+    wantarray ? @bounds : \@bounds;
 }
 
 sub get_creation_info
@@ -1759,5 +1828,15 @@ sub feature_quality_data
     $ftr ? $ftr->{quality} : {};
 }
 
+sub flattened_feature_aliases
+{
+    my($self, $feature) = @_;
+    my @aliases = ref($feature->{aliases}) ? @{$feature->{aliases}} : ();
+    if (ref($feature->{alias_pairs}))
+    {
+	push(@aliases, map { join(":", @$_) } @{$feature->{alias_pairs}});
+    }
+    return @aliases;
+}
 
 1;
