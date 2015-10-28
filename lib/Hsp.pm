@@ -409,5 +409,29 @@ sub sloc {
     return $retVal;
 }
 
+=head3 qloc
+
+    my $qloc = $hsp->qloc;
+
+Return the match region of the query sequence as a L<BasicLocation> object.
+
+=cut
+
+sub qloc {
+    my ($self) = @_;
+    my $retVal;
+    my $contig = $self->qid;
+    my $q1 = $self->q1;
+    my $q2 = $self->q2;
+    if ($q1 == $q2) {
+        $retVal = BasicLocation->new($contig, $q1, $self->dir, 1);
+    } elsif ($q1 < $q2) {
+        $retVal = BasicLocation->new($contig, $q1, '+', $q2 + 1 - $q1);
+    } else {
+        $retVal = BasicLocation->new($contig, $q1, '-', $q1 + 1 - $q2);
+    }
+    return $retVal;
+}
+
 
 1;
