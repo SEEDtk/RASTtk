@@ -234,9 +234,12 @@ sub FindGenomes {
     # Save the genomes with a lot of hits.
     my $minHits = $self->{minHits};
     my %retVal;
-    for my $genome (keys %hits) {
+    for my $genome (sort keys %hits) {
         if ($hits{$genome} >= $minHits) {
             $retVal{$genome} = [$hits{$genome}, $gHash->{$genome}];
+            print "$genome kept.\n"; ##TODO delete this line
+        } else {
+            print "$genome has too few hits.\n"; ##TODO delete this line
         }
     }
     # Return the set of genomes found.
@@ -280,12 +283,17 @@ sub ProcessHits {
     # Loop through it, counting hits.
     my $n = length($seq) - $kmerSize;
     for (my $i = 0; $i <= $n; $i++) {
-        my $kmer = SeedUtils::translate(substr($seq, $i, $kmerSize));
-        my $genomes = $kmerHash->{$kmer};
-        if ($genomes) {
-            for my $genome (@$genomes) {
-                $hits->{$genome}++;
+        my $dna = substr($seq, $i, $kmerSize);
+        my $kmer1 = SeedUtils::translate($dna);
+        my $kmer2 = SeedUtils::translate(SeedUtils::rev_comp($dna));
+        for my $kmer ($kmer1, $kmer2) {
+            my $genomes = $kmerHash->{$kmer};
+            if ($genomes) {
+                for my $genome (@$genomes) {
+                    $hits->{$genome}++;
+                }
             }
+
         }
     }
 }
