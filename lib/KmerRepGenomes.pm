@@ -125,7 +125,6 @@ sub new {
             my @tuples = $shrub->GetAll('Function2Feature Feature Protein AND Feature Feature2Genome',
                     'Function2Feature(from-link) = ? AND Function2Feature(security) = ?',
                     [$role, $priv], 'Feature2Genome(to-link) Protein(sequence)');
-            print "Processing $role. " . scalar(@tuples) . " proteins found.\n";
             # Loop through the proteins.
             for my $tuple (@tuples) {
                 my ($genome, $seq) = @$tuple;
@@ -199,7 +198,6 @@ sub FindGenomes {
     my $objects = SeedUtils::read_encoded_object($self->{fileName});
     my $kmerHash = $objects->{kmers};
     my $gHash = $objects->{genomes};
-    print "Kmer database read from $self->{fileName}.\n";
     # Count the contigs processed.
     my $contigCount = 0;
     # Open the FASTA file.
@@ -209,7 +207,6 @@ sub FindGenomes {
     } else {
         open($ih, "<", $fastaFile) || die "Could not open fasta file $fastaFile: $!";
     }
-    print "Processing FASTA input.\n";
     # Loop through the contigs.
     my @seqs;
     while (! eof $ih) {
@@ -218,9 +215,6 @@ sub FindGenomes {
             # Here we have a header line. Process the old contig.
             $self->ProcessHits($kmerHash, \%hits, \@seqs);
             $contigCount++;
-            if ($contigCount % 100 == 0) {
-                print "$contigCount contigs processed.\n";
-            }
             # Start a new one.
             @seqs = ();
         } else {
