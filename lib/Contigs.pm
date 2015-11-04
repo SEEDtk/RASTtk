@@ -455,4 +455,30 @@ sub tuples {
     my ($self) = @_;
     return map { $self->{triples}{$_} } sort keys %{$self->{triples}};
 }
+
+=head3 contig_dna
+
+    my $dna = $contigs->contig_dna($contigID);
+
+Return the entire DNA sequence of a single contig.
+
+=over 4
+
+=item contigID
+
+ID of the desired contig.
+
+=item RETURN
+
+Returns the DNA sequence of the identified contig.
+
+=back
+
+=cut
+
+sub contig_dna {
+    my ($self, $contigID) = @_;
+    return $self->{triples}{$contigID}[2];
+}
+
 1;
