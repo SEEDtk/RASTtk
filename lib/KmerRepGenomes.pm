@@ -237,9 +237,6 @@ sub FindGenomes {
     for my $genome (sort keys %hits) {
         if ($hits{$genome} >= $minHits) {
             $retVal{$genome} = [$hits{$genome}, $gHash->{$genome}];
-            print "$genome kept.\n"; ##TODO delete this line
-        } else {
-            print "$genome has too few hits.\n"; ##TODO delete this line
         }
     }
     # Return the set of genomes found.
