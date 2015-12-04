@@ -19,6 +19,9 @@
 package KmerRepGenomes;
 
     use strict;
+    use Data::Dumper;
+    use Carp;
+    use gjoseqlib;
     use warnings;
     use SeedUtils;
 
@@ -116,7 +119,7 @@ sub new {
     my $maxFound = $options{maxFound} // 10;
     my $priv = $options{priv} // 1;
     # Do we need to rebuild?
-    if ($force || ! -f $kmerFile) {
+    if ($force || ! -s $kmerFile) {
         # This is our working copy of the kmer hash.
         my %kmerHash;
         # Yes we must rebuild. Loop through the roles.
@@ -207,24 +210,11 @@ sub FindGenomes {
     } else {
         open($ih, "<", $fastaFile) || die "Could not open fasta file $fastaFile: $!";
     }
-    # Loop through the contigs.
-    my @seqs;
-    while (! eof $ih) {
-        my $line = <$ih>;
-        if ($line =~ /^>(\S+)/) {
-            # Here we have a header line. Process the old contig.
-            $self->ProcessHits($kmerHash, \%hits, \@seqs);
-            $contigCount++;
-            # Start a new one.
-            @seqs = ();
-        } else {
-            # Here we have a data line. Save its value.
-            chomp $line;
-            push @seqs, $line;
-        }
+    my @tuples = &gjoseqlib::read_fasta($ih);
+    foreach my $tuple (@tuples) {
+        $self->ProcessHits($kmerHash,\%hits,[$tuple->[2]]);
     }
-    # Process the residual contig.
-    $self->ProcessHits($kmerHash, \%hits, \@seqs);
+
     # Save the genomes with a lot of hits.
     my $minHits = $self->{minHits};
     my %retVal;
@@ -268,26 +258,33 @@ Reference to a list of the components of the sequence. The components are concat
 sub ProcessHits {
     my ($self, $kmerHash, $hits, $seqs) = @_;
     # Compute the kmer size in base pairs.
-    my $kmerSize = $self->{kmerSize} * 3;
+    my $kmerSize = $self->{kmerSize};  # in aa
     # Form the final sequence.
     my $seq = join("", @$seqs);
-    # Loop through it, counting hits.
-    my $n = length($seq) - $kmerSize;
-    for (my $i = 0; $i <= $n; $i++) {
-        my $dna = substr($seq, $i, $kmerSize);
-        my $kmer1 = SeedUtils::translate($dna);
-        my $kmer2 = SeedUtils::translate(SeedUtils::rev_comp($dna));
-        for my $kmer ($kmer1, $kmer2) {
-            my $genomes = $kmerHash->{$kmer};
-            if ($genomes) {
-                for my $genome (@$genomes) {
-                    $hits->{$genome}++;
-                }
-            }
-
-        }
+    foreach my $offset (0,1,2) {
+        next if (length($seq) < 3);
+        my $seq1 = substr($seq,$offset);      
+        &hits(\$seq1,$kmerSize,$kmerHash,$hits);
+        $seq1 = &SeedUtils::rev_comp($seq1);
+        &hits(\$seq1,$kmerSize,$kmerHash,$hits);
     }
 }
 
+sub hits {
+    my($seqP,$kmerSize,$kmerHash,$hits) = @_;
+
+    # Loop through it, counting hits.
+    my $translated = uc &SeedUtils::translate($$seqP);
+    my $n = length($translated) - $kmerSize;
+    for (my $i = 0; $i <= $n; $i++) {
+        my $aa = substr($translated, $i, $kmerSize);
+        my $genomes = $kmerHash->{$aa};
+        if ($genomes) {
+            for my $genome (@$genomes) {
+                $hits->{$genome}++;
+            }
+        }
+    }
+}
 
 1;
