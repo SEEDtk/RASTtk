@@ -253,7 +253,7 @@ sub add_features_to_gto {
                             -function => $function,
                             -annotator => $annotator,
                             -annotation => "fast_project from $fromFid",
-                            -event_id => $event_id,
+                            -analysis_event_id => $event_id,
                             -quality_measure => \%quality_measure);
             # If we have an ID prefix, add it.
             if ($idprefix) {
