@@ -2617,7 +2617,7 @@ Read a list of IDs from a tab-delimited file. The IDs are taken from the first c
 
 =item fileName
 
-Name of the file from which to read the IDs.
+Name of the file from which to read the IDs, or an open file handle for the file containing the IDs.
 
 =item RETURN
 
@@ -2630,7 +2630,12 @@ Returns a list of the IDs read.
 sub read_ids {
     my ($fileName) = @_;
     # Open the file.
-    open(my $ih, "<", $fileName) || die "Could not open $fileName: $!";
+    my $ih;
+    if (ref $fileName eq 'GLOB') {
+        $ih = $fileName;
+    } else {
+        open($ih, "<", $fileName) || die "Could not open $fileName: $!";
+    }
     # This will contain the return list.
     my @retVal;
     # Loop through it.
