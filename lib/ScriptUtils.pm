@@ -168,5 +168,45 @@ sub Opts {
     return $retVal;
 }
 
+=head3 get_col
+
+    my @values = ScriptUtils::get_col($ih, $col);
+
+Read from the specified tab-delimited input stream and extract the values from the specified column.
+An undefined or zero value for the column index will retrieve the last column in each row.
+
+=over 4
+
+=item ih
+
+Open input handle for a tab-delimited file.
+
+=item col
+
+Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
+
+=item RETURN
+
+Returns a list of the values retrieved.
+
+=back
+
+=cut
+
+sub get_col {
+    my ($ih, $col) = @_;
+    my @retVal;
+    while (! eof $ih) {
+        my $line = <$ih>;
+        $line =~ s/\r?\n$//;
+        my @flds = split /\t/, $line;
+        if ($col) {
+            push @retVal, $flds[$col - 1];
+        } else {
+            push @retVal, pop @flds;
+        }
+    }
+    return @retVal;
+}
 
 1;
