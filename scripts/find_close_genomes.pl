@@ -66,7 +66,8 @@ the hash. This option is only used in the SEEDtk environment and only if no data
 
 =item priv
 
-The privilege level at which the roles of a protein should be assessed. The default is C<1>.
+The privilege level at which the roles of a protein should be assessed. The default is C<1>. This option is only used in
+the SEEDtk environment and only if no database file exists.
 
 =item output
 

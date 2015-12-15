@@ -481,4 +481,29 @@ sub contig_dna {
     return $self->{triples}{$contigID}[2];
 }
 
+=head3 fasta_out
+
+    $contigs->fasta_out($oh);
+
+Write the contigs as a FASTA file to an open output handle.
+
+=over 4
+
+=item oh
+
+Open output handle to which the FASTA data should be written.
+
+=back
+
+=cut
+
+sub fasta_out {
+    my ($self, $oh) = @_;
+    # Loop through the contig triples, printing them.
+    my $triples = $self->{triples};
+    for my $contigID (sort keys %$triples) {
+        print $oh ">$triples->[0] $triples->[1]\n$triples->[2]\n";
+    }
+}
+
 1;
