@@ -209,4 +209,48 @@ sub get_col {
     return @retVal;
 }
 
+=head3 get_couplets
+
+    my @couplets = ScriptUtils::get_couplets($ih, $col);
+
+Read from the specified tab-delimited input stream and extract the values from the specified column.
+An undefined or zero value for the column index will retrieve the last column in each row.
+
+=over 4
+
+=item ih
+
+Open input handle for a tab-delimited file.
+
+=item col
+
+Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
+
+=item RETURN
+
+Returns a list of 2-tuples. Each 2-tuple will consist of (0) the value from the input column and (1) the
+original row as a list reference.
+
+=back
+
+=cut
+
+sub get_couplets {
+    my ($ih, $col) = @_;
+    my @retVal;
+    while (! eof $ih) {
+        my $line = <$ih>;
+        $line =~ s/\r?\n$//;
+        my @flds = split /\t/, $line;
+        my $value;
+        if ($col) {
+            $value = $flds[$col - 1];
+        } else {
+            $value = $flds[$#flds];
+        }
+        push @retVal, [$value, \@flds];
+    }
+    return @retVal;
+}
+
 1;
