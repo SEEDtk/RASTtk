@@ -989,6 +989,7 @@ sub hypo {
     $func =~ s/\s*\#.*$//;
     if ($func =~ /lmo\d+ protein/i)          { return 1 }
     if ($func =~ /hypoth/i)                  { return 1 }
+    if ($func =~ /^hypo$/i)                  { return 1 }
     if ($func =~ /conserved protein/i)       { return 1 }
     if ($func =~ /gene product/i)            { return 1 }
     if ($func =~ /interpro/i)                { return 1 }
