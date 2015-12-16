@@ -38,7 +38,7 @@ T
 Parse the command-line options for a services command and return the helper object.
 
 The helper object is only returned if a database connection is required (this is the default).
-The type of helper object is determined by the value of the environment variable C<SERVICES>
+The type of helper object is determined by the value of the environment variable C<SERVICE>
 or by the command-line option --db. The possible choices are
 
 =over 4
@@ -55,10 +55,30 @@ Thus, to use L<svc_all_genomes.pl> with SEEDtk, you would either need to submit
 
 or
 
-    export SERVICES=SEEDtk
+    export SERVICE=SEEDtk
     svc_all_genomes
 
 The command-line option overrides the environment variable.
+
+Most commands have the following common command-line options.
+
+=over 4
+
+=item input
+
+Name of the input file. The default is C<->, which uses the standard input.
+
+=item col
+
+Index of the input column (1-based). The default is C<0>, indicating the last column.
+
+=item batch
+
+The number of input records to process in a batch. Most retrieval methods are more efficient operating
+on multiple input lines at once, but if commands are strung together in a pipe, breaking the input into
+smaller batches increases the opportunity for parallelism. The default is C<1000>.
+
+=back
 
 The parameters to this method are as follows:
 
@@ -129,7 +149,7 @@ sub get_options {
             $type = $1;
         } else {
             # No command-line option. Pull from the environment.
-            $type = $ENV{SERVICES};
+            $type = $ENV{SERVICE};
         }
         # Get the helper name.
         $helperName = HELPER_NAMES->{$type};
@@ -148,7 +168,7 @@ sub get_options {
         push @connectOptions, ["input|i=s", "name of the input file (defaults to standard input)", { default => '-' }];
         # Check for a column specifier.
         if ($inputStyle eq 'col') {
-            push @connectOptions, ["col|c=i", "column to use for input (negative numbers count from the end)", { default => -1 }];
+            push @connectOptions, ["col|c=i", "column to use for input (0 for the last)", { default => 0 }];
             push @connectOptions, ["batch|b=i", "number of input records to process per batch (0 for all)", { default => 1000 }]
         }
     }
@@ -156,8 +176,8 @@ sub get_options {
     # but it has already been examined if it is present.
     my ($opt, $usage) = describe_options('%c %o ' . $parmComment, @options, @connectOptions,
            [ "help|h", "display usage information", { shortcircuit => 1}],
-           [ "db", "type of database-- SEEDtk (if omitted, SERVICES environment variable is used)",
-                { default => $ENV{SERVICES} }]);
+           [ "db", "type of database-- SEEDtk (if omitted, SERVICE environment variable is used)",
+                { default => $ENV{SERVICE} }]);
     # The above method dies if the options are invalid. We check here for the HELP option.
     if ($opt->help) {
         print $usage->text;
@@ -191,7 +211,13 @@ L<Getopt::Long::Descriptive::Opts> object returned by L</get_options>.
 
 sub ih {
     my ($opt) = @_;
-    open(my $retVal, '<', $opt->input) || die "Could not open input file: $!";
+    my $fileName = $opt->input;
+    my $retVal;
+    if ($fileName eq '-') {
+        $retVal = \*STDIN;
+    } else {
+        open($retVal, "<$fileName") || die "Could not open input file $fileName: $!";
+    }
     return $retVal;
 }
 
@@ -228,7 +254,7 @@ sub get_batch {
     my ($ih, $opt) = @_;
     # Access the batch size and the column number.
     my $batchSize = $opt->batch;
-    my $col = $opt->col;
+    my $col = $opt->col - 1;
     # This will count the number of rows processed.
     my $count = 0;
     # We will stop when the count equals the batch size. It will never equal -1. Note that a batch
