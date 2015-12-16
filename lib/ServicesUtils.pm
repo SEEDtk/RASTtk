@@ -108,8 +108,6 @@ If C<col>, then a single column is used as input. The default is C<col>.
 
 If TRUE, then it is presumed there is no need for a database connection. No helper object will be returned.
 
-=item whole
-
 =back
 
 =item RETURN
