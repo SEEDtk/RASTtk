@@ -185,6 +185,11 @@ Open input handle for a tab-delimited file.
 
 Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
 
+=item batchSize (optional)
+
+If specified, only a limited number of rows will be returned. The specified value is the number of rows.
+This parameter is used to divide the input into batches for performance or parallelism reasons.
+
 =item RETURN
 
 Returns a list of the values retrieved.
@@ -211,7 +216,7 @@ sub get_col {
 
 =head3 get_couplets
 
-    my @couplets = ScriptUtils::get_couplets($ih, $col);
+    my @couplets = ScriptUtils::get_couplets($ih, $col, $batchSize);
 
 Read from the specified tab-delimited input stream and extract the values from the specified column.
 An undefined or zero value for the column index will retrieve the last column in each row.
@@ -226,6 +231,11 @@ Open input handle for a tab-delimited file.
 
 Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
 
+=item batchSize (optional)
+
+If specified, only a limited number of rows will be returned. The specified value is the number of rows.
+This parameter is used to divide the input into batches for performance or parallelism reasons.
+
 =item RETURN
 
 Returns a list of 2-tuples. Each 2-tuple will consist of (0) the value from the input column and (1) the
@@ -236,19 +246,32 @@ original row as a list reference.
 =cut
 
 sub get_couplets {
-    my ($ih, $col) = @_;
+    my ($ih, $col, $batchSize) = @_;
+    # This will count the number of rows processed.
+    my $count = 0;
+    # We will stop when the count equals the batch size. It will never equal -1. Note that a batch
+    # size of 0 also counts as unlimited.
+    $batchSize ||= -1;
+    # This will be the return list.
     my @retVal;
-    while (! eof $ih) {
+    # Loop until done.
+    while (! eof $ih && $count != $batchSize) {
         my $line = <$ih>;
         $line =~ s/\r?\n$//;
         my @flds = split /\t/, $line;
-        my $value;
-        if ($col) {
-            $value = $flds[$col - 1];
-        } else {
-            $value = $flds[$#flds];
+        # Only proceed if the line is nonblank.
+        if (@flds) {
+            # Extract the desired column.
+            my $value;
+            if ($col) {
+                $value = $flds[$col - 1];
+            } else {
+                $value = $flds[$#flds];
+            }
+            # Store and count the result.
+            push @retVal, [$value, \@flds];
+            $count++;
         }
-        push @retVal, [$value, \@flds];
     }
     return @retVal;
 }
