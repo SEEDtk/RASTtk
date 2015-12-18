@@ -108,6 +108,10 @@ If C<col>, then a single column is used as input. The default is C<col>.
 
 If TRUE, then it is presumed there is no need for a database connection. No helper object will be returned.
 
+=item batchSize
+
+The default batch size to use. If C<0>, then no batching is performed. The default default batch size is C<1000>.
+
 =back
 
 =item RETURN
@@ -131,6 +135,7 @@ sub get_options {
         $flags = pop @options;
     }
     my $inputStyle = $flags->{input} // 'col';
+    my $batchDefault = $flags->{batchSize} // 1000;
     # This will contain the name of the helper object.
     my $helperName;
     # This will contain the helper object itself.
@@ -167,7 +172,7 @@ sub get_options {
         # Check for a column specifier.
         if ($inputStyle eq 'col') {
             push @connectOptions, ["col|c=i", "column to use for input (0 for the last)", { default => 0 }];
-            push @connectOptions, ["batch|b=i", "number of input records to process per batch (0 for all)", { default => 1000 }]
+            push @connectOptions, ["batch|b=i", "number of input records to process per batch (0 for all)", { default => $batchDefault }]
         }
     }
     # Parse the command line. Note that the "db" option is included for documentation purposes,
