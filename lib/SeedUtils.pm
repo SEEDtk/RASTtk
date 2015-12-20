@@ -1694,7 +1694,7 @@ sub sims {
 
 Return a hash containing the translation of nucleotide triples to proteins.
 Methods such as L</translate> can take a translation scheme as a parameter.
-This method returns the translation scheme for genetic code 11 or 4,
+This method returns the translation scheme for genetic codes 1 through 12 and 25,
 and an error for all other cocdes. The scheme is implemented as a reference to a
 hash that contains nucleotide triplets as keys and has protein letters as values.
 
@@ -1712,8 +1712,47 @@ sub genetic_code {
     elsif ($ncbi_genetic_code_num ==  4) {
         $code->{TGA} = 'W';
     }
+    elsif ($ncbi_genetic_code_num == 2) {
+        $code->{AGA} = '*';
+        $code->{AGG} = '*';
+        $code->{AUA} = 'M';
+        $code->{UGA} = 'W';
+    }
+    elsif ($ncbi_genetic_code_num == 3) {
+        $code->{AUA} = 'M';
+        $code->{CUU} = 'T';
+        $code->{CUC} = 'T';
+        $code->{CUA} = 'T';
+        $code->{CUG} = 'T';
+        $code->{UGA} = 'W';
+    }
+    elsif ($ncbi_genetic_code_num == 5) {
+        $code->{AGA} = 'S';
+        $code->{AGG} = 'S';
+        $code->{AUA} = 'M';
+        $code->{UGA} = 'W';
+    }
+    elsif ($ncbi_genetic_code_num == 6) {
+        $code->{UAA} = 'Q';
+        $code->{UAG} = 'Q';
+    }
+    elsif ($ncbi_genetic_code_num == 9) {
+        $code->{AAA} = 'N';
+        $code->{AGA} = 'S';
+        $code->{AGG} = 'S';
+        $code->{UGA} = 'W';
+    }
+    elsif ($ncbi_genetic_code_num == 10) {
+        $code->{UGA} = '*';
+    }
+    elsif ($ncbi_genetic_code_num == 12) {
+        $code->{CUG} = 'S';
+    }
+    elsif ($ncbi_genetic_code_num == 25) {
+        $code->{UGA} = 'G';
+    }
     else {
-        die "Sorry, only genetic codes 1, 4, and 11 are currently supported";
+        die "Sorry, $ncbi_genetic_code_num is not currently supported.";
     }
 
     return $code;

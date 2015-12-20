@@ -283,5 +283,42 @@ sub get_batch {
     return @retVal;
 }
 
+=head3 get_cols
+
+    my @values = ServicesUtils::get_cols($ih, @cols);
+
+Get one or more columns from the next input line.
+
+=over 4
+
+=item ih
+
+Open file handle for the input file. The next line will be read and parsed into columns.
+
+=item cols
+
+List containing the 1-based column indexes. A column index of 0 indicates the last column.
+
+=item RETURN
+
+Returns a list of the values found in the specified columns.
+
+=back
+
+=cut
+
+sub get_cols {
+    my ($ih, @cols) = @_;
+    # Get the input line.
+    my $line = <$ih>;
+    # Strip off the line-end characters.
+    $line =~ s/\r?\n$//;
+    # Split into columns.
+    my @values = split /\t/, $line;
+    # Extract the desired values.
+    my @retVal = map { $values[$_ - 1] } @cols;
+    # Return the result.
+    return @retVal;
+}
 
 1;
