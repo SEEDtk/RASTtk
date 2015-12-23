@@ -283,6 +283,47 @@ sub get_batch {
     return @retVal;
 }
 
+=head3 get_column
+
+    my $valueList = ServicesUtils::get_column($fileName, $col);
+
+Get all the values from the specified column in a tab-delimited file.
+
+=over 4
+
+=item fileName
+
+Name of a tab-delimited file.
+
+=item col
+
+Index (1-based) of the column from which to get the values. A value of C<0> indicates the last column.
+
+=item RETURN
+
+Returns a reference to a list of the values read.
+
+=back
+
+=cut
+
+sub get_column {
+    my ($fileName, $col) = @_;
+    open(my $ih, "<$fileName") || die "Could not open $fileName: $!";
+    my @retVal;
+    while (! eof $ih) {
+        # Get the input line.
+        my $line = <$ih>;
+        # Strip off the line-end characters.
+        $line =~ s/\r?\n$//;
+        # Split into columns.
+        my @cols = split /\t/, $line;
+        push @retVal, $cols[$col - 1];
+    }
+    return \@retVal;
+}
+
+
 =head3 get_cols
 
     my @values = ServicesUtils::get_cols($ih, @cols);
