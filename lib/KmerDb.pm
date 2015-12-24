@@ -307,6 +307,34 @@ sub count_hits {
     }
 }
 
+
+=head3 name
+
+    my $groupName = $kmerdb->name($groupID);
+
+Return the name of a group.
+
+=over 4
+
+=item groupID
+
+ID of the group whose name is desired.
+
+=item RETURN
+
+Returns the name of the identified group. If the group is not found in the group name hash, returns
+the incoming group ID.
+
+=back
+
+=cut
+
+sub name {
+    my ($self, $groupID) = @_;
+    my $retVal = $self->{groupHash}{$groupID} // $groupID;
+    return $retVal;
+}
+
 =head2 Internal Methods
 
 =head3 accumulate_hits
@@ -346,33 +374,6 @@ sub accumulate_hits {
             }
         }
     }
-}
-
-=head3 name
-
-    my $groupName = $kmerdb->name($groupID);
-
-Return the name of a group.
-
-=over 4
-
-=item groupID
-
-ID of the group whose name is desired.
-
-=item RETURN
-
-Returns the name of the identified group. If the group is not found in the group name hash, returns
-the incoming group ID.
-
-=back
-
-=cut
-
-sub name {
-    my ($self, $groupID) = @_;
-    my $retVal = $self->{groupHash}{$groupID} // $groupID;
-    return $retVal;
 }
 
 1;
