@@ -206,7 +206,11 @@ sub new {
         open($logh, ">$workDir/status.log") || die "Could not open log file: $!";
     }
     # Correct the genome ID if this is a contigs object.
-    $genomeID =~ s/\.contigs$//;
+    if ($genomeID =~ /^(\d+\.\d+)/) {
+        $genomeID = $1;
+    } else {
+        $genomeID = '6666666.6';
+    }
     # Compute the options.
     my $retVal = {
         contigs => $contigs,
