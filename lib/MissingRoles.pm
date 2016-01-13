@@ -188,13 +188,6 @@ Password for calls to RAST (if needed).
 
 sub new {
     my ($class, $contigs, $annotations, $helper, $workDir, %options) = @_;
-    # Set up the log file.
-    my $logh;
-    if ($options{warn}) {
-        $logh = \*STDERR;
-    } else {
-        open($logh, ">$workDir/status.log") || die "Could not open log file: $!";
-    }
     # Compute the genome ID and name.
     my $genomeID = ServicesUtils::json_field($contigs, 'id');
     my $name = ServicesUtils::json_field($contigs, 'name');
@@ -204,6 +197,13 @@ sub new {
     }
     if (! -d $workDir) {
         File::Copy::Recursive::pathmk($workDir) || die "Could not create $workDir: $!";
+    }
+    # Set up the log file.
+    my $logh;
+    if ($options{warn}) {
+        $logh = \*STDERR;
+    } else {
+        open($logh, ">$workDir/status.log") || die "Could not open log file: $!";
     }
     # Correct the genome ID if this is a contigs object.
     $genomeID =~ s/\.contigs$//;
