@@ -118,11 +118,14 @@ sub Annotate {
     my $retVal;
     # Create the contig string.
     my $contigString = join("", map { ">$_->[0] $_->[1]\n$_->[2]\n" } @$contigs );
+    # Fix up the name.
+    unless ($name =~ /^\S+\s+\S+/) {
+        $name = "Unknown sp. $name";
+    }
     # Now we create an HTTP request to submit the job to RAST.
     my $url = URI->new(RAST_URL . '/submit/GenomeAnnotation');
-    print STDERR "name = $name, tax = $taxonID, gc = $geneticCode, domain = $domain.\n"; ## TODO debugging
     $url->query_form(
-        scientific_name => "Unknown sp. $name",
+        scientific_name => $name,
         taxonomy_id => $taxonID,
         genetic_code => $geneticCode,
         domain => $domain
