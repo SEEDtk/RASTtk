@@ -134,6 +134,7 @@ sub Annotate {
     my $ua = LWP::UserAgent->new();
     my $response = $ua->request($request);
     if ($response->code ne 200) {
+        print STDERR "ERROR response: " . $response->content . "\n"; ##TODO debugging
         die "Error response for RAST submisssion: " . $response->message;
     } else {
         # Get the job ID.
@@ -158,7 +159,6 @@ sub Annotate {
         $request = HTTP::Request->new(GET => $url, $header);
         $response = $ua->request($request);
         if ($response->code ne 200) {
-            print "ERROR response: " . $response->content . "\n"; ##TODO debugging
             die "Error response for RAST retrieval: " . $response->message;
         }
         my $json = $response->content;
