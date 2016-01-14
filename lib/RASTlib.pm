@@ -122,7 +122,7 @@ sub Annotate {
     my $url = URI->new(RAST_URL . '/submit/GenomeAnnotation');
     print STDERR "name = $name, tax = $taxonID, gc = $geneticCode, domain = $domain.\n"; ## TODO debugging
     $url->query_form(
-        scientific_name => $name,
+        scientific_name => "Unknown sp. $name",
         taxonomy_id => $taxonID,
         genetic_code => $geneticCode,
         domain => $domain
