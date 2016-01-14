@@ -159,6 +159,7 @@ sub Annotate {
         $response = $ua->request($request);
         if ($response->code ne 200) {
             die "Error response for RAST retrieval: " . $response->message;
+            print STDERR $response->content; ##TODO debugging
         }
         my $json = $response->content;
         $retVal = SeedUtils::read_encoded_object(\$json);
