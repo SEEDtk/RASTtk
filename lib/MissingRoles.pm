@@ -359,7 +359,7 @@ sub Process {
     }
     close $oh; undef $oh;
     # Now we need to get the features for these roles and blast them.
-    print $logh  "Retrieving features from close genomes.\n";
+    print $logh  "Retrieving features from close genomes using " . scalar(@sortedRoles) . ".\n";
     my $triples = $self->GetRoleFeatureTuples(\@sortedRoles, \@sorted);
     # Run the BLAST.
     print $logh  "Performing BLAST on " . scalar(@$triples) . " features.\n";
