@@ -362,7 +362,7 @@ sub Process {
     print $logh  "Retrieving features from close genomes.\n";
     my $triples = $self->GetRoleFeatureTuples(\@sortedRoles, \@sorted);
     # Run the BLAST.
-    print $logh  "Performing BLAST.\n";
+    print $logh  "Performing BLAST on " . scalar(@$triples) . " features.\n";
     my $matches = $self->RunBlast($triples, $fastaFile, $self->{maxE}, $self->{minLen});
     my $blastFile = "$workDir/blast.tbl";
     # Now we process the matches. We spool them to an intermediate file at the same time
@@ -432,7 +432,7 @@ sub RunBlast {
     my @retVal;
     # Get the matches.
     my $matches = BlastInterface::blast($triples, $fastaFile, 'tblastn',
-            { outForm => 'hsp', maxE => $maxe });
+            { outForm => 'hsp', maxE => $maxe, tmpdir => $self->{workDir} });
     # Filter by length.
     my ($rejected, $kept) = (0, 0);
     for my $match (@$matches) {
