@@ -180,6 +180,14 @@ User name for calls to RAST (if needed).
 
 Password for calls to RAST (if needed).
 
+=item genomeID
+
+ID of the genome containing the incoming contigs. The default is taken from the ID of the contigs object.
+
+=item genomeName
+
+Name of the genome containing the incoming contigs. The default is taken from the name of the contigs object.
+
 =back
 
 =back
@@ -189,8 +197,8 @@ Password for calls to RAST (if needed).
 sub new {
     my ($class, $contigs, $annotations, $helper, $workDir, %options) = @_;
     # Compute the genome ID and name.
-    my $genomeID = ServicesUtils::json_field($contigs, 'id');
-    my $name = ServicesUtils::json_field($contigs, 'name');
+    my $genomeID = $options{genomeID} // ServicesUtils::json_field($contigs, 'id');
+    my $name = $options{genomeName} // ServicesUtils::json_field($contigs, 'name');
     # Compute the working directory.
     if (! $workDir) {
         $workDir = "$genomeID.files";
