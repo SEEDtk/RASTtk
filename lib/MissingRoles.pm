@@ -338,14 +338,17 @@ sub Process {
     my $genomeRolesH = $helper->roles_in_genomes(\@sorted, 0, 'ssOnly');
     # Filter out the ones already in the new genome.
     for my $closeG (@sorted) {
-        print $logh  "Processing roles in $closeG.\n";
+        print $logh  "Processing roles in $closeG.  ";
         # Get the close genome's roles.
+        my $count = 0;
         my $rolesL = $genomeRolesH->{$closeG};
         for my $role (@$rolesL) {
             if (! $roleH->{$role}) {
                 $roleCounts{$role}++;
+                $count++;
             }
         }
+        print $logh "$count found.\n";
     }
     # Get the role descriptions.
     my $roleNamesH = $helper->role_to_desc([keys %roleCounts]);
@@ -359,7 +362,7 @@ sub Process {
     }
     close $oh; undef $oh;
     # Now we need to get the features for these roles and blast them.
-    print $logh  "Retrieving features from close genomes using " . scalar(@sortedRoles) . ".\n";
+    print $logh  "Retrieving features from close genomes using " . scalar(@sortedRoles) . " roles.\n";
     my $triples = $self->GetRoleFeatureTuples(\@sortedRoles, \@sorted);
     # Run the BLAST.
     print $logh  "Performing BLAST on " . scalar(@$triples) . " features.\n";
