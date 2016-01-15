@@ -348,15 +348,16 @@ sub Process {
     for my $closeG (@sorted) {
         print $logh  "Processing roles in $closeG.  ";
         # Get the close genome's roles.
-        my $count = 0;
+        my ($count, $total) = (0, 0);
         my $rolesL = $genomeRolesH->{$closeG};
         for my $role (@$rolesL) {
+            $total++;
             if (! $roleH->{$role}) {
                 $roleCounts{$role}++;
                 $count++;
             }
         }
-        print $logh "$count found.\n";
+        print $logh "$count of $total found.\n";
     }
     # Get the role descriptions.
     my $roleNamesH = $helper->role_to_desc([keys %roleCounts]);
