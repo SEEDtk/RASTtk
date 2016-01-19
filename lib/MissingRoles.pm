@@ -379,21 +379,27 @@ sub Process {
     my $matches = $self->RunBlast($triples, $fastaFile, $self->{maxE}, $self->{minLen});
     my $blastFile = "$workDir/blast.tbl";
     # Now we process the matches. We spool them to an intermediate file at the same time
-    # we queue them to the output.
+    # we queue them to the output. Only the best match for a role is kept inthe final output.
     print $logh  "Spooling BLAST output to $blastFile.\n";
     my @retVal;
+    my $oldRole = "";
     open($oh, ">$blastFile") || die "Could not open $blastFile: $!";
     for my $match (@$matches) {
         # Spool to the blast file.
         print $oh join("\t", @$match) . "\n";
-        # Get the output fields.
+        # Is this a new role?
         my $role = $match->qdef;
-        my $desc = $roleNamesH->{$role};
-        my $count = $roleCounts{$role};
-        my $score = $match->scr;
-        my $pct = $match->pct;
-        my $loc = $match->sid . "_" . $match->s1 . $match->dir . $match->n_mat;
-        push @retVal, [$role, $desc, $count, $score, $pct, $loc];
+        if ($role ne $oldRole) {
+            $oldRole = $role;
+            # Get the output fields.
+            my $desc = $roleNamesH->{$role};
+            my $count = $roleCounts{$role};
+            my $score = $match->scr;
+            my $pct = $match->pct;
+            my $seq = $match->sseq;
+            my $loc = $match->sid . "_" . $match->s1 . $match->dir . $match->n_mat;
+            push @retVal, [$role, $desc, $count, $score, $pct, $loc, $seq];
+        }
     }
     close $oh; undef $oh;
     print $logh  "All done.\n";
