@@ -133,6 +133,9 @@ sub new {
                 my ($genome, $seq) = @$tuple;
                 # Convert the string to upper case. An initial "M" is put in lower case so it is decoded correctly.
                 $seq = uc $seq;
+                if ($seq =~ /^M(.+)/) {
+                    $seq = "m$1";
+                }
                 # Loop through the protein's kmers.
                 my $n = length($seq) - $kmerSize;
                 for (my $i = 0; $i <= $n; $i++) {

@@ -1694,7 +1694,7 @@ sub sims {
 
 Return a hash containing the translation of nucleotide triples to proteins.
 Methods such as L</translate> can take a translation scheme as a parameter.
-This method returns the translation scheme for genetic codes 1 through 12 and 25,
+This method returns the translation scheme for genetic code 11 or 4,
 and an error for all other cocdes. The scheme is implemented as a reference to a
 hash that contains nucleotide triplets as keys and has protein letters as values.
 
@@ -1712,47 +1712,8 @@ sub genetic_code {
     elsif ($ncbi_genetic_code_num ==  4) {
         $code->{TGA} = 'W';
     }
-    elsif ($ncbi_genetic_code_num == 2) {
-        $code->{AGA} = '*';
-        $code->{AGG} = '*';
-        $code->{AUA} = 'M';
-        $code->{UGA} = 'W';
-    }
-    elsif ($ncbi_genetic_code_num == 3) {
-        $code->{AUA} = 'M';
-        $code->{CUU} = 'T';
-        $code->{CUC} = 'T';
-        $code->{CUA} = 'T';
-        $code->{CUG} = 'T';
-        $code->{UGA} = 'W';
-    }
-    elsif ($ncbi_genetic_code_num == 5) {
-        $code->{AGA} = 'S';
-        $code->{AGG} = 'S';
-        $code->{AUA} = 'M';
-        $code->{UGA} = 'W';
-    }
-    elsif ($ncbi_genetic_code_num == 6) {
-        $code->{UAA} = 'Q';
-        $code->{UAG} = 'Q';
-    }
-    elsif ($ncbi_genetic_code_num == 9) {
-        $code->{AAA} = 'N';
-        $code->{AGA} = 'S';
-        $code->{AGG} = 'S';
-        $code->{UGA} = 'W';
-    }
-    elsif ($ncbi_genetic_code_num == 10) {
-        $code->{UGA} = '*';
-    }
-    elsif ($ncbi_genetic_code_num == 12) {
-        $code->{CUG} = 'S';
-    }
-    elsif ($ncbi_genetic_code_num == 25) {
-        $code->{UGA} = 'G';
-    }
     else {
-        die "Sorry, $ncbi_genetic_code_num is not currently supported.";
+        die "Sorry, only genetic codes 1, 4, and 11 are currently supported";
     }
 
     return $code;
@@ -2030,16 +1991,29 @@ Name of the relevant directory.
 sub verify_dir {
     # Get the parameters.
     my ($dirName) = @_;
+    warn "SeedUtils::verify_dir processing dirName \'$dirName\'\n" if $ENV{FIG_VERBOSE};
+
     # Strip off the final slash, if any.
     $dirName =~ s#/$##;
+
     # Only proceed if the directory does NOT already exist.
     if (! -d $dirName) {
         # If there is a parent directory, recursively insure it is there.
         if ($dirName =~ m#(.+)/[^/]+$#) {
+            warn "Creating directory \'$1\'\n" if $ENV{FIG_VERBOSE};
             verify_dir($1);
         }
+        else {
+            warn "Directory name \'$1\' is invalid";
+        }
+
         # Create this particular directory with full permissions.
-        mkdir $dirName, 0777;
+        warn "Creating directory \'$dirName\'\n" if $ENV{FIG_VERBOSE};
+        mkdir($dirName, 0777)
+            or warn "Directory name \'$1\' is invalid";
+    }
+    else {
+        warn "Directory \'$dirName\' exists" if $ENV{FIG_VERBOSE};
     }
 }
 
@@ -2657,7 +2631,7 @@ Read a list of IDs from a tab-delimited file. The IDs are taken from the first c
 
 =item fileName
 
-Name of the file from which to read the IDs, or an open file handle for the file containing the IDs.
+Name of the file from which to read the IDs.
 
 =item RETURN
 
@@ -2670,12 +2644,7 @@ Returns a list of the IDs read.
 sub read_ids {
     my ($fileName) = @_;
     # Open the file.
-    my $ih;
-    if (ref $fileName eq 'GLOB') {
-        $ih = $fileName;
-    } else {
-        open($ih, "<", $fileName) || die "Could not open $fileName: $!";
-    }
+    open(my $ih, "<", $fileName) || die "Could not open $fileName: $!";
     # This will contain the return list.
     my @retVal;
     # Loop through it.
