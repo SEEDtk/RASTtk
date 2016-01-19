@@ -26,6 +26,7 @@ package MissingRoles;
     use FileHandle;
     use BlastInterface;
     use ServicesUtils;
+    use Hsp;
 
 =head1 Search for Missing Roles in Contigs
 
