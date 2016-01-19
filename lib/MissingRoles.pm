@@ -445,6 +445,12 @@ sub RunBlast {
     # Get the matches.
     my $matches = BlastInterface::blast($triples, $fastaFile, 'tblastn',
             { outForm => 'hsp', maxE => $maxe, tmpdir => $self->{workDir} });
+    # Fix the matches in case we have the wrong BlastInterface.
+    for my $match (@$matches) {
+        if (ref $match eq 'ARRAY') {
+            bless $match, 'Hsp';
+        }
+    }
     # Filter by length.
     my ($rejected, $kept) = (0, 0);
     for my $match (@$matches) {
