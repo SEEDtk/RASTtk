@@ -293,7 +293,7 @@ Get all the values from the specified column in a tab-delimited file.
 
 =item fileName
 
-Name of a tab-delimited file.
+Name of a tab-delimited file, or an open file handle for the input.
 
 =item col
 
@@ -309,7 +309,12 @@ Returns a reference to a list of the values read.
 
 sub get_column {
     my ($fileName, $col) = @_;
-    open(my $ih, "<$fileName") || die "Could not open $fileName: $!";
+    my $ih;
+    if (ref $fileName eq 'GLOB') {
+        $ih = $fileName;
+    } else {
+        open($ih, "<$fileName") || die "Could not open $fileName: $!";
+    }
     my @retVal;
     while (! eof $ih) {
         # Get the input line.
