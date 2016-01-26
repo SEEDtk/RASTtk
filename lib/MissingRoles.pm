@@ -199,7 +199,8 @@ sub new {
     my ($class, $contigs, $annotations, $helper, $workDir, %options) = @_;
     # Compute the genome ID and name.
     my $genomeID = $options{genomeID} // ServicesUtils::json_field($contigs, 'id');
-    my $name = $options{genomeName} // ServicesUtils::json_field($contigs, 'name');
+    my $name = $options{genomeName} // ServicesUtils::json_field($contigs, 'scientific_name', optional => 1)
+            // ServicesUtils::json_field($contigs, 'name');
     # Compute the working directory.
     if (! $workDir) {
         $workDir = "$genomeID.files";
