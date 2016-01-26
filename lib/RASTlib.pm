@@ -33,7 +33,7 @@ L<GenomeTypeObject>. The GTO produced is the true SEEDtk version.
 =cut
 
 # URL for RAST requests
-use constant RAST_URL => 'http://redwood.mcs.anl.gov:5000/quick';
+use constant RAST_URL => 'http://p3c.theseed.org/rast/quick';
 
 =head2 Public Methods
 
