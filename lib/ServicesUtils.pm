@@ -163,7 +163,9 @@ sub get_options {
         require "$helperName.pm";
         $helper = eval("$helperName->new()");
         # Get the connection options.
-        @connectOptions = $helper->script_options();
+        push @connectOptions, $helper->script_options(),
+           [ "db", "type of database-- SEEDtk (if omitted, SERVICE environment variable is used)",
+                { default => $ENV{SERVICE} }];
     }
     # Do we need a standard input?
     unless ($inputStyle eq 'none') {
@@ -178,9 +180,7 @@ sub get_options {
     # Parse the command line. Note that the "db" option is included for documentation purposes,
     # but it has already been examined if it is present.
     my ($opt, $usage) = describe_options('%c %o ' . $parmComment, @options, @connectOptions,
-           [ "help|h", "display usage information", { shortcircuit => 1}],
-           [ "db", "type of database-- SEEDtk (if omitted, SERVICE environment variable is used)",
-                { default => $ENV{SERVICE} }]);
+           [ "help|h", "display usage information", { shortcircuit => 1}]);
     # The above method dies if the options are invalid. We check here for the HELP option.
     if ($opt->help) {
         print $usage->text;
