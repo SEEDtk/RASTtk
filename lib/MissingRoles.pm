@@ -175,11 +175,13 @@ current directory, and will be created if it does not exist.
 
 =item user
 
-User name for calls to RAST (if needed).
+User name for calls to RAST (if needed). If no user name is specified, the environment variable C<RASTUSER>
+will be interrogated.
 
 =item password
 
-Password for calls to RAST (if needed).
+Password for calls to RAST (if needed). If no password is specified, the environment variable C<RASTPASS>
+will be interrogated.
 
 =item genomeID
 
@@ -234,8 +236,8 @@ sub new {
         minLen => ($options{minLen} // 50),
         geneticCode => ($options{geneticCode} // 11),
         domain => ($options{domain} // 'B'),
-        user => $options{user},
-        password => $options{password},
+        user => $options{user} // $ENV{RASTUSER},
+        password => $options{password} // $ENV{RASTPASS},
         genomeID => $genomeID,
         name => $name
     };

@@ -142,6 +142,7 @@ sub Annotate {
     } else {
         # Get the job ID.
         my $jobID = $response->content;
+        warn "Rast job ID is $jobID.\n";
         # Form a request for retreiving the job status.
         $url = join("/", RAST_URL, $jobID, 'status');
         $request = HTTP::Request->new(GET => $url, $header);

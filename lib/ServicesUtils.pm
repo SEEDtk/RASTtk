@@ -29,8 +29,6 @@ This is a simple package that contains the basic utility methods for common serv
 service scripts provide a single interface to multiple different genomic databases-- including SEEDtk and
 PATRIC, and are designed to allow the creation of command-line pipelines for research.
 
-T
-
 =head2 Public Methods
 
     my ($opt, $helper) = ServicesUtils::get_options($parmComment, @options, \%flags);
@@ -344,6 +342,7 @@ Open file handle for the input file. The next line will be read and parsed into 
 =item cols
 
 List containing the 1-based column indexes. A column index of 0 indicates the last column.
+The string 'all' indicates all columns.
 
 =item RETURN
 
@@ -362,7 +361,14 @@ sub get_cols {
     # Split into columns.
     my @values = split /\t/, $line;
     # Extract the desired values.
-    my @retVal = map { $values[$_ - 1] } @cols;
+    my @retVal;
+    for my $col (@cols) {
+        if ($col eq 'all') {
+            push @retVal, @values;
+        } else {
+            push @retVal, $values[$col - 1];
+        }
+    }
     # Return the result.
     return @retVal;
 }
