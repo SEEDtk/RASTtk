@@ -43,7 +43,7 @@ The size of a kmer.
 =item maxFound
 
 The maximum number of groups in which a kmer can be found before it is considered common. Common kmers are removed from
-the hash.
+the hash. A value of C<0> indicates no kmers will be considered common.
 
 =item kmerHash
 
@@ -196,19 +196,22 @@ sub Finalize {
     my ($self) = @_;
     # Get the common-kmer threshold.
     my $maxFound = $self->{maxFound};
-    # Loop through the kmers.
-    my $kmerHash = $self->{kmerHash};
-    for my $kmer (keys %$kmerHash) {
-        # Get this kmer's list.
-        my $groupList = $kmerHash->{$kmer};
-        # Are we keeping it?
-        if (scalar @$groupList > $maxFound) {
-            # No, it is too common.
-            delete $kmerHash->{$kmer};
-        } else {
-            # Yes. Remove the duplicates.
-            my %groupHash = map { $_ => 1 } @$groupList;
-            $kmerHash->{$kmer} = [keys %groupHash];
+    # Only proceed if it is nonzero. Zero means we don't care about common kmers.
+    if ($maxFound > 0) {
+        # Loop through the kmers.
+        my $kmerHash = $self->{kmerHash};
+        for my $kmer (keys %$kmerHash) {
+            # Get this kmer's list.
+            my $groupList = $kmerHash->{$kmer};
+            # Are we keeping it?
+            if (scalar @$groupList > $maxFound) {
+                # No, it is too common.
+                delete $kmerHash->{$kmer};
+            } else {
+                # Yes. Remove the duplicates.
+                my %groupHash = map { $_ => 1 } @$groupList;
+                $kmerHash->{$kmer} = [keys %groupHash];
+            }
         }
     }
     # Denote this database is finalized.
@@ -244,6 +247,60 @@ sub Save {
 }
 
 =head2 Query Methods
+
+=head3 kmer_list
+
+    my $kmerList = $kmerdb->kmer_list();
+
+Return a list of the kmers in the database.
+
+=cut
+
+sub kmer_list {
+    # Get the parameters.
+    my ($self) = @_;
+    # Get the kmer hash.
+    my $kmerH = $self->{kmerHash};
+    # Get the keys of the hash.
+    my $retVal = [keys %$kmerH];
+    # Return the result.
+    return $retVal;
+}
+
+=head3 groups_of
+
+    my $groupList = $kmerdb->groups_of($kmer);
+
+Return a list of the groups containing a specified kmer.
+
+=over 4
+
+=item kmer
+
+The kmer whose group list is desired.
+
+=item RETURN
+
+Returns a reference to a list of group IDs, or an empty list if the kmer is not in the database.
+
+=back
+
+=cut
+
+sub groups_of {
+    # Get the parameters.
+    my ($self, $kmer) = @_;
+    # Get the kmer hash.
+    my $kmerH = $self->{kmerHash};
+    # Get the group list. We return an empty list if the kmer is not in the hash.
+    my $retVal = $kmerH->{$kmer} // [];
+    # Return the result.
+    return $retVal;
+}
+
+
+
+
 
 =head3 count_hits
 
