@@ -123,7 +123,7 @@ implemented as methods on the services helper object.
 
 =cut
 
-use constant HELPER_NAMES => { SEEDtk => 'STKServices' };
+use constant HELPER_NAMES => { SEEDtk => 'STKServices', P3 => 'P3Services' };
 
 sub get_options {
     my ($parmComment, @options) = @_;
