@@ -144,11 +144,13 @@ sub get_options {
     unless ($flags->{nodb}) {
         # Yes. Now we must determine the operating environment. Check for a command-line option.
         my $type;
-        my $loc = 0; while ($loc < @ARGV && $ARGV[$loc] !~ /^--db=(\S+)/) { $loc++ }
-        if ($loc < @ARGV) {
-            # We found the option. Save its value.
-            $type = $1;
-        } else {
+        my $n = scalar @ARGV;
+        for (my $loc = 0; $loc < $n && ! $type; $loc++) {
+            if ($ARGV[$loc] =~ /^--db=(\S+)/) {
+                $type = $1;
+            }
+        }
+        if (! $type) {
             # No command-line option. Pull from the environment.
             $type = $ENV{SERVICE};
         }
