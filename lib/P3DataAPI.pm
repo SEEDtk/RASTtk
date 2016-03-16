@@ -4,6 +4,7 @@ use LWP::UserAgent;
 use strict;
 use JSON::XS;
 use Data::Dumper;
+use URI::Escape;  # uri_escape()
 
 eval {
     require FIG_Config;
@@ -39,6 +40,11 @@ sub query
 	{
 	    @vals = @{$vals[0]};
 	}
+	if ($vals[0] eq "product") {
+
+			#$vals[1] =~ s/ /\+/g;
+			$vals[1] = "\"$vals[1]\"";
+	}
 	my $qe = "$k(" . join(",", @vals) . ")";
 	push(@q, $qe);
     }
@@ -55,7 +61,7 @@ sub query
     {
 	my $lim = "limit($chunk,$start)";
 	my $q = "$qstr&$lim";
-	print "Qry $url '$q'\n";
+	#print "Qry $url?$q\n";
 #	my $resp = $ua->post($url,
 #			     Accept => "application/json",
 #			     Content => $q);
