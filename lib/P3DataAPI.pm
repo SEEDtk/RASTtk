@@ -4,12 +4,15 @@ use LWP::UserAgent;
 use strict;
 use JSON::XS;
 use Data::Dumper;
+no warnings 'once';
 
 eval {
     require FIG_Config;
 };
 
 our $default_url = $FIG_Config::p3_data_api_url || "https://www.patricbrc.org/api";
+
+use warnings 'once';
 
 sub new
 {
