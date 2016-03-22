@@ -58,7 +58,7 @@ sub query
     {
 	my $lim = "limit($chunk,$start)";
 	my $q = "$qstr&$lim";
-	print "Qry $url '$q'\n";
+	# print "Qry $url '$q'\n";
 #	my $resp = $ua->post($url,
 #			     Accept => "application/json",
 #			     Content => $q);
