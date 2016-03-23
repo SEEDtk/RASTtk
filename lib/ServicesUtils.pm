@@ -46,6 +46,10 @@ or by the command-line option --db. The possible choices are
 
 Use the L<Shrub> database in the SEEDtk environment.
 
+=item P3
+
+Use the PATRIC web interface.
+
 =back
 
 Thus, to use L<svc_all_genomes.pl> with SEEDtk, you would either need to submit
@@ -165,7 +169,7 @@ sub get_options {
         $helper = eval("$helperName->new()");
         # Get the connection options.
         push @connectOptions, $helper->script_options(),
-           [ "db", "type of database-- SEEDtk (if omitted, SERVICE environment variable is used)",
+           [ "db=s", "type of database-- SEEDtk or P3 (if omitted, SERVICE environment variable is used)",
                 { default => $ENV{SERVICE} }];
     }
     # Do we need a standard input?

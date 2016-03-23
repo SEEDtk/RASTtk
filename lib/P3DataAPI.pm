@@ -58,11 +58,11 @@ sub query
     {
 	my $lim = "limit($chunk,$start)";
 	my $q = "$qstr&$lim";
-	# print "Qry $url '$q'\n";
-#	my $resp = $ua->post($url,
-#			     Accept => "application/json",
-#			     Content => $q);
-	my $resp = $ua->get("$url?$q", Accept => "application/json");
+#       print STDERR "Qry $url '$q'\n";
+	my $resp = $ua->post($url,
+			     Accept => "application/json",
+			     Content => $q);
+#	my $resp = $ua->get("$url?$q", Accept => "application/json");
 	if (!$resp->is_success)
 	{
 	    die "Failed: " . $resp->code . "\n" . $resp->content;
