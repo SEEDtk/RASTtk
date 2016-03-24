@@ -4,7 +4,9 @@ use LWP::UserAgent;
 use strict;
 use JSON::XS;
 use Data::Dumper;
+
 no warnings 'once';
+
 
 eval {
     require FIG_Config;
@@ -41,6 +43,11 @@ sub query
 	if (@vals == 1 && ref($vals[0]))
 	{
 	    @vals = @{$vals[0]};
+	}
+	if ($vals[0] eq "product") {
+
+			#$vals[1] =~ s/ /\+/g;
+			$vals[1] = "\"$vals[1]\"";
 	}
 	my $qe = "$k(" . join(",", @vals) . ")";
 	push(@q, $qe);
