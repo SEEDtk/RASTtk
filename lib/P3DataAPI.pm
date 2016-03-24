@@ -59,18 +59,17 @@ sub query
 	my $lim = "limit($chunk,$start)";
 	my $q = "$qstr&$lim";
 #       print STDERR "Qry $url '$q'\n";
-	my $resp = $ua->post($url,
-			     Accept => "application/json",
-			     Content => $q);
-#	my $resp = $ua->get("$url?$q", Accept => "application/json");
+#	my $resp = $ua->post($url,
+#			     Accept => "application/json",
+#			     Content => $q);
+	my $resp = $ua->get("$url?$q", Accept => "application/json");
 	if (!$resp->is_success)
 	{
 	    die "Failed: " . $resp->code . "\n" . $resp->content;
 	}
-
 	my $data = decode_json($resp->content);
 	push @result, @$data;
-
+#        print STDERR scalar(@$data) . " results found.\n";
 	my $r = $resp->header('content-range');
 #	print "r=$r\n";
 	if ($r =~ m,items\s+(\d+)-(\d+)/(\d+),)
