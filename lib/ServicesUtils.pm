@@ -23,6 +23,7 @@ package ServicesUtils;
     use Getopt::Long::Descriptive;
 
 
+
 =head1 Service Script Utilities
 
 This is a simple package that contains the basic utility methods for common service scripts. The common
@@ -44,6 +45,10 @@ or by the command-line option --db. The possible choices are
 =item STK
 
 Use the L<Shrub> database in the SEEDtk environment.
+
+=item P3
+
+Use the PATRIC web interface.
 
 =back
 
@@ -144,11 +149,13 @@ sub get_options {
     unless ($flags->{nodb}) {
         # Yes. Now we must determine the operating environment. Check for a command-line option.
         my $type;
-        my $loc = 0; while ($loc < @ARGV && $ARGV[$loc] !~ /^--db=(\S+)/) { $loc++ }
-        if ($loc < @ARGV) {
-            # We found the option. Save its value.
-            $type = $1;
-        } else {
+        my $n = scalar @ARGV;
+        for (my $loc = 0; $loc < $n && ! $type; $loc++) {
+            if ($ARGV[$loc] =~ /^--db=(\S+)/) {
+                $type = $1;
+            }
+        }
+        if (! $type) {
             # No command-line option. Pull from the environment.
             $type = $ENV{SERVICE};
         }
@@ -162,7 +169,7 @@ sub get_options {
         $helper = eval("$helperName->new()");
         # Get the connection options.
         push @connectOptions, $helper->script_options(),
-           [ "db", "type of database-- SEEDtk (if omitted, SERVICE environment variable is used)",
+           [ "db=s", "type of database-- SEEDtk or P3 (if omitted, SERVICE environment variable is used)",
                 { default => $ENV{SERVICE} }];
     }
     # Do we need a standard input?

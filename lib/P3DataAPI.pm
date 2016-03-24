@@ -4,13 +4,17 @@ use LWP::UserAgent;
 use strict;
 use JSON::XS;
 use Data::Dumper;
-use URI::Escape;  # uri_escape()
+
+no warnings 'once';
+
 
 eval {
     require FIG_Config;
 };
 
 our $default_url = $FIG_Config::p3_data_api_url || "https://www.patricbrc.org/api";
+
+use warnings 'once';
 
 sub new
 {
@@ -61,11 +65,11 @@ sub query
     {
 	my $lim = "limit($chunk,$start)";
 	my $q = "$qstr&$lim";
-	#print "Qry $url?$q\n";
-#	my $resp = $ua->post($url,
-#			     Accept => "application/json",
-#			     Content => $q);
-	my $resp = $ua->get("$url?$q", Accept => "application/json");
+#       print STDERR "Qry $url '$q'\n";
+	my $resp = $ua->post($url,
+			     Accept => "application/json",
+			     Content => $q);
+#	my $resp = $ua->get("$url?$q", Accept => "application/json");
 	if (!$resp->is_success)
 	{
 	    die "Failed: " . $resp->code . "\n" . $resp->content;
