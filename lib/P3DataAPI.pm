@@ -44,11 +44,6 @@ sub query
 	{
 	    @vals = @{$vals[0]};
 	}
-	if ($vals[0] eq "product") {
-
-			#$vals[1] =~ s/ /\+/g;
-			$vals[1] = "\"$vals[1]\"";
-	}
 	my $qe = "$k(" . join(",", @vals) . ")";
 	push(@q, $qe);
     }
