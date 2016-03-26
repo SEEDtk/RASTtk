@@ -79,7 +79,7 @@ Index of the input column (1-based). The default is C<0>, indicating the last co
 
 The number of input records to process in a batch. Most retrieval methods are more efficient operating
 on multiple input lines at once, but if commands are strung together in a pipe, breaking the input into
-smaller batches increases the opportunity for parallelism. The default is C<1000>.
+smaller batches increases the opportunity for parallelism. The default is C<500>.
 
 =back
 
@@ -138,7 +138,7 @@ sub get_options {
         $flags = pop @options;
     }
     my $inputStyle = $flags->{input} // 'col';
-    my $batchDefault = $flags->{batchSize} // 1000;
+    my $batchDefault = $flags->{batchSize} // 500;
     # This will contain the name of the helper object.
     my $helperName;
     # This will contain the helper object itself.
