@@ -138,7 +138,7 @@ sub get_options {
         $flags = pop @options;
     }
     my $inputStyle = $flags->{input} // 'col';
-    my $batchDefault = $flags->{batchSize} // 500;
+    my $batchDefault = $flags->{batchSize} // 200;
     # This will contain the name of the helper object.
     my $helperName;
     # This will contain the helper object itself.
