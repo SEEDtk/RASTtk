@@ -218,6 +218,37 @@ sub Finalize {
     $self->{finalized} = 1;
 }
 
+=head3 ComputeDiscriminators
+
+    $kmerdb->ComputeDiscriminators();
+
+Clean up the kmer hash to remove kmers found in more than one group. This is an alternative to
+L<Finalize>.
+
+=cut
+
+sub ComputeDiscriminators {
+    my ($self) = @_;
+    # Loop through the kmers.
+    my $kmerHash = $self->{kmerHash};
+    for my $kmer (keys %$kmerHash) {
+        # Get this kmer's list and remove duplicate groups.
+        my $groupList = $kmerHash->{$kmer};
+        my %groupHash = map { $_ => 1 } @$groupList;
+        my @groups = keys %groupHash;
+        # Is this kmer in only one group?
+        if (scalar @groups == 1) {
+            # Yes, keep it.
+            $kmerHash->{$kmer} = @groups;
+        } else {
+            # No, delete it.
+            delete $kmerHash->{$kmer};
+        }
+    }
+    # Denote this database is finalized.
+    $self->{finalized} = 1;
+}
+
 =head3 Save
 
     $kmerdb->Save($file);
@@ -297,9 +328,6 @@ sub groups_of {
     # Return the result.
     return $retVal;
 }
-
-
-
 
 
 =head3 count_hits
