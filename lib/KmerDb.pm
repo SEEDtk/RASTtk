@@ -239,7 +239,7 @@ sub ComputeDiscriminators {
         # Is this kmer in only one group?
         if (scalar @groups == 1) {
             # Yes, keep it.
-            $kmerHash->{$kmer} = @groups;
+            $kmerHash->{$kmer} = \@groups;
         } else {
             # No, delete it.
             delete $kmerHash->{$kmer};

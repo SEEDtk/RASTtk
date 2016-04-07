@@ -472,7 +472,7 @@ sub update_feature_index
 	$seen{$_->{id}}++ foreach @{$self->features};
 	my @dups = grep { $seen{$_} > 1 } keys %seen;
 	my $n = 10;
-	my $extra;
+	my $extra = '';
 	if (@dups > $n)
 	{
 	    $#dups = $n-1;

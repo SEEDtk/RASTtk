@@ -146,19 +146,26 @@ sub gto_of {
     # Get the features.
     my @f = $self->query("genome_feature", ["eq", "genome_id", $genomeID],
                     ["select", "patric_id", "sequence_id", "strand", "segments", "feature_type", "product", "aa_sequence"]);
+    # This prevents duplicates.
+    my %fids;
     for my $f (@f) {
-        my $prefix = $f->{sequence_id} . "_";
-        my $strand = $f->{strand};
-        my @locs;
-        for my $s (@{$f->{segments}}) {
-            my ($s1, $s2) = split /\.\./, $s;
-            my $len = $s2 + 1 - $s1;
-            my $start = ($strand eq '-' ? $s2 : $s1);
-            push @locs, "$prefix$start$strand$len";
+        # Skip duplicates.
+        my $fid = $f->{patric_id};
+        if (! $fids{$fid}) {
+            my $prefix = $f->{sequence_id} . "_";
+            my $strand = $f->{strand};
+            my @locs;
+            for my $s (@{$f->{segments}}) {
+                my ($s1, $s2) = split /\.\./, $s;
+                my $len = $s2 + 1 - $s1;
+                my $start = ($strand eq '-' ? $s2 : $s1);
+                push @locs, "$prefix$start$strand$len";
+            }
+            $retVal->add_feature({-id => $fid, -location => \@locs,
+                    -type => $f->{feature_type}, -function => $f->{product},
+                    -protein_translation => $f->{aa_sequence} });
+            $fids{$fid} = 1;
         }
-        $retVal->add_feature({-id => $f->{patric_id}, -location => \@locs,
-                -type => $f->{feature_type}, -function => $f->{product},
-                -protein_translation => $f->{aa_sequence} });
     }
     # Return the GTO.
     return $retVal;
