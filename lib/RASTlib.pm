@@ -167,7 +167,11 @@ sub Annotate {
         }
         my $json = $response->content;
         $retVal = SeedUtils::read_encoded_object(\$json);
+        # Add the RAST information to the GTO.
+        $retVal->{rast_specs} = { id => $jobID, user => $user }
     }
+    # Return the GTO built.
+    return $retVal;
 }
 
 
