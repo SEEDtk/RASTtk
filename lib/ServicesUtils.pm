@@ -32,6 +32,8 @@ PATRIC, and are designed to allow the creation of command-line pipelines for res
 
 =head2 Public Methods
 
+=head3 get_options
+
     my ($opt, $helper) = ServicesUtils::get_options($parmComment, @options, \%flags);
 
 Parse the command-line options for a services command and return the helper object.

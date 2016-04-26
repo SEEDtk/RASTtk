@@ -135,7 +135,11 @@ sub new {
         $triplesList = $source;
     } elsif (ref $source eq 'GenomeTypeObject') {
         # The parameter is a GenomeTypeObject.
-        $triplesList = [$source->contigs];
+        $triplesList = [];
+        my $contigs = $source->{contigs};
+        for my $contig (@$contigs) {
+            push @$triplesList, [$contig->{id}, '', $contig->{dna}];
+        }
     } else {
         # Here we have a FASTA source.
         $triplesList = gjoseqlib::read_fasta($source);
@@ -502,7 +506,8 @@ sub fasta_out {
     # Loop through the contig triples, printing them.
     my $triples = $self->{triples};
     for my $contigID (sort keys %$triples) {
-        print $oh ">$triples->[0] $triples->[1]\n$triples->[2]\n";
+        my $tuple = $triples->{$contigID};
+        print $oh ">$tuple->[0] $tuple->[1]\n$tuple->[2]\n";
     }
 }
 
