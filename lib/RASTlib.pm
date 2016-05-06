@@ -98,9 +98,9 @@ sub Annotate {
     my ($contigs, $taxonID, $name, %options) = @_;
     if (! $taxonID) {
         die "Missing taxon ID for RAST annotation.";
-    } elsif ($taxonID =~ /^(\d+)\.(?:\d+)?$/) {
+    } elsif ($taxonID =~ /^(\d+)\.\d+$/) {
         $taxonID = $1;
-    } else {
+    } elsif ($taxonID !~ /^\d+$/) {
         die "Invalid taxon ID $taxonID for RAST annotation.";
     }
     if (! $name) {
