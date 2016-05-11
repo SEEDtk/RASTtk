@@ -149,7 +149,7 @@ sub AddSequence {
     # upper case.
     for (my $i = 0; $i < $last; $i++) {
         my $kmer = uc substr($sequence, $i, $klen);
-        push @{$kmerHash->{$kmer}}, $groupID;
+        $kmerHash->{$kmer}{$groupID}++;
     }
     # Process the group name if we got one.
     if ($name) {
@@ -202,15 +202,18 @@ sub Finalize {
         my $kmerHash = $self->{kmerHash};
         for my $kmer (keys %$kmerHash) {
             # Get this kmer's list.
-            my $groupList = $kmerHash->{$kmer};
+            my $groupHash = $kmerHash->{$kmer};
+            my $count = 0;
+            for my $group (keys %$groupHash) {
+                $count += $groupHash->{$group};
+            }
             # Are we keeping it?
-            if (scalar @$groupList > $maxFound) {
+            if ($count > $maxFound) {
                 # No, it is too common.
                 delete $kmerHash->{$kmer};
             } else {
                 # Yes. Remove the duplicates.
-                my %groupHash = map { $_ => 1 } @$groupList;
-                $kmerHash->{$kmer} = [keys %groupHash];
+                $kmerHash->{$kmer} = [keys %$groupHash];
             }
         }
     }
@@ -233,9 +236,8 @@ sub ComputeDiscriminators {
     my $kmerHash = $self->{kmerHash};
     for my $kmer (keys %$kmerHash) {
         # Get this kmer's list and remove duplicate groups.
-        my $groupList = $kmerHash->{$kmer};
-        my %groupHash = map { $_ => 1 } @$groupList;
-        my @groups = keys %groupHash;
+        my $groupHash = $kmerHash->{$kmer};
+        my @groups = keys %$groupHash;
         # Is this kmer in only one group?
         if (scalar @groups == 1) {
             # Yes, keep it.
