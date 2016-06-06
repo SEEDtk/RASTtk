@@ -156,6 +156,7 @@ sub Annotate {
             } else {
                  my $status = $response->content;
                  $done = ($status eq 'completed');
+                 if (! $done) { print STDERR "$status\n"; } ##TODO debugging
             }
         }
         # Get the results.
