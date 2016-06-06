@@ -155,8 +155,11 @@ sub Annotate {
                 die "Error response for RAST status: " . $response->message;
             } else {
                  my $status = $response->content;
-                 $done = ($status eq 'completed');
-                 if (! $done) { print STDERR "$status\n"; } ##TODO debugging
+                 if ($status eq 'completed') {
+                     $done = 1;
+                 } elsif ($status ne 'in-progress') {
+                     die "Error status for RAST: $status.";
+                 }
             }
         }
         # Get the results.
