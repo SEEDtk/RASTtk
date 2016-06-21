@@ -33,7 +33,7 @@ L<GenomeTypeObject>. The GTO produced is the true SEEDtk version.
 =cut
 
 # URL for RAST requests
-use constant RAST_URL => 'http://p3c.theseed.org/rast/quick';
+use constant RAST_URL => 'https://p3.theseed.org/rast/quick';
 
 =head2 Public Methods
 
@@ -136,6 +136,7 @@ sub Annotate {
     my $request = HTTP::Request->new(POST => "$url", $header, $contigString);
     # Submit the request.
     my $ua = LWP::UserAgent->new();
+#    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0x00);
     my $response = $ua->request($request);
     if ($response->code ne 200) {
         die "Error response for RAST submisssion: " . $response->message;
