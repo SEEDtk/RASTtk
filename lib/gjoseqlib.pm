@@ -15,8 +15,25 @@ Efficient reading of an entire file of sequences:
   @seq_entries = read_fasta( \*FILEHANDLE )
   @seq_entries = read_fasta(  $filename )
 
+Legacy interface:
+
+  @seq_entries = read_fasta_seqs( \*FILEHANDLE )   # Original form
+
 Reading sequences one at a time to conserve memory.  Calls to different
 files can be intermixed.
+
+  @entry = read_next_fasta( \*FILEHANDLE )
+ \@entry = read_next_fasta( \*FILEHANDLE )
+  @entry = read_next_fasta(  $filename )
+ \@entry = read_next_fasta(  $filename )
+  @entry = read_next_fasta()                   # STDIN
+ \@entry = read_next_fasta()                   # STDIN
+
+Close an open file that has not been read to the end:
+
+  close_fasta(  $filename )
+ 
+Legacy interface:
 
   @entry = read_next_fasta_seq( \*FILEHANDLE )
  \@entry = read_next_fasta_seq( \*FILEHANDLE )
@@ -24,10 +41,6 @@ files can be intermixed.
  \@entry = read_next_fasta_seq(  $filename )
   @entry = read_next_fasta_seq()                   # STDIN
  \@entry = read_next_fasta_seq()                   # STDIN
-
-Legacy interface:
-
-  @seq_entries = read_fasta_seqs( \*FILEHANDLE )   # Original form
 
 Reading clustal alignment.
 
@@ -239,9 +252,13 @@ require Exporter;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
-        read_fasta_seqs
         read_fasta
+        read_next_fasta
+        close_fasta
+
+        read_fasta_seqs
         read_next_fasta_seq
+
         read_clustal_file
         read_clustal
         parse_fasta_title
@@ -519,11 +536,24 @@ sub read_fasta_0
 }
 
 
-=head2 read_next_fasta_seq
+=head2 read_next_fasta
 
 Read one fasta sequence at a time from a file.  This is half as fast a
 read_fasta(), but can handle an arbitrarily large file.  State information
 is retained in hashes, so any number of streams can be interlaced.
+
+      @entry = read_next_fasta( \*FILEHANDLE )
+     \@entry = read_next_fasta( \*FILEHANDLE )
+      @entry = read_next_fasta(  $filename )
+     \@entry = read_next_fasta(  $filename )
+      @entry = read_next_fasta()                # \*STDIN
+     \@entry = read_next_fasta()                # \*STDIN
+
+Where,
+
+      @entry = ( $id, $description, $seq )
+
+Longer, legacy name:
 
       @entry = read_next_fasta_seq( \*FILEHANDLE )
      \@entry = read_next_fasta_seq( \*FILEHANDLE )
@@ -532,11 +562,14 @@ is retained in hashes, so any number of streams can be interlaced.
       @entry = read_next_fasta_seq()                # \*STDIN
      \@entry = read_next_fasta_seq()                # \*STDIN
 
-      @entry = ( $id, $description, $seq )
-
 When reading at the end of file, () is returned.
 With a filename, reading past this will reopen the file at the beginning.
 
+Beware: openning a filename, and not reading it to the end leaves the file
+open, which can hit the file system limit for open files.  So, use 
+
+      close_fasta(  $filename )
+    
 =cut
 
 #  Reading always overshoots, so save next id and description
@@ -547,7 +580,19 @@ With a filename, reading past this will reopen the file at the beginning.
     my %file_handle;
     my %close_file;
 
-    sub read_next_fasta_seq
+    sub close_fasta
+    {
+        $_[0] or return 0;
+        my $fh = $file_handle{ $_[0] }
+            or return 0;
+        if ( $close_file{ $fh } ) { close $fh; delete $close_file{ $fh } }
+        delete $file_handle{ $_[0] };
+        1;
+    }
+
+    sub read_next_fasta_seq { read_next_fasta( @_ ) }
+
+    sub read_next_fasta
     {
         $_[0] ||= \*STDIN;               #  Undefined $_[0] fails with use warn
         my $fh = $file_handle{ $_[0] };
@@ -580,6 +625,7 @@ With a filename, reading past this will reopen the file at the beginning.
             $next_header{$fh} = '';
         }
 
+        local $_;
         while ( <$fh> )
         {
             chomp;
