@@ -557,7 +557,7 @@ sub gto_of {
         $genetic_code = $code[0]->{genetic_code} if (@code);
 
         # Create the initial GTO.
-        my $retVal = GenomeTypeObject->new();
+        $retVal = GenomeTypeObject->new();
         $retVal->set_metadata(
             {
                 id               => $g->{genome_id},
