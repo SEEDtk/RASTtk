@@ -185,11 +185,6 @@ Open input handle for a tab-delimited file.
 
 Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
 
-=item batchSize (optional)
-
-If specified, only a limited number of rows will be returned. The specified value is the number of rows.
-This parameter is used to divide the input into batches for performance or parallelism reasons.
-
 =item RETURN
 
 Returns a list of the values retrieved.
@@ -212,6 +207,42 @@ sub get_col {
         }
     }
     return @retVal;
+}
+
+=head3 read_col
+
+    my $value = ScriptUtils::get_col($ih, $col);
+
+Read from the specified tab-delimited input stream and extract the value from the specified column
+of the next record. An undefined or zero value for the column index will retrieve the last column.
+
+=over 4
+
+=item ih
+
+Open input handle for a tab-delimited file.
+
+=item col
+
+Index (1-based) of the desired column. A zero or undefined value may be used to specified the last column.
+
+=item RETURN
+
+Returns the value retrieved.
+
+=back
+
+=cut
+
+sub read_col {
+    my ($ih, $col) = @_;
+    my $retVal;
+    $col //= 0;
+    my $line = <$ih>;
+    $line =~ s/\r?\n$//;
+    my @flds = split /\t/, $line;
+    $retVal = $flds[$col - 1];
+    return $retVal;
 }
 
 =head3 get_couplets
