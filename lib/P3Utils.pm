@@ -194,6 +194,49 @@ sub get_couplets {
     return $retVal;
 }
 
+=head3 get_col
+
+    my $column = P3Utils::get_col($ih, $colNum);
+
+Read an entire column of data from a tab-delimited input file.
+
+=over 4
+
+=item ih
+
+Open input file handle for the tab-delimited input file, positioned after the headers.
+
+=item colNum
+
+Index of the key column.
+
+=item RETURN
+
+Returns a reference to a list of column values.
+
+=back
+
+=cut
+
+sub get_col {
+    my ($ih, $colNum) = @_;
+    # Declare the return variable.
+    my @retVal;
+    # Loop through the input.
+    while (! eof $ih) {
+        # Read the next line.
+        my $line = <$ih>;
+        # Remove the EOL.
+        $line =~ s/[\r\n]+$//;
+        # Split the line into fields.
+        my @fields = split /\t/, $line;
+        # Extract the key column.
+        push @retVal, $fields[$colNum];
+    }
+    # Return the result.
+    return \@retVal;
+}
+
 =head3 process_headers
 
     my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
@@ -246,6 +289,47 @@ sub process_headers {
     }
     # Return the results.
     return (\@outHeaders, $keyCol);
+}
+
+=head3 find_column
+
+    my $keyCol = P3Utils::find_column($col, \@headers);
+
+Determine the correct (0-based) index of the key column in a file from a column specifier and the headers.
+The column specifier can be a 1-based index or the name of a header.
+
+=over 4
+
+=item col
+
+Incoming column specifier.
+
+=item headers
+
+Reference to a list of column header names.
+
+=item RETURN
+
+Returns the 0-based index of the key column.
+
+=back
+
+=cut
+
+sub find_column {
+    my ($col, $headers) = @_;
+    my $retVal;
+    if ($col =~ /^\-?\d+$/) {
+        # Here we have a column number.
+        $retVal = $col - 1;
+    } else {
+        # Here we have a header name.
+        my $n = scalar @$headers;
+        for ($retVal = 0; $retVal < $n && $headers->[$retVal] ne $col; $retVal++) {};
+        die "\"$col\" not found in headers." if ($retVal >= $n); 
+    }
+    return $retVal;
+
 }
 
 =head3 form_filter
