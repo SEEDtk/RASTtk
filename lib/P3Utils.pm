@@ -36,7 +36,7 @@ Mapping from user-friendly names to PATRIC names.
 
 =cut
 
-use constant OBJECTS => {   genome => 'genome', feature => 'genome_feature', protein_family => 'protein_family_ref',
+use constant OBJECTS => {   genome => 'genome', feature => 'genome_feature', family => 'protein_family_ref',
                             genome_drug => 'genome_amr' };
 
 =head3 FIELDS
@@ -46,8 +46,8 @@ Mapping from user-friendly object names to default fields.
 =cut
 
 use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', 'genome_status', 'gc_content'],
-                            feature => ['feature_id', 'feature_type', 'location', 'product'],
-                            protein_family => ['family_id', 'family_type', 'family_product'],
+                            feature => ['patric_id', 'feature_type', 'location', 'product'],
+                            family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'] };
 
 =head3 IDCOL
@@ -56,7 +56,7 @@ Mapping from user-friendly object names to ID column names.
 
 =cut
 
-use constant IDCOL =>   {   genome => 'genome_id', feature => 'feature_id', protein_family => 'family_id',
+use constant IDCOL =>   {   genome => 'genome_id', feature => 'patric_id', family => 'family_id',
                             genome_drug => 'id' };
 
 =head2  Methods
@@ -87,14 +87,20 @@ Multi-valued equality constraints of the form I<field-name>C<,>I<value1>C<,>I<va
 The constraint is satisfied if the field value matches any one of the specified constraint values. Multiple
 constraints may be specified by coding the option multiple times.
 
+=item required
+
+Specifies the name of a field that must have a value for the record to be included in the output. Multiple
+fields may be specified by coding the option multiple times.
+
 =back
 
 =cut
 
 sub data_options {
-    return (['attr|a=s@', 'fields to return'],
-            ['equal|eq|e=s@', 'search constraint in the form field_name,value'],
-            ['in=s@', 'any-value search constraint in the form field_name,value1,value2,...,valueN']);
+    return (['attr|a=s@', 'field(s) to return'],
+            ['equal|eq|e=s@', 'search constraint(s) in the form field_name,value'],
+            ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
+            ['required|r=s@', 'field(s) required to have values']);
 }
 
 =head3 col_options
@@ -290,6 +296,14 @@ sub form_filter {
         @values = map { clean_value($_) } @values;
         # Apply the constraint.
         push @retVal, ['in', $field, '(', join(',', @values) . ')'];
+    }
+    # Get the requirement constraints.
+    my $reqList = $opt->required // [];
+    for my $field (@$reqList) {
+        # Validate the field name.
+        die "Invalid field name \"$field\" for required-specification." if ($field =~ /\W+/);
+        # Apply the constraint.
+        push @retVal, ['eq', $field, '*'];
     }
     # Return the filter clauses.
     return \@retVal;
@@ -754,7 +768,21 @@ sub _process_entries {
     my ($retList, $entries, $row, $cols) = @_;
     for my $entry (@$entries) {
         my @outCols = map { $entry->{$_} } @$cols;
-        push @$retList, [@$row, @outCols];
+        # Process the columns. If any are undefined, we change them
+        # to empty strings. If all are undefined, we throw away the
+        # record.
+        my $reject = 1;
+        for (my $i = 0; $i < @outCols; $i++) {
+            if (! defined $outCols[$i]) {
+                $outCols[$i] = '';
+            } else {
+                $reject = 0;
+            }
+        }
+        # Output the record if it is NOT rejected.
+        if (! $reject) {
+            push @$retList, [@$row, @outCols];
+        }
     }
 }
 
