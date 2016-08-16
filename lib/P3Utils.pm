@@ -563,6 +563,8 @@ on this object.
 sub script_opts {
     # Get the parameters.
     my ($parmComment, @options) = @_;
+    # Insure we can talk to PATRIC from inside Argonne.
+    $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME} = 0;
     # Parse the command line.
     my ($retVal, $usage) = describe_options('%c %o ' . $parmComment, @options,
            [ "help|h", "display usage information", { shortcircuit => 1}]);
