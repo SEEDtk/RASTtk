@@ -45,6 +45,62 @@ sub auth_header {
     }
 }
 
+=head3 query
+
+    my @rows = $d->query($core, @query);
+
+Run a query against the PATRIC database. Automatic flow control is used to reduce the possibility of timeout or overrun
+errors.
+
+=over 4
+
+=item core
+
+The name of the PATRIC object to be queried.
+
+=item query
+
+A list of query specifications, consisting of zero or more tuples. The first element of each tuple is a specification type,
+which must be one of the following.
+
+=over 8
+
+=item select
+
+Specifies a list of the names for the fields to be returned. There should only be one C<select> tuple. If none is present,
+all the fields will be returned.
+
+=item eq
+
+Specifies a field name and matching value. This forms a constraint on the query. If the field is a string field, the
+constraint will be satisfied if the value matches a substring of the field value. If the field is a numeric field, the
+constraint will be satisfied if the value exactly matches the field value. In the string case, an interior asterisk can
+be used as a wild card.
+
+=item in
+
+Specifies a field name and a string containing a comma-delimited list of matching values enclosed in parentheses. This forms 
+a constraint on the query. It works much like C<eq>, except the constraint is satisfied if the field value matches any one of 
+the specified values. This is the only way to introduce OR-like functionality into the query.
+
+=item sort
+
+Specifies a list of field names, each prefixed by a C<+> or C<->. The output will be sorted in the fashion indicated by
+the field names, ascending for C<+>, descending for C<->.
+
+=back
+
+Note that parentheses must be manually removed from field values and special characters in the database are frequently
+ignored during string matches.
+
+=item RETURN
+
+Returns a list of tuples for the records matched, with one value per field.
+
+=back
+
+=cut
+
 sub query
 {
     my ( $self, $core, @query ) = @_;
