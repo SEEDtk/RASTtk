@@ -818,6 +818,107 @@ sub match {
     return $retVal;
 }
 
+=head3 match_headers
+
+    my (\@headers, \@cols) = P3Utils::match_headers($ih, $fileType => @fields);
+
+Search the headers of the specified input file for the named fields and return the list of headers plus a list of 
+the column indices for the named fields.
+
+=over 4
+
+=item ih
+
+Open input file handle.
+
+=item fileType
+
+Name to give the input file in error messages.
+
+=item fields
+
+A list of field names for the desired columns.
+
+=item RETURN
+
+Returns a two-element list consisting of (0) a reference to a list of the headers from the input file and 
+(1) a reference to a list of column indices for the desired columns of the input, in order.
+
+=back
+
+=cut
+
+sub find_headers {
+    my ($ih, $fileType, @fields) = @_;
+    # Read the column headers from the file.
+    my $line = <$ih>;
+    $line =~ s/[\r\n]+$//;
+    my @headers = split /\t/, $line;
+    # Get a hash of the field names.
+    my %fieldH = map { $_ => undef } @fields;
+    # Loop through the headers, saving indices.
+    for (my $i = 0; $i < @headers; $i++) {
+        my $header = $headers[$i];
+        if (exists $fieldH{$header}) {
+            $fieldH{$header} = $i;
+        }
+    }
+    # Accumulate the headers that were not found.
+    my @bad;
+    for my $field (keys %fieldH) {
+        if (! defined $fieldH{$field}) {
+            push @bad, $field;
+        }
+    }
+    # If any headers were not found, it is an error.
+    if (scalar(@bad) == 1) {
+        die "Could not find required column \"$bad[0]\" in $fileType file.";
+    } elsif (scalar(@bad) > 1) {
+        die "Could not find required columns in $fileType file: " . join(", ", @bad);
+    }
+    # If we got this far, we are ok, so return the results.
+    my @cols = map { $fieldH{$_} } @fields;
+    return (\@headers, \@cols);
+}
+
+=head3 get_cols
+
+    my @values = P3Utils::get_cols($ih, $cols);
+
+This method returns all the values in the specified columns of the input file, in order. It is meant to be used
+as a companion to L</find_headers>.
+
+=over 4
+
+=item ih
+
+Open input file handle.
+
+=item cols
+
+Reference to a list of column indices.
+
+=item RETURN
+
+Returns a list containing the fields in the specified columns, in order.
+
+=back
+
+=cut
+
+sub get_cols {
+    my ($ih, $cols) = @_;
+    # Read the input line.
+    my $line = <$ih>;
+    $line =~ s/[\r\n]+$//;
+    # Get the columns.
+    my @fields = split /\t/, $line;
+    # Extract the ones we want.
+    my @retVal = map { $fields[$_] } @$cols;
+    # Return the resulting values.
+    return @retVal;
+}
+
 =head2 Internal Methods
 
 =head3 _process_entries
