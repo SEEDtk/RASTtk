@@ -6,15 +6,14 @@ use P3Utils;
 =head1 Compute Cluster Signatures
 
      p3-signature-clusters  
-        < family.data                   
+        < peg.data                   
         > cluster.signatures
 
 The standard input file normally contains I<[n/a, n/a, family_id, feature_id, contig, start, end, strand, function]>
 (the first two columns are ignored). Such a file is created from a family signatures file (output of
 L<p3-signature-familes.pl>) using the following command
 
-    p3-get-family-features --attr patric_id --attr accession --attr start --attr end --attr strand --attr product 
-                           --col family.family_id --gFile=FileOfGenomeIds
+    p3-signature-peginfo --gs1=FileOfGenomeIds < family.data > peg.data
 
 However, any file containing the appropriately named columns in the headers (see below) will work.
 
@@ -135,8 +134,12 @@ while (! eof $ih)
 my %fam_score;
 my %best_fam_cluster;
 
-foreach my $g (keys(%genomes))
+foreach my $g (sort { $a <=> $b } keys(%genomes))
 {
+    #  We compute all clusters for a genome, sort them by length,
+    #  print them.
+    my @output;
+
     # Get all the features for this genome and sort them by contig ID and location midpoint.
     my $features = $genomes{$g};
     my @sorted = sort { ($a->[0] cmp $b->[0]) or ($a->[1] <=> $b->[1]) } @$features;
@@ -154,20 +157,27 @@ foreach my $g (keys(%genomes))
         my $n = @close;
         if ($n > 2)
         {
-            if ($verbose)
-            {
-                foreach $_ (@close)
-                {
-                    print join("\t",($_->[2],$_->[3],$_->[4])),"\n";
-                }
-                print "//\n";
-            }
-            else 
-            {
-                my $pegs = join(",",map { $_->[3] } @close);
-                print $g,"\t",$pegs,"\n";
-            }
-        }
+            push(@output,[$n,[@close]]);
+	}
+    }
+    my @sorted_clusters = sort { $b->[0] <=> $a->[0]} @output;
+    foreach my $cluster (@sorted_clusters)
+    {
+	my $close = $cluster->[1];
+	if ($verbose)
+	{
+	    foreach $_ (@$close)
+	    {
+		print join("\t",($_->[2],$_->[3],$_->[4])),"\n";
+	    }
+	    print "//\n";
+	}
+	else 
+	{
+	    my $pegs = join(",",map { $_->[3] } @$close);
+	    print $g,"\t",$pegs,"\n";
+	}
     }
 }
+
 
