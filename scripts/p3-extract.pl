@@ -1,6 +1,6 @@
 =head1 Select Rows from an Input File
 
-    p3-collate [options] value
+    p3-extract [options] value
 
 This script extracts rows from a tab-delimited file based on the value in a specified column. Optionally,
 it can create a second output file containing the rejected rows.

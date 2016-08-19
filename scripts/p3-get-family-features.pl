@@ -68,9 +68,7 @@ if ($opt->gfile) {
     my $genomeFile = $opt->gfile;
     # Get the headers from the genome file.
     open(my $gh, "<$genomeFile") || die "Could not open genome file: $!";
-    my ($gHeaders) = P3Utils::process_headers($gh);
-    # Find the key column.
-    my $gCol = P3Utils::find_column($opt->gcol, $gHeaders);
+    my ($gHeaders, $gCol) = P3Utils::process_headers($gh, $opt->gcol);
     # Read it in.
     my $genomeIDs = P3Utils::get_col($gh, $gCol);
     # Create the genome ID filter and add it to the existing filter data.
@@ -84,7 +82,7 @@ P3Utils::print_cols($outHeaders);
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Get the output rows for these input couplets.
-    my $resultList = P3Utils::get_data($p3, feature => $filterList, $selectList, $famField => $couplets);
+    my $resultList = P3Utils::get_data_batch($p3, feature => $filterList, $selectList, $couplets, $famField);
     # Print them.
     for my $result (@$resultList) {
         P3Utils::print_cols($result);

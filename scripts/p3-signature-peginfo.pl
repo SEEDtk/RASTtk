@@ -43,17 +43,13 @@ my $filterList = [];
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
-my ($outHeaders) = P3Utils::process_headers($ih);
-# Save the key column.
-my $keyCol = P3Utils::find_column('family.family_id', $outHeaders);
+my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, 'family.family_id');
 # Compute the family ID column.
 my $famField = 'plfam_id';
 my $genomeFile = $opt->gs1;
 # Get the headers from the genome file.
 open(my $gh, "<$genomeFile") || die "Could not open genome file: $!";
-my ($gHeaders) = P3Utils::process_headers($gh);
-# Find the key column.
-my $gCol = P3Utils::find_column('genome.genome_id', $gHeaders);
+my ($gHeaders, $gCol) = P3Utils::process_headers($gh, 'genome.genome_id');
 # Read it in.
 my $genomeIDs = P3Utils::get_col($gh, $gCol);
 # Create the genome ID filter and add it to the existing filter data.
@@ -66,7 +62,7 @@ P3Utils::print_cols($outHeaders);
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Get the output rows for these input couplets.
-    my $resultList = P3Utils::get_data($p3, feature => $filterList, \@selectList, $famField => $couplets);
+    my $resultList = P3Utils::get_data_batch($p3, feature => $filterList, \@selectList, $couplets, $famField);
     # Print them.
     for my $result (@$resultList) {
         P3Utils::print_cols($result);
