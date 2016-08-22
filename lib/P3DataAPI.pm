@@ -133,7 +133,7 @@ sub query
         #	my $resp = $ua->post($url,
         #			     Accept => "application/json",
         #			     Content => $q);
-        my ( $start, $end );
+        my $end;
         $start = gettimeofday if $self->{benchmark};
         my $resp = $ua->get( "$url?$q", Accept => "application/json" );
         $end = gettimeofday if $self->{benchmark};
