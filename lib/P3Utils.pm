@@ -643,6 +643,78 @@ sub get_data_batch {
     return \@retVal;
 }
 
+=head3 get_data_keyed
+
+    my $resultList = P3Utils::get_data_keyed($p3, $object, \@filter, \@cols, \@keys, $keyField);
+
+Return all of the indicated fields for the indicated entity (object) with the specified constraints.
+The query is by key, and the keys are split into batches to prevent PATRIC from overloading.
+
+=over 4
+
+=item p3
+
+L<P3DataAPI> object for accessing the database.
+
+=item object
+
+User-friendly name of the PATRIC object whose data is desired (e.g. C<genome>, C<feature>).
+
+=item filter
+
+Reference to a list of filter clauses for the query.
+
+=item cols
+
+Reference to a list of the names of the fields to return from the object.
+
+=item keys
+
+A reference to a list of key values.
+
+=item keyfield (optional)
+
+The key field to use. If omitted, the object's ID field is used.
+
+=item RETURN
+
+Returns a reference to a list of tuples containing the data returned by PATRIC.
+
+=back
+
+=cut
+
+sub get_data_keyed {
+    my ($p3, $object, $filter, $cols, $keys, $keyField) = @_;
+    # Ths will be the return list.
+    my @retVal;
+    # Get the real object name and the ID column.
+    my $realName = OBJECTS->{$object};
+    $keyField //= IDCOL->{$object};
+    # Now we need to form the query modifiers. We start with the column selector. We need to insure the key
+    # field is included.
+    my @keyList;
+    if (! scalar(grep { $_ eq $keyField } @$cols)) {
+        @keyList = ($keyField);
+    }
+    my @mods = (['select', @keyList, @$cols], @$filter);
+    # Create a filter for the keys.
+    # Loop through the keys, a group at a time.
+    my $n = @$keys;
+    for (my $i = 0; $i < @$keys; $i += 200) {
+        # Split out the keys in this batch.
+        my $j = $i + 199;
+        if ($j >= $n) { $j = $n - 1 };
+        my @keys = @{$keys}[$i .. $j];
+        my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
+        # Next we run the query and push the output into the return list.
+        my @results = $p3->query($realName, $keyClause, @mods);
+        _process_entries(\@retVal, \@results, [], $cols);
+    }
+    # Return the result rows.
+    return \@retVal;
+}
+
 =head3 script_opts
 
     my $opt = P3Utils::script_opts($parmComment, @options);
