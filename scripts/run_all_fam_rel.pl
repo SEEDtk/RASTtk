@@ -3,7 +3,7 @@ use Data::Dumper;
 
 =head1 Compute related by signatures for all Genera/Species
 
-    run_all_sel_by_sig Output
+    run_all_sel_by_sig Output genus
 
 Will build a large Output directory. It will contain subdirectories
 for each genus/species computation based on p3-related-by-clusters
@@ -12,13 +12,16 @@ runs (each producing one of the subdirectories).
 
 =head2 Parameters
 
-There are no positional parameters.
+There are two positional parameters-- an output directory (which must not exist) and
+an optional genus. If the genus is specified, only that genus will be processed; otherwise,
+they will all be processed.
 
 Standard input is not used.
 
 =cut
 
-my $outD = shift @ARGV; $outD || die "specify an output directory";
+my ($outD, $genus1) = @ARGV; 
+$outD || die "specify an output directory";
 
 mkdir($outD,0777) || die "cannot make $outD";
 my $cmd = "p3-all-genomes --attr genome_name";
@@ -38,8 +41,15 @@ foreach my $tuple (@genomes)
 	$gs{$g}->{$s}->{$id} = 1;
     }
 }
+my @geni;
+if ($genus1) {
+    @geni = ($genus1);
+} else {
+    @geni = sort keys %gs;
+}
 
-foreach my $genus (sort keys(%gs))
+
+foreach my $genus (@geni)
 {
     my @species = sort keys(%{$gs{$genus}});
     foreach my $s (@species)
