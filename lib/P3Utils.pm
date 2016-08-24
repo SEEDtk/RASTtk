@@ -252,8 +252,7 @@ Open input file handle.
 =item opt (optional)
 
 If specified, should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
-column or a string containing the key column name. If this parameter is undefined or omitted, it will be presumed 
-there is no key column.
+column. If this parameter is undefined or omitted, it will be presumed there is no key column.
 
 =item RETURN
 
@@ -277,12 +276,7 @@ sub process_headers {
     my $keyCol;
     # Search for the key column.
     if (defined $opt) {
-        my $col;
-        if (ref $opt) {
-            $col = $opt->col;
-        } else {
-            $col = $opt;
-        }
+        my $col = $opt->col;
         if ($col =~ /^\-?\d+$/) {
             # Here we have a column number.
             $keyCol = $col - 1;
@@ -561,11 +555,11 @@ sub get_data {
 
 =head3 get_data_batch
 
-    my $resultList = P3Utils::get_data_batch($p3, $object, \@filter, \@cols, \@couplets, $keyField);
+    my $resultList = P3Utils::get_data_batch($p3, $object, \@filter, \@cols, \@couplets);
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
-This version differs from L</get_data> in that the couplet keys are matched to a true key field (the
-matches are exact).
+This version differs from L</get_data> in that the couplet keys are matched to the object's true
+key field.
 
 =over 4
 
@@ -590,10 +584,6 @@ Reference to a list of the names of the fields to return from the object.
 A reference to a list of 2-tuples, each tuple consisting of a key value followed by a reference to a list of the values
 from the input row containing that key value.
 
-=item keyfield (optional)
-
-The key field to use. If omitted, the object's ID field is used.
-
 =item RETURN
 
 Returns a reference to a list of tuples containing the data returned by PATRIC, each output row appended to the appropriate input
@@ -604,12 +594,12 @@ row from the couplets.
 =cut
 
 sub get_data_batch {
-    my ($p3, $object, $filter, $cols, $couplets, $keyField) = @_;
+    my ($p3, $object, $filter, $cols, $couplets) = @_;
     # Ths will be the return list.
     my @retVal;
     # Get the real object name and the ID column.
     my $realName = OBJECTS->{$object};
-    $keyField //= IDCOL->{$object};
+    my $keyField = IDCOL->{$object};
     # Now we need to form the query modifiers. We start with the column selector. We need to insure the key
     # field is included.
     my @keyList;
