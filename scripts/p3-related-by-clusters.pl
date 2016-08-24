@@ -116,9 +116,9 @@ for ($i=0; ($i < $iterations); $i++)
     &run("p3-pick $sz2 < $gs2 > $outD/sample2");
     &run("p3-signature-families --min $min --max $max --gs1 $outD/sample1 --gs2 $outD/sample2 > $outD/F");
     &run("p3-signature-peginfo --gs1=$outD/sample1 < $outD/F | p3-signature-clusters > $outD/CS/$i");
-    &run("perl get_fam_rel.pl < $outD/CS/$i >> $outD/fam.rel");
+    &run("get_fam_rel < $outD/CS/$i >> $outD/fam.rel");
 }
-&run("perl get_fam_corr.pl < $outD/fam.rel > $outD/related.signature.families");
+&run("get_fam_corr < $outD/fam.rel > $outD/related.signature.families");
 
 sub run {
     shift if UNIVERSAL::isa($_[0],__PACKAGE__);

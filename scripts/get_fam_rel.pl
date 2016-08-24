@@ -1,6 +1,7 @@
 use strict;
 use Data::Dumper;
-
+#
+# Collapse a cluster to a single line of family IDs.
 $/ = "\n//\n";
 my $x;
 while (defined($x = <STDIN>))

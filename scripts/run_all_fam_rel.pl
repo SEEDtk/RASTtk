@@ -66,7 +66,7 @@ foreach my $genus (sort keys(%gs))
 	    &dump_to_file(\@in,$fI);
 	    &dump_to_file(\@out,$fO);
 	    my $outN = "Output.$genus.$s";
-	    &run("p3-related-by-clusters. --gs1 $fI --gs2 $fO -n 1 --sz2=30 --sz1=30  -o $outD/$outN --min 1.0 --max 0.0");
+	    &run("p3-related-by-clusters --gs1 $fI --gs2 $fO -n 1 --sz2=30 --sz1=30  -o $outD/$outN --min 1.0 --max 0.0");
 #            die "perl p3-related-by-clusters.pl --gs1 $fI --gs2 $fO -n 1 --sz2=30 --sz1=30  -o $outD/$outN --min 1.0 --max 0.0";
 	    unlink $fI;
 	    unlink $fO;

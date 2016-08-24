@@ -1,6 +1,6 @@
 use strict;
 use Data::Dumper;
-
+## Compute how often families occur in the same cluster.
 my %counts;
 
 while (defined($_ = <STDIN>))
