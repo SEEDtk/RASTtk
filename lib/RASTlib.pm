@@ -157,7 +157,7 @@ sub Annotate {
                  my $status = $response->content;
                  if ($status eq 'completed') {
                      $done = 1;
-                 } elsif ($status ne 'in-progress') {
+                 } elsif ($status ne 'in-progress' && $status ne 'queued') {
                      die "Error status for RAST: $status.";
                  }
             }
