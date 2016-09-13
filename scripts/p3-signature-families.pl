@@ -8,7 +8,6 @@ use P3DataAPI;
 
      p3-signature-families --gs1=FileOfGenomeIds 
                            --gs2=FileOfGenomeIds 
-			   --families=ProteinFamilies
 			   [--min=MinGs1Frac]
 			   [--max=MaxGs2Frac]
 	> family.signatures		   
@@ -71,6 +70,8 @@ close(GENOMES);
 # It is keyed by family ID, and each value is a sub-hash with keys "in" and "out"
 # pointing to counts.
 my %counts;
+# This hash maps families to their annotation product.
+my %families;
 # This hash maps "in" to a list of all the genomes in the set, and "out" to a list of all
 # the genomes not in the set.
 my %genomes = (in => [keys %gs1], out => [keys %gs2]);
@@ -78,26 +79,27 @@ for my $type (qw(in out)) {
     my $genomeL = $genomes{$type};
     for my $genome (@$genomeL) {
         # Get all of the protein families in this genome. A single family may appear multiple times.
-        my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'plfam_id', '*']], ['plfam_id']);
-        # Sort out the unique families.
-        my %families = map { $_->[0] => 1 } @$resultList;
-        # Count them.
-        for my $family (keys %families) {
-            $counts{$family}{$type}++;
+        my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'plfam_id', '*']], ['plfam_id', 'product']);
+        # Save the families and count the unique ones.
+        my %uniques;
+        for my $result (@$resultList) {
+            my ($fam, $product) = @$result;
+            $families{$fam} = $product;
+            if (! $uniques{$fam}) {
+                $counts{$fam}{$type}++;
+                $uniques{$fam} = 1;
+            } 
         }
     }
 }
 # Print the header.
-P3Utils::print_cols([qw(counts_in_set1 counts_in_set2 family.family_id)]);
+P3Utils::print_cols([qw(counts_in_set1 counts_in_set2 family.family_id family.product)]);
 my $szI = scalar keys %gs1;
 my $szO = scalar keys %gs2;
-foreach my $fam (keys(%counts))
-{
+foreach my $fam (keys(%counts)) {
     my $x1 = $counts{$fam}->{in}; if (! defined $x1) { $x1 = 0}
     my $x2 = $counts{$fam}->{out}; if (! defined $x2) { $x2 = 0}
-    if ((($x2/$szO) <= $max_out) &&
-	(($x1/$szI) >= $min_in))
-    {
-	P3Utils::print_cols([$x1,$x2,$fam]);
+    if ((($x2/$szO) <= $max_out) && (($x1/$szI) >= $min_in)) {
+        P3Utils::print_cols([$x1,$x2,$fam, $families{$fam}]);
     }
 }
