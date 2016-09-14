@@ -68,7 +68,7 @@ the family, (1) the number of genomes in set 2 containing the family, and (2) th
 
 =cut
 
-sub Progress {
+sub Process {
     my ($gs1, $gs2, $min_in, $max_out, $jobObject) = @_;
     # Get access to PATRIC.
     my $p3 = P3DataAPI->new();
