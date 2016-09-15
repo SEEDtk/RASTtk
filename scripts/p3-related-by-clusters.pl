@@ -95,7 +95,7 @@ my ($opt, $helper) = P3Utils::script_opts('', P3Utils::ih_options(),
 					  ["sz2=i","size of sample from gs2", { default => 20 }],
 					  ["min=f","min fraction of gs1 to be signature family", { default => 1 }],
 					  ["max=f","max fraction of gs2 to be signature family", { default => 0 }],
-					  ["iterations|n=i",{ default => 20 }],
+					  ["iterations|n=i",{ default => 10 }],
 					  ["output|o=s","output directory", { required => 1 }]);
 my $ih = P3Utils::ih($opt);
 my $gs1 = $opt->gs1;
