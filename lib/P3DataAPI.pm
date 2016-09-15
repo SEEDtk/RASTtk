@@ -138,7 +138,8 @@ sub query
         my $resp = $ua->get( "$url?$q", Accept => "application/json" );
         $end = gettimeofday if $self->{benchmark};
         if ( !$resp->is_success ) {
-            die "Failed: " . $resp->code . "\n" . $resp->content;
+            my $content = $resp->content || $q;
+            die "Failed: " . $resp->code . " $content";
         }
         if ( $self->{benchmark} ) {
             my $elap = $end - $start;
