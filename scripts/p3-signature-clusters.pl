@@ -2,11 +2,12 @@ use Data::Dumper;
 use strict;
 use warnings;
 use P3Utils;
- 
+use P3Signatures;
+
 =head1 Compute Cluster Signatures
 
-     p3-signature-clusters  
-        < peg.data                   
+     p3-signature-clusters
+        < peg.data
         > cluster.signatures
 
 The standard input file normally contains I<[n/a, n/a, family_id, feature_id, contig, start, end, strand, function]>
@@ -101,7 +102,7 @@ considered close. The default is 2000.
 
 =cut
 
-my ($opt, $helper) = P3Utils::script_opts('', P3Utils::ih_options(), 
+my ($opt, $helper) = P3Utils::script_opts('', P3Utils::ih_options(),
         ["terse|t","display in abbreviated format"],
         ["distance|d", "maximum distance between close features", { default => 2000 }]);
 
@@ -114,69 +115,31 @@ my %genomes;
 my $ih = P3Utils::ih($opt);
 
 # Parse the headers to get the input column indices.
-my (undef, $cols) = P3Utils::find_headers($ih, input => qw(family.family_id feature.patric_id feature.accession
-        feature.start feature.end feature.strand feature.product));
-# Loop through the input.
+my (undef, $cols) = P3Utils::find_headers($ih, input => qw(family.family_id feature.product feature.patric_id feature.accession
+        feature.start feature.end feature.strand));
+# Spool in the input.
+my @pegInfo;
 while (! eof $ih)
 {
-    my($fam,$peg,$contig,$begin,$end,$strand,$func) = P3Utils::get_cols($ih, $cols);
-    # Note we only process protein-encoding genes.
-    if ($peg =~ /^fig\|(\d+\.\d+)\.peg\.\d+$/)
-    {
-        # Store this feature and its midpoint with the genome. We will eventually sort
-        # by midpoint to assemble the clusters. 
-        my $g = $1;
-        my $mid = int(($begin+$end)/2);
-        push(@{$genomes{$g}},[$contig,$mid,$fam,$peg,$func]);
-    }
+    my @pegDatum = P3Utils::get_cols($ih, $cols);
+    push @pegInfo, \@pegDatum;
 }
 
-my %fam_score;
-my %best_fam_cluster;
-
-foreach my $g (sort { $a <=> $b } keys(%genomes))
+my $pegClusters = P3Signatures::Clusters(\@pegInfo, $distance);
+for my $cluster ($pegClusters)
 {
-    #  We compute all clusters for a genome, sort them by length,
-    #  print them.
-    my @output;
-
-    # Get all the features for this genome and sort them by contig ID and location midpoint.
-    my $features = $genomes{$g};
-    my @sorted = sort { ($a->[0] cmp $b->[0]) or ($a->[1] <=> $b->[1]) } @$features;
-
-    while (my $x = shift (@sorted))
-    {
-        #  $x is of the form [$contig,$mid,$fam,$peg,$func]
-        my @close = ($x);
-        while ((@sorted > 0) && ($sorted[0]->[0] eq $close[-1]->[0]) &&
-                                (abs($sorted[0]->[1] - $close[-1]->[1]) < $distance))
-        {
-            $x = shift @sorted;
-            push(@close,$x);
+    if ($verbose) {
+        for my $pegDatum (@$cluster) {
+            print join("\t", $pegDatum->[1], $pegDatum->[0], $pegDatum->[2]) . "\n";
         }
-        my $n = @close;
-        if ($n > 2)
-        {
-            push(@output,[$n,[@close]]);
-	}
-    }
-    my @sorted_clusters = sort { $b->[0] <=> $a->[0]} @output;
-    foreach my $cluster (@sorted_clusters)
-    {
-	my $close = $cluster->[1];
-	if ($verbose)
-	{
-	    foreach $_ (@$close)
-	    {
-		print join("\t",($_->[2],$_->[3],$_->[4])),"\n";
-	    }
-	    print "//\n";
-	}
-	else 
-	{
-	    my $pegs = join(",",map { $_->[3] } @$close);
-	    print $g,"\t",$pegs,"\n";
-	}
+        print "//\n";
+    } else {
+        my $peg1 = $cluster->[0][0];
+        my $genome = "";
+        if ($peg1 =~ /^fig\|(\d+\.\d+)/) {
+            $genome = $1;
+        }
+        print join("\t", $genome, map { $_->[1] } @$cluster) . "\n";
     }
 }
 
