@@ -185,12 +185,13 @@ sub PegInfo {
             my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
             push @retVal, @$batch;
             @couplets = ();
-        } else {
-            push @couplets, [$fam, [$fam]];
         }
+        push @couplets, [$fam, [$fam]];
     }
-    my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
-    push @retVal, @$batch;
+    if (@couplets) {
+        my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
+        push @retVal, @$batch;
+    }
     # Return the results.
     return \@retVal;
 }
