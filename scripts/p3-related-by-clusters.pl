@@ -12,7 +12,7 @@ use File::Copy::Recursive;
                             --sz1 Sample_size_for_gs1
                             --sz2 Sample_size_for_gs2
                             --iterations Number_random_sample_iterations
-                            --Output_Directory
+                            --Output Directory
 
 This tool takes as input two genome sets.  These will often be
 
@@ -82,7 +82,7 @@ For each iteration pick a sample of sz2 genomes from gs2
 
 run this many iterations of random subsets of gs1 and gs2
 
-=item Output_directory
+=item Output directory
 
 a created directory that will contain the output
 
