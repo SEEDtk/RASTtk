@@ -2487,14 +2487,14 @@ sub call {
         return unless($result->content); # notification?
 
         if ($service) {
-            return JSON::RPC::ServiceObject->new($result, $self->json);
+            return JSON::RPC::Legacy::ServiceObject->new($result, $self->json);
         }
 
-        return JSON::RPC::ReturnObject->new($result, $self->json);
+        return JSON::RPC::Legacy::ReturnObject->new($result, $self->json);
     }
     elsif ($result->content_type eq 'application/json')
     {
-        return JSON::RPC::ReturnObject->new($result, $self->json);
+        return JSON::RPC::Legacy::ReturnObject->new($result, $self->json);
     }
     else {
         return;
