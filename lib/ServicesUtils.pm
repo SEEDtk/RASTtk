@@ -233,7 +233,7 @@ sub ih {
 
 =head3 get_batch
 
-    my @tuples = ServicesUtils::get_batch($ih, $opt);
+    my @tuples = ServicesUtils::get_batch($ih, $opt, $noBatching);
 
 Get a batch of input to process. This method is used for the common case where we are loading a single
 input column from the input file and processing it against the data. The column is specified as a command-line
@@ -250,6 +250,10 @@ Open handle to the input file.
 
 L<Getopt::Long::Descriptive::Opts> object returned by L</get_options>.
 
+=item noBatching (optional)
+
+If TRUE, then the entire input is read regardless of the batch size.
+
 =item RETURN
 
 Returns a list of 2-tuples, each consisting of (0) an input value from the selected column, and (1) a reference
@@ -261,9 +265,9 @@ will be returned.
 =cut
 
 sub get_batch {
-    my ($ih, $opt) = @_;
+    my ($ih, $opt, $noBatching) = @_;
     # Access the batch size and the column number.
-    my $batchSize = $opt->batch;
+    my $batchSize = ($noBatching ? 0 : $opt->batch);
     my $col = $opt->col - 1;
     # This will count the number of rows processed.
     my $count = 0;
