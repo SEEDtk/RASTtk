@@ -48,7 +48,7 @@ use constant FAMTYPE => {'local' => 'plfam_id', global => 'pgfam_id', figfam => 
 my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
         ['gFile|gfile|g=s', 'name of a file containing genome IDs'],
         ['gCol|gcol=s', 'index (1-based) or name of the genome file column with the IDs', { default => 'genome.genome_id'}],
-        ['ftype|fType=s', 'type of protein family (local, global, figfam', { default => 'local'}]);
+        ['ftype|fType=s', 'type of protein family (local, global, figfam', { default => 'global'}]);
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Compute the output columns.

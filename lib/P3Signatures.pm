@@ -101,7 +101,7 @@ sub Process {
             if ($jobObject) {
                 $jobObject->Progress("Reading features for $genome ($gCount of $gTotal).$comment");
             }
-            my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'plfam_id', '*']], ['plfam_id', 'product']);
+            my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'pgfam_id', '*']], ['pgfam_id', 'product']);
             # Save the families and count the unique ones.
             my %uniques;
             for my $result (@$resultList) {
@@ -182,14 +182,14 @@ sub PegInfo {
     my @couplets;
     for my $fam (@$families) {
         if (scalar(@couplets) > $batchSize) {
-            my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
+            my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'pgfam_id');
             push @retVal, @$batch;
             @couplets = ();
         }
         push @couplets, [$fam, [$fam]];
     }
     if (@couplets) {
-        my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
+        my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'pgfam_id');
         push @retVal, @$batch;
     }
     # Return the results.

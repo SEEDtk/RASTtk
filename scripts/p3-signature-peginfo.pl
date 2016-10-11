@@ -45,7 +45,7 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, 'family.family_id');
 # Compute the family ID column.
-my $famField = 'plfam_id';
+my $famField = 'pgfam_id';
 my $genomeFile = $opt->gs1;
 # Get the headers from the genome file.
 open(my $gh, "<$genomeFile") || die "Could not open genome file: $!";
