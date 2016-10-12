@@ -6,8 +6,8 @@ use P3DataAPI;
 use JSON::XS;
 
 my($opt, $usage) = describe_options("%c %o group-name",
-				    ["show-error|e" => "Show verbose error messages"],
-				    ["help|h" => "Show this help message."]);
+                                    ["show-error|e" => "Show verbose error messages"],
+                                    ["help|h" => "Show this help message."]);
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) if @ARGV != 1;
 
@@ -19,17 +19,19 @@ my $home = $ws->home_workspace;
 my $group_path = "$home/Feature Groups/$group";
 
 my @patric_ids;
-
+my $lines = 0;
 while (<STDIN>)
 {
     if (/^\s*(fig\|\d+\.\d+\S+)\s*$/)
     {
-	push(@patric_ids, $1);
+        push(@patric_ids, $1);
     }
-    else
+    elsif ($lines)
     {
-	die "Invalid genome ID at line $.\n";
+        my $errLine = $lines + 1;
+        die "Invalid feature ID at line $errLine.\n";
     }
+    $lines++;
 }
 my $feature_list;
 
@@ -53,9 +55,9 @@ my $res;
 
 eval {
     $res = $ws->create({
-	objects => [[$group_path, "feature_group", {}, $group_txt]],
-	permission => "w",
-	overwrite => 1,
+        objects => [[$group_path, "feature_group", {}, $group_txt]],
+        permission => "w",
+        overwrite => 1,
     });
 };
 if (!$res)
