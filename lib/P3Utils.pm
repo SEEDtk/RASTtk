@@ -15,6 +15,7 @@
 # http://www.theseed.org/LICENSE.TXT.
 #
 
+# This is a SAS Component
 
 package P3Utils;
 
