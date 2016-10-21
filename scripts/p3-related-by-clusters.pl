@@ -78,11 +78,11 @@ For each iteration pick a sample of sz1 genomes from gs1
 
 For each iteration pick a sample of sz2 genomes from gs2
 
-=item Iterations
+=item iterations
 
 run this many iterations of random subsets of gs1 and gs2
 
-=item Output directory
+=item output
 
 a created directory that will contain the output
 
