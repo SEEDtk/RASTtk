@@ -12,6 +12,7 @@ use File::Copy::Recursive;
                             --sz1 Sample_size_for_gs1
                             --sz2 Sample_size_for_gs2
                             --iterations Number_random_sample_iterations
+                            --family fam_type
                             --Output Directory
 
 This tool takes as input two genome sets.  These will often be
@@ -85,6 +86,10 @@ run this many iterations of random subsets of gs1 and gs2
 =item output
 
 a created directory that will contain the output
+
+=item family
+
+Type of protein family-- local, global, or
 
 =back
 
