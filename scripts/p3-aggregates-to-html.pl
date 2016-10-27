@@ -27,6 +27,8 @@ while (<>) {
               chomp($_);
               ($f1, $f2, $count) = split("\t",$_);
               print  "<H2> $f1 and $f2 <br>occur together $count times</H2>";
+#              print "(<span style=\"color: blue; font-weight: 300;\">fig|nnn.n.peg.n</span> = go to Patric feature page for this peg)";
+              print "<br>(<span style=\"color: green; font-weight: 300;\">&#9400;</span> = go to compare regions for this peg)";
               print   "<H3>$genome </H3>";
               $hdg=0;
         } else {
@@ -34,7 +36,9 @@ while (<>) {
             chomp $_;
             my ($id, $fam, $func) = split("\t", $_);
             my $link = $patric."view/Feature/".$id;
-            $html .=  "<td><A HREF=\"".$link."\" target=\_blank >".$id."</A></td>\n";
+            my $crlink = "http://p3.theseed.org/qa/compare_regions/$id";
+            $html .=  "<td><A HREF=\"".$link."\" target=\_blank >".$id."</A>&nbsp &nbsp";
+            $html .= "<A HREF=\"".$crlink."\" target=\_blank style=\"font-size: 100%; font-weight: 300; color: green;\">&#9400;</A></td>\n";
             my $color = "color:blue";
             if ($fam eq $f1 || $fam eq $f2) {$color="color:red";}
             my $famlink = $patric."view/FeatureList/?eq(plfam_id,$fam)#view_tab=features";
