@@ -8,6 +8,8 @@ my $f2;
 my $count;
 my $genome;
 my $html = "";
+print "<center><H1>Distinguishing Signature Clusters</H1>";
+print "(with links to Patric)</center><hr><br><br>";
 
 while (<>) {
     if ($_ =~ '////') {
