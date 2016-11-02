@@ -64,19 +64,5 @@ if (-d $tempDir) {
 }
 # Copy in the fasta file.
 File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
-# Compute the output file name.
-my $outFile = "$tempDir/results.txt";
 # Run checkm.
-my @output = `checkm lineage_wf --file=$outFile --tmpdir=$tempDir $tempDir $tempDir/cm`;
-# Spool the output.
-if (-s $outFile) {
-    open(my $ih, "<$outFile") || die "Could not access checkm results: $!";
-    while (! eof $ih) {
-        my $line = <$ih>;
-        print $line;
-    }
-} else {
-    for my $output (@output) {
-        print STDERR $output;
-    }
-}
+system('checkm', 'lineage_wf', '--tmpdir', $workDir, $tempDir, "$tempDir/cm");
