@@ -64,6 +64,7 @@ if (-d $tempDir) {
     print STDERR "Clearing $tempDir\n";
     File::Copy::Recursive::pathmk($tempDir);
 }
+File::Copy::Recursive::pathmk("$tempDir/Temp");
 # Copy in the fasta file.
 File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
 # Run checkm.
