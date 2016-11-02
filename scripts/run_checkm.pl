@@ -58,8 +58,10 @@ if (! $workDir) {
 # Create the temporary directory.
 my $tempDir = "$workDir/cm$$";
 if (-d $tempDir) {
+    print STDERR "Creating $tempDir\n";
     File::Copy::Recursive::pathempty($tempDir);
 } else {
+    print STDERR "Clearing $tempDir\n";
     File::Copy::Recursive::pathmk($tempDir);
 }
 # Copy in the fasta file.
