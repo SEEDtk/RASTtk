@@ -67,7 +67,7 @@ File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
 # Compute the output file name.
 my $outFile = "$tempDir/results.txt";
 # Run checkm.
-my @output = `checkm lineage_wf --file=$outFile $tempDir $tempDir/cm`;
+my @output = `checkm lineage_wf --file=$outFile --tmpDir=$tempDir $tempDir $tempDir/cm`;
 # Spool the output.
 if (-s $outFile) {
     open(my $ih, "<$outFile") || die "Could not access checkm results: $!";
