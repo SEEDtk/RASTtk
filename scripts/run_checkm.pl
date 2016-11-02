@@ -70,4 +70,4 @@ File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
 # Run checkm.
 my $cmd = "checkm lineage_wf --tmpdir $tempDir/Temp $tempDir $tempDir/cm";
 print "$cmd\n";
-# system($cmd);
+system($cmd);
