@@ -65,4 +65,4 @@ if (-d $tempDir) {
 # Copy in the fasta file.
 File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
 # Run checkm.
-system('checkm', 'lineage_wf', '--tmpdir', $workDir, $tempDir, "$tempDir/cm");
+system('checkm', 'lineage_wf', '--tmpdir', "$tempDir/Temp", $tempDir, "$tempDir/cm");
