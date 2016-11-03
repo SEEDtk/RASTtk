@@ -45,6 +45,8 @@ my $opt = ScriptUtils::Opts('fileName workDir'
 if (! ($ENV{PATH} =~ m#/disks/patric-common/runtime/bin#)) {
     $ENV{PATH} = "/disks/patric-common/runtime/bin:$ENV{PATH}";
 }
+print "Path = " . $ENV{PATH} . "\n";
+die "check path";
 my ($fileName, $workDir) = @ARGV;
 if (! $workDir) {
     die "No working directory specified.";
