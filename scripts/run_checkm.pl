@@ -42,11 +42,9 @@ The scoring report will be sent to the standard output.
 my $opt = ScriptUtils::Opts('fileName workDir'
         );
 # Verify that we have the necessary paths.
-if (! ($ENV{PATH} =~ m#/disks/patric-common/runtime/bin#)) {
-    $ENV{PATH} = "/disks/patric-common/runtime/bin:$ENV{PATH}";
-}
-print "Path = " . $ENV{PATH} . "\n";
-die "check path";
+my @paths = grep { $_ ne '/disks/patric-common/runtime/bin' } split /:/, $ENV{PATH};
+$ENV{PATH} = join(':', "/disks/patric-common/runtime/bin", @paths);
+print STDERR "Path = " . $ENV{PATH} . "\n";
 my ($fileName, $workDir) = @ARGV;
 if (! $workDir) {
     die "No working directory specified.";
@@ -71,5 +69,5 @@ File::Copy::Recursive::pathmk("$tempDir/Temp");
 File::Copy::Recursive::fcopy($fileName, "$tempDir/contigs.fna");
 # Run checkm.
 my $cmd = "checkm lineage_wf --tmpdir $tempDir/Temp $tempDir $tempDir/cm";
-print "$cmd\n";
-exec($cmd);
+print STDERR "$cmd\n";
+system($cmd);
