@@ -41,10 +41,6 @@ The scoring report will be sent to the standard output.
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('fileName workDir'
         );
-# Verify that we have the necessary paths.
-my @paths = grep { $_ ne '/disks/patric-common/runtime/bin' } split /:/, $ENV{PATH};
-$ENV{PATH} = join(':', "/disks/patric-common/runtime/bin", @paths);
-print STDERR "Path = " . $ENV{PATH} . "\n";
 my ($fileName, $workDir) = @ARGV;
 if (! $workDir) {
     die "No working directory specified.";
