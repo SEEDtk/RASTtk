@@ -34,7 +34,7 @@ my ($opt, $helper) = P3Utils::script_opts('',["d=s","a directory created by p3-r
 my $outD = $opt->d;
 
 ###########
-&SeedUtils::run("perl p3-aggregate-sss.pl -d $outD");
+&SeedUtils::run("p3-aggregate-sss -d $outD");
 ###########
 my @ignore = ('Mobile','mobile','transposase','Transposase');
 
