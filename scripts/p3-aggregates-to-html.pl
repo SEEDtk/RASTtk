@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use strict;
+use URI::Escape;
 
 my $patric = "https://www.beta.patricbrc.org/";
 my $hdg=1;
@@ -35,8 +36,9 @@ while (<>) {
             $html .=  "<tr>\n";
             chomp $_;
             my ($id, $fam, $func) = split("\t", $_);
-            my $link = $patric."view/Feature/".$id;
-            my $crlink = "http://p3.theseed.org/qa/compare_regions/$id";
+            my $escId = uri_escape($id);
+            my $link = $patric."view/Feature/".$escId;
+            my $crlink = "http://p3.theseed.org/qa/compare_regions/$escId";
             $html .=  "<td><A HREF=\"".$link."\" target=\_blank >".$id."</A>&nbsp &nbsp";
             $html .= "<A HREF=\"".$crlink."\" target=\_blank style=\"font-size: 100%; font-weight: 300; color: green;\">&#9400;</A></td>\n";
             my $color = "color:blue";
