@@ -29,7 +29,7 @@ while (<>) {
               ($f1, $f2, $count) = split("\t",$_);
               print  "<H2> $f1 and $f2 <br>occur together $count times</H2>";
 #              print "(<span style=\"color: blue; font-weight: 300;\">fig|nnn.n.peg.n</span> = go to Patric feature page for this peg)";
-              print "<br>(<span style=\"color: green; font-weight: 300;\">&#9400;</span> = go to compare regions for this peg)";
+              print "<br>(<span style=\"color: blue; font-weight: 300;\">&#9400;</span> = go to compare regions for this peg)";
               print   "<H3>$genome </H3>";
               $hdg=0;
         } else {
