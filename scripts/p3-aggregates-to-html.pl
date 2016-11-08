@@ -8,8 +8,6 @@ my $f2;
 my $count;
 my $genome;
 my $html = "";
-print "<center><H1>Distinguishing Signature Clusters</H1>";
-print "(with links to Patric)</center><hr><br><br>";
 
 while (<>) {
     if ($_ =~ '////') {
@@ -30,7 +28,7 @@ while (<>) {
               ($f1, $f2, $count) = split("\t",$_);
               print  "<H2> $f1 and $f2 <br>occur together $count times</H2>";
 #              print "(<span style=\"color: blue; font-weight: 300;\">fig|nnn.n.peg.n</span> = go to Patric feature page for this peg)";
-              print "<br>(<span style=\"color: blue; font-weight: 300;\">&#9400;</span> = go to compare regions for this peg)";
+              print "<br>(<span style=\"color: green; font-weight: 300;\">&#9400;</span> = go to compare regions for this peg)";
               print   "<H3>$genome </H3>";
               $hdg=0;
         } else {
@@ -40,7 +38,7 @@ while (<>) {
             my $link = $patric."view/Feature/".$id;
             my $crlink = "http://p3.theseed.org/qa/compare_regions/$id";
             $html .=  "<td><A HREF=\"".$link."\" target=\_blank >".$id."</A>&nbsp &nbsp";
-            $html .= "<A HREF=\"".$crlink."\" target=\_blank style=\"font-size: 100%; font-weight: 300; color: blue;\">&#9400;</A></td>\n";
+            $html .= "<A HREF=\"".$crlink."\" target=\_blank style=\"font-size: 100%; font-weight: 300; color: green;\">&#9400;</A></td>\n";
             my $color = "color:blue";
             if ($fam eq $f1 || $fam eq $f2) {$color="color:red";}
             my $famlink = $patric."view/FeatureList/?eq(plfam_id,$fam)#view_tab=features";
