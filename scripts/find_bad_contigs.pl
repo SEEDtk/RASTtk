@@ -19,7 +19,6 @@
 
 use strict;
 use warnings;
-use Shrub;
 use ScriptUtils;
 use Data::Dumper;
 use GenomeTypeObject;
@@ -40,18 +39,19 @@ It uses an evaluation by predictors to
 
 ## describe positional parameters
 
-The command-line options are those found in L<Shrub/script_options> and
-L<ScriptUtils/ih_options> plus the following.
+The command-line options are the following.
 
 =over 4
 
-=i --GTO  a genome type object representing the bin
+=item GTO
 
-=i -r File RowScores
+a genome type object representing the bin
+
+=item r
 
 a 3-column table containing [RoleId,PredictedValue,ActualValue]
 
-=i  --ids_to_use
+=item ids_to_use
 
 a 2-column of [role-id,role] defining the set of accurate roles
 
@@ -60,10 +60,10 @@ a 2-column of [role-id,role] defining the set of accurate roles
 =cut
 
 # Get the command-line parameters.
-my $opt = ScriptUtils::Opts('', Shrub::script_options(),
-			    ['gto=s',   'GenomeTypeObjet', { required => 1 }],
-			    ['r=s',     'Role Evaluation File'],
-			    ['i=s',     'usable ids mapped to roles', { required => 1 }]
+my $opt = ScriptUtils::Opts('',
+                            ['gto=s',   'GenomeTypeObjet', { required => 1 }],
+                            ['r=s',     'Role Evaluation File'],
+                            ['i=s',     'usable ids mapped to roles', { required => 1 }]
                            );
 my $gtoF   = $opt->gto;
 my $rolesF = $opt->r;
@@ -90,15 +90,15 @@ foreach my $feature (@$features)
     my $function = $feature->{function};
     foreach my $role (&SeedUtils::roles_of_function($function))
     {
-	my $rid = $role_to_role_id{$role};
+        my $rid = $role_to_role_id{$role};
         if ($rid && $good_roles{$rid})
-	{
-	    foreach my $loc (@$locationL)
-	    {
-		my $contig = $loc->[0];
-		$good_contigs{$contig} = 1;
-	    }
-	}
+        {
+            foreach my $loc (@$locationL)
+            {
+                my $contig = $loc->[0];
+                $good_contigs{$contig} = 1;
+            }
+        }
     }
 }
 
@@ -117,13 +117,13 @@ foreach my $tuple (@contigs)
     my $dna = $tuple->{dna};
     if (! $good_contigs{$id})
     {
-	print join("\t",($id,length($dna))),"\n";
-	$badN++;
-	$bad_sz += length($dna);
+        print join("\t",($id,length($dna))),"\n";
+        $badN++;
+        $bad_sz += length($dna);
     }
     else
     {
-	$good_sz += length($dna);
+        $good_sz += length($dna);
     }
 }
 print STDERR "bad = $badN\n";

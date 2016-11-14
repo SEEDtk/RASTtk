@@ -19,14 +19,13 @@
 
 use strict;
 use warnings;
-use Shrub;
 use ScriptUtils;
 use Data::Dumper;
 use GenomeTypeObject;
 
 =head1 show pegs on contigs
 
-    ˜show_pegs_on_contigs --gto GTO < contigs > report
+    pegs_on_contigs --gto GTO < contigs > report
 
 This tool is used to display PEGs that occur on a set of desgnated
 contigs.
@@ -35,20 +34,22 @@ contigs.
 
 ## describe positional parameters
 
-The command-line options are those found in L<Shrub/script_options> and
+The command-line options are those found in
 L<ScriptUtils/ih_options> plus the following.
 
 =over 4
 
-=i --GTO  a genome type object representing the bin
+=item gto
+
+a genome type object representing the bin
 
 =back
 
 =cut
 
 # Get the command-line parameters.
-my $opt = ScriptUtils::Opts('', Shrub::script_options(),
-			    ['gto=s',   'GenomeTypeObjet', { required => 1 }]);
+my $opt = ScriptUtils::Opts('',
+        ['gto=s',   'GenomeTypeObjet', { required => 1 }]);
 my $gtoF   = $opt->gto;
 
 my $gto = GenomeTypeObject->new({ file => $gtoF });
@@ -74,13 +75,13 @@ while (defined($_ = <STDIN>))
     my $contig;
     if (($_ =~ /^(\S+)\t(\d+)/) && ($contig = $1) && $contig_to_features{$contig})
     {
-	print $contig,"\t",$2,"\n";
-	my $features = $contig_to_features{$contig};
-	foreach my $feature (sort { ($a->[2] <=> $b->[2]) } @$features)
-	{
-	    print "\t",join("\t",@$feature),"\n";
-	}
-	print "\n";
+        print $contig,"\t",$2,"\n";
+        my $features = $contig_to_features{$contig};
+        foreach my $feature (sort { ($a->[2] <=> $b->[2]) } @$features)
+        {
+            print "\t",join("\t",@$feature),"\n";
+        }
+        print "\n";
     }
 }
 
