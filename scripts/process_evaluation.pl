@@ -46,11 +46,13 @@ my ($count, $total) = (0, 0);
 while (! eof $ih) {
     my $line = <$ih>;
     $line =~ s/[\r\n]+$//;
-    my ($role, $actual, $predict, $weight) = split /\t/, $line;
-    if ($actual == $predict) {
-        $count += $weight;
+    if ($line) {
+        my ($role, $actual, $predict, $weight) = split /\t/, $line;
+        if ($actual == $predict) {
+            $count += $weight;
+        }
+        $total += $weight;
     }
-    $total += $weight;
 }
 my $score = $count * 100 / $total;
-printf(".2f\n", $score);
+printf("%.2f\n", $score);
