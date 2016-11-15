@@ -46,8 +46,8 @@ my ($count, $total) = (0, 0);
 while (! eof $ih) {
     my $line = <$ih>;
     $line =~ s/[\r\n]+$//;
-    if ($line) {
-        my ($role, $actual, $predict, $weight) = split /\t/, $line;
+    my ($role, $actual, $predict, $weight) = split /\t/, $line;
+    if ($actual) {
         if ($actual == $predict) {
             $count += $weight;
         }
