@@ -88,7 +88,7 @@ The sleep interval in seconds while waiting for RAST to complete. The default is
 
 =item RETURN
 
-Returns a L<GenomeTypeObject> for the annotated genome.
+Returns an unblessed L<GenomeTypeObject> for the annotated genome.
 
 =back
 
