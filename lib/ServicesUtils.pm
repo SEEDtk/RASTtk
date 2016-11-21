@@ -52,6 +52,10 @@ Use the L<Shrub> database in the SEEDtk environment.
 
 Use the PATRIC web interface.
 
+=item GP
+
+Use the GenomePackages directory.
+
 =back
 
 Thus, to use L<svc_all_genomes.pl> with SEEDtk, you would either need to submit
@@ -130,7 +134,7 @@ implemented as methods on the services helper object.
 
 =cut
 
-use constant HELPER_NAMES => { SEEDtk => 'STKServices', P3 => 'P3Services' };
+use constant HELPER_NAMES => { SEEDtk => 'STKServices', P3 => 'P3Services', GP => 'GPServices' };
 
 sub get_options {
     my ($parmComment, @options) = @_;
@@ -159,7 +163,7 @@ sub get_options {
         }
         if (! $type) {
             # No command-line option. Pull from the environment.
-            $type = $ENV{SERVICE};
+            $type = $ENV{SERVICE} // 'SEEDtk';
         }
         # Get the helper name.
         $helperName = HELPER_NAMES->{$type};

@@ -326,7 +326,13 @@ sub groups_of {
     # Get the kmer hash.
     my $kmerH = $self->{kmerHash};
     # Get the group list. We return an empty list if the kmer is not in the hash.
-    my $retVal = $kmerH->{$kmer} // [];
+    my $hash = $kmerH->{$kmer};
+    my $retVal;
+    if ($hash) {
+        $retVal = [keys %$hash];
+    } else {
+        $retVal = [];
+    }
     # Return the result.
     return $retVal;
 }

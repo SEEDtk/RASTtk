@@ -382,6 +382,7 @@ sub solr_query_raw_multi
         }
         else
         {
+            no warnings 'once';
             warn "Query failed: " . $res->code . " " . $res->content . "\n" . "error=$Net::HTTPS::NB::HTTPS_ERROR\n";
         }
     }
