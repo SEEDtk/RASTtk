@@ -19,14 +19,14 @@ eval {
     require HTTP::Async;
     $have_async = 1;
 };
-use IO::Socket::SSL;
+#use IO::Socket::SSL;
 
-$IO::Socket::SSL::DEBUG = 0;
+#$IO::Socket::SSL::DEBUG = 0;
 
-IO::Socket::SSL::set_ctx_defaults(
-                                       SSL_verifycn_scheme => 'www',
-                                       SSL_verify_mode => 0,
-                                  );
+#IO::Socket::SSL::set_ctx_defaults(
+#                                       SSL_verifycn_scheme => 'www',
+#                                       SSL_verify_mode => 0,
+#                                  );
 
 no warnings 'once';
 
