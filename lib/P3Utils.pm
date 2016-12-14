@@ -885,7 +885,7 @@ sub match {
     # This will be the return value.
     my $retVal = 0;
     # Determine the type of match.
-    if ($pattern =~ /^\-?\d+(?:\.\d+)?/) {
+    if ($pattern =~ /^\-?\d+(?:\.\d+)?$/) {
         # Here we have a numeric match.
         if ($pattern == $key) {
             $retVal = 1;
