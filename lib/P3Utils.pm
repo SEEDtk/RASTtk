@@ -38,7 +38,7 @@ Mapping from user-friendly names to PATRIC names.
 =cut
 
 use constant OBJECTS => {   genome => 'genome', feature => 'genome_feature', family => 'protein_family_ref',
-                            genome_drug => 'genome_amr' };
+                            genome_drug => 'genome_amr', contig =>  'genome_sequence' };
 
 =head3 FIELDS
 
@@ -49,7 +49,8 @@ Mapping from user-friendly object names to default fields.
 use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', 'genome_status', 'gc_content'],
                             feature => ['patric_id', 'feature_type', 'location', 'product'],
                             family => ['family_id', 'family_type', 'family_product'],
-                            genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'] };
+                            genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
+                            contig => ['genome_id', 'accession'] };
 
 =head3 IDCOL
 
@@ -58,7 +59,7 @@ Mapping from user-friendly object names to ID column names.
 =cut
 
 use constant IDCOL =>   {   genome => 'genome_id', feature => 'patric_id', family => 'family_id',
-                            genome_drug => 'id' };
+                            genome_drug => 'id', contig => 'sequence_id' };
 
 =head2  Methods
 
@@ -253,7 +254,7 @@ Open input file handle.
 =item opt (optional)
 
 If specified, should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
-column or a string containing the key column name. If this parameter is undefined or omitted, it will be presumed 
+column or a string containing the key column name. If this parameter is undefined or omitted, it will be presumed
 there is no key column.
 
 =item RETURN
@@ -291,7 +292,7 @@ sub process_headers {
             # Here we have a header name.
             my $n = scalar @outHeaders;
             for ($keyCol = 0; $keyCol < $n && $outHeaders[$keyCol] ne $col; $keyCol++) {};
-            die "\"$col\" not found in headers." if ($keyCol >= $n); 
+            die "\"$col\" not found in headers." if ($keyCol >= $n);
         }
     }
     # Return the results.
@@ -333,7 +334,7 @@ sub find_column {
         # Here we have a header name.
         my $n = scalar @$headers;
         for ($retVal = 0; $retVal < $n && $headers->[$retVal] ne $col; $retVal++) {};
-        die "\"$col\" not found in headers." if ($retVal >= $n); 
+        die "\"$col\" not found in headers." if ($retVal >= $n);
     }
     return $retVal;
 
@@ -795,7 +796,7 @@ opens the standard input.
 
 =item opt
 
-L<Getopt::Long::Descriptive::Opt> object for the current command-line options. 
+L<Getopt::Long::Descriptive::Opt> object for the current command-line options.
 
 =item RETURN
 
@@ -884,7 +885,7 @@ sub match {
     # This will be the return value.
     my $retVal = 0;
     # Determine the type of match.
-    if ($pattern =~ /^\-?\d+(?:\.\d+)?/) {
+    if ($pattern =~ /^\-?\d+(?:\.\d+)?$/) {
         # Here we have a numeric match.
         if ($pattern == $key) {
             $retVal = 1;
@@ -905,7 +906,7 @@ sub match {
 
     my (\@headers, \@cols) = P3Utils::match_headers($ih, $fileType => @fields);
 
-Search the headers of the specified input file for the named fields and return the list of headers plus a list of 
+Search the headers of the specified input file for the named fields and return the list of headers plus a list of
 the column indices for the named fields.
 
 =over 4
@@ -924,7 +925,7 @@ A list of field names for the desired columns.
 
 =item RETURN
 
-Returns a two-element list consisting of (0) a reference to a list of the headers from the input file and 
+Returns a two-element list consisting of (0) a reference to a list of the headers from the input file and
 (1) a reference to a list of column indices for the desired columns of the input, in order.
 
 =back
