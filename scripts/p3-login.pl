@@ -98,24 +98,38 @@ sub write_config
 }
 
 sub get_pass {
-    my $key  = 0;
-    my $pass = "";
-    print "Password: ";
-    ReadMode(4);
-    while ( ord($key = ReadKey(0)) != 10 ) {
-	# While Enter has not been pressed
-	if (ord($key) == 127 || ord($key) == 8) {
-	    chop $pass;
-	    print "\b \b";
-	} elsif (ord($key) < 32) {
-	    # Do nothing with control chars
-	} else {
-	    $pass .= $key;
-	    print "*";
-	}
+    if ($^O eq 'MSWin32')
+    {
+	$| = 1;
+	print "Password: ";
+	ReadMode('noecho');
+	my $password = <STDIN>;
+	chomp($password);
+	print "\n";
+	ReadMode(0);
+	return $password;
     }
-    ReadMode(0);
-    print "\n";
-    return $pass;
+    else
+    {
+	my $key  = 0;
+	my $pass = "";
+	print "Password: ";
+	ReadMode(4);
+	while ( ord($key = ReadKey(0)) != 10 ) {
+	    # While Enter has not been pressed
+	    if (ord($key) == 127 || ord($key) == 8) {
+		chop $pass;
+		print "\b \b";
+	    } elsif (ord($key) < 32) {
+		# Do nothing with control chars
+	    } else {
+		$pass .= $key;
+		print "*";
+	    }
+	}
+	ReadMode(0);
+	print "\n";
+	return $pass;
+    }
 }
 

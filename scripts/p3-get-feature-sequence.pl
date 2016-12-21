@@ -52,6 +52,7 @@ while (<$ih>)
     chomp;
     my @cols = split(/\t/);
     my $fid = $cols[$keyCol];
+    if (! $fid) {next};
     my($ftype) = $fid =~ /fig\|\d+\.\d+\.(\S+)\.\d+$/;
     my $stype = "na_sequence";
     $stype = "aa_sequence" if $is_protein{lc($ftype)} && !$opt->dna;
