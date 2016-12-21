@@ -468,17 +468,17 @@ sub update_feature_index
         my $nftr = @{$self->features};
         my $nind = keys %$feature_index;
 
-	my %seen;
-	$seen{$_->{id}}++ foreach @{$self->features};
-	my @dups = grep { $seen{$_} > 1 } keys %seen;
-	my $n = 10;
-	my $extra = '';
-	if (@dups > $n)
-	{
-	    $#dups = $n-1;
-	    $extra = "...";
-	}
-	my $ndups = @dups;
+        my %seen;
+        $seen{$_->{id}}++ foreach @{$self->features};
+        my @dups = grep { $seen{$_} > 1 } keys %seen;
+        my $n = 10;
+        my $extra = '';
+        if (@dups > $n)
+        {
+            $#dups = $n-1;
+            $extra = "...";
+        }
+        my $ndups = @dups;
 
         die "Number of features ($nftr) not equal to index size ($nind). $ndups duplicate ids: \n@dups$extra";
     }
@@ -789,7 +789,7 @@ that feature type.
 #
 #   -id                      =>  $ftr_id
 #   -id_client               =>  $id_client_object
-#   -id_prefix               =>  $id_prefix       
+#   -id_prefix               =>  $id_prefix
 #   -id_type                 =>  $type            #  D = $ftr_type
 #
 sub add_feature
@@ -1453,10 +1453,10 @@ sub sorted_features
     my @f = sort {
         my($ac, $apos, $atype) = sort_position($a);
         my($bc, $bpos, $btype) = sort_position($b);
-	($contig_order{$ac} <=> $contig_order{$bc}) or
-	    $apos <=> $bpos or
-		($atype cmp $btype) 
-		} @{$self->{features}};
+        ($contig_order{$ac} <=> $contig_order{$bc}) or
+            $apos <=> $bpos or
+                ($atype cmp $btype)
+                } @{$self->{features}};
     return wantarray ? @f : \@f;
 }
 
@@ -1483,17 +1483,17 @@ sub renumber_features
 
         my($c, $left, $type) = sort_position($f);
 
-	my $id;
-	if (exists $next_id{$type})
-	{
-	    $id = $next_id{$type}++;
-	}
-	else
-	{
-	    $id = 1;
-	    $next_id{$type} = 2;
-	}
-	    
+        my $id;
+        if (exists $next_id{$type})
+        {
+            $id = $next_id{$type}++;
+        }
+        else
+        {
+            $id = 1;
+            $next_id{$type} = 2;
+        }
+
         if ($f->{id} =~ /(.*\.)(\d+)$/)
         {
             my $new_id = $1 . $id;
@@ -1858,9 +1858,24 @@ sub flattened_feature_aliases
     my @aliases = ref($feature->{aliases}) ? @{$feature->{aliases}} : ();
     if (ref($feature->{alias_pairs}))
     {
-	push(@aliases, map { join(":", @$_) } @{$feature->{alias_pairs}});
+        push(@aliases, map { join(":", @$_) } @{$feature->{alias_pairs}});
     }
     return @aliases;
 }
 
+sub is_complete {
+    my ($self) = @_;
+    # Run through the contigs. We are complete if 70% of the sequence data is in big contigs (>= 20K base pairs).
+    my $contigs = $self->{contigs};
+    my ($bigLen, $totLen) = (0, 0);
+    for my $contig (@$contigs) {
+        my $dnaLength = length $contig->{dna};
+        $totLen += $dnaLength;
+        if ($dnaLength >= 20000) {
+            $bigLen += $dnaLength;
+        }
+    }
+    my $retVal = ((($bigLen / $totLen) >= 0.7) ? 1 : 0);
+    return $retVal;
+}
 1;
