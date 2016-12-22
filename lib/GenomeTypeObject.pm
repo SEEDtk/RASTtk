@@ -1865,17 +1865,37 @@ sub flattened_feature_aliases
 
 sub is_complete {
     my ($self) = @_;
-    # Run through the contigs. We are complete if 70% of the sequence data is in big contigs (>= 20K base pairs).
+    # Run through the contigs, collecting lengths.
     my $contigs = $self->{contigs};
-    my ($bigLen, $totLen) = (0, 0);
+    my $totLen = 0;
+    my @lens;
     for my $contig (@$contigs) {
         my $dnaLength = length $contig->{dna};
         $totLen += $dnaLength;
-        if ($dnaLength >= 20000) {
-            $bigLen += $dnaLength;
+        push @lens, $dnaLength;
+    }
+    # We can only be complete if the total length is 300K or more.
+    my $retVal = 0;
+    if ($totLen >= 300000) {
+        # We are looking for the L70, that is, the length of the shortest contig in the set of
+        # all the longest contigs that make up 70% of the total length. So, first, we sort the
+        # lengths from longest to shortest.
+        @lens = sort { $b <=> $a } @lens;
+        # We accumulate the contig length as we go through the sorted list until we break the
+        # 70% threshold.
+        my $threshold = 0.7 * $totLen;
+        my $cumul = 0;
+        my $last;
+        for my $len (@lens) {
+            $cumul += $len;
+            $last = $len;
+            last if ($cumul >= $threshold);
+        }
+        if ($last >= 20000) {
+            $retVal = 1;
         }
     }
-    my $retVal = ((($bigLen / $totLen) >= 0.7) ? 1 : 0);
     return $retVal;
 }
+
 1;
