@@ -2,7 +2,7 @@
 use strict;
 use URI::Escape;
 
-my $patric = "https://www.beta.patricbrc.org/";
+my $patric = "https://www.patricbrc.org/";
 my $hdg=1;
 my $f1;
 my $f2;
@@ -14,7 +14,7 @@ while (<>) {
     if ($_ =~ '////') {
         $hdg=1;
     } elsif ($_ =~ '//$') {
-         next; 
+         next;
     } elsif ($_ =~ '^###') {
         my ($hash, $genome) = split("\t", $_);
         #print  "<H3>$genome </H3>";
