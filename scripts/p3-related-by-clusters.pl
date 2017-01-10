@@ -1,6 +1,7 @@
 use Data::Dumper;
 use strict;
 use warnings;
+use P3DataAPI;
 use P3Utils;
 use P3Signatures;
 use File::Copy::Recursive;
@@ -129,6 +130,41 @@ open($ih, "<$gs2") || die "Could not open $gs2: $!";
 my $genomes2 = P3Utils::get_col($ih, 0);
 my %pairCounts;
 my $i;
+
+#
+# Filter genome groups to remove genomes that do not appear in PATRIC.
+#
+
+my $api = P3DataAPI->new();
+my $names = $api->genome_name($genomes1);
+my $ids = [];
+for my $gid (@$genomes1)
+{
+    if ($names->{$gid})
+    {
+	push(@$ids, $gid);
+    }
+    else
+    {
+	warn "Genome $gid does not appear in PATRIC\n";
+    }
+}
+$genomes1 = $ids;
+$ids = [];
+$names = $api->genome_name($genomes2);
+for my $gid (@$genomes2)
+{
+    if ($names->{$gid})
+    {
+	push(@$ids, $gid);
+    }
+    else
+    {
+	warn "Genome $gid does not appear in PATRIC\n";
+    }
+}
+$genomes2 = $ids;
+
 for ($i=0; ($i < $iterations); $i++)
 {
     print "Processing iteration $i.\n";

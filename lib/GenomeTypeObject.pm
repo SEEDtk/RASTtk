@@ -468,17 +468,17 @@ sub update_feature_index
         my $nftr = @{$self->features};
         my $nind = keys %$feature_index;
 
-	my %seen;
-	$seen{$_->{id}}++ foreach @{$self->features};
-	my @dups = grep { $seen{$_} > 1 } keys %seen;
-	my $n = 10;
-	my $extra = '';
-	if (@dups > $n)
-	{
-	    $#dups = $n-1;
-	    $extra = "...";
-	}
-	my $ndups = @dups;
+        my %seen;
+        $seen{$_->{id}}++ foreach @{$self->features};
+        my @dups = grep { $seen{$_} > 1 } keys %seen;
+        my $n = 10;
+        my $extra = '';
+        if (@dups > $n)
+        {
+            $#dups = $n-1;
+            $extra = "...";
+        }
+        my $ndups = @dups;
 
         die "Number of features ($nftr) not equal to index size ($nind). $ndups duplicate ids: \n@dups$extra";
     }
@@ -789,7 +789,7 @@ that feature type.
 #
 #   -id                      =>  $ftr_id
 #   -id_client               =>  $id_client_object
-#   -id_prefix               =>  $id_prefix       
+#   -id_prefix               =>  $id_prefix
 #   -id_type                 =>  $type            #  D = $ftr_type
 #
 sub add_feature
@@ -1453,10 +1453,10 @@ sub sorted_features
     my @f = sort {
         my($ac, $apos, $atype) = sort_position($a);
         my($bc, $bpos, $btype) = sort_position($b);
-	($contig_order{$ac} <=> $contig_order{$bc}) or
-	    $apos <=> $bpos or
-		($atype cmp $btype) 
-		} @{$self->{features}};
+        ($contig_order{$ac} <=> $contig_order{$bc}) or
+            $apos <=> $bpos or
+                ($atype cmp $btype)
+                } @{$self->{features}};
     return wantarray ? @f : \@f;
 }
 
@@ -1483,17 +1483,17 @@ sub renumber_features
 
         my($c, $left, $type) = sort_position($f);
 
-	my $id;
-	if (exists $next_id{$type})
-	{
-	    $id = $next_id{$type}++;
-	}
-	else
-	{
-	    $id = 1;
-	    $next_id{$type} = 2;
-	}
-	    
+        my $id;
+        if (exists $next_id{$type})
+        {
+            $id = $next_id{$type}++;
+        }
+        else
+        {
+            $id = 1;
+            $next_id{$type} = 2;
+        }
+
         if ($f->{id} =~ /(.*\.)(\d+)$/)
         {
             my $new_id = $1 . $id;
@@ -1858,9 +1858,44 @@ sub flattened_feature_aliases
     my @aliases = ref($feature->{aliases}) ? @{$feature->{aliases}} : ();
     if (ref($feature->{alias_pairs}))
     {
-	push(@aliases, map { join(":", @$_) } @{$feature->{alias_pairs}});
+        push(@aliases, map { join(":", @$_) } @{$feature->{alias_pairs}});
     }
     return @aliases;
+}
+
+sub is_complete {
+    my ($self) = @_;
+    # Run through the contigs, collecting lengths.
+    my $contigs = $self->{contigs};
+    my $totLen = 0;
+    my @lens;
+    for my $contig (@$contigs) {
+        my $dnaLength = length $contig->{dna};
+        $totLen += $dnaLength;
+        push @lens, $dnaLength;
+    }
+    # We can only be complete if the total length is 300K or more.
+    my $retVal = 0;
+    if ($totLen >= 300000) {
+        # We are looking for the L70, that is, the length of the shortest contig in the set of
+        # all the longest contigs that make up 70% of the total length. So, first, we sort the
+        # lengths from longest to shortest.
+        @lens = sort { $b <=> $a } @lens;
+        # We accumulate the contig length as we go through the sorted list until we break the
+        # 70% threshold.
+        my $threshold = 0.7 * $totLen;
+        my $cumul = 0;
+        my $last;
+        for my $len (@lens) {
+            $cumul += $len;
+            $last = $len;
+            last if ($cumul >= $threshold);
+        }
+        if ($last >= 20000) {
+            $retVal = 1;
+        }
+    }
+    return $retVal;
 }
 
 1;
