@@ -9,6 +9,7 @@ my $f2;
 my $count;
 my $genome;
 my $html = "";
+my $tmp = "";
 
 while (<>) {
     if ($_ =~ '////') {
