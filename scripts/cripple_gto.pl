@@ -93,4 +93,3 @@ for my $gtoFile (@gtos) {
     $gto->destroy_to_file($outFile);
 }
 print "All done.\n";
-## TODO process the input to produce the output.
