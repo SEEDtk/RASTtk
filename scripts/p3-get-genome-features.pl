@@ -13,6 +13,19 @@ The standard input can be overwritten using the options in L<P3Utils/ih_options>
 
 Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options>.
 
+The command-line options are those given in L<P3Utils/data_options>.
+You can peruse
+
+    https://github.com/PATRIC3/patric_solr/blob/master/genome_feature/conf/schema.xml
+     to gain access to all of the supported fields.  There are quite a
+     few, so do not panic.  You can use something like
+
+         p3-get-genome-features -e feature_type,CDS -a annotation -a start -a end -a product
+
+         to get some commonly sought fields.
+
+
+
 =cut
 
 use strict;
