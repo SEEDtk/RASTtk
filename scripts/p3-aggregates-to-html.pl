@@ -2,6 +2,22 @@
 use strict;
 use URI::Escape;
 
+=head1 Aggregates-to-html Produces readable summaries of Aggregates
+
+     p3-aggregates-to-html < aggregated.clusters > readable.aggregates
+
+This tool is part of a pipeline used to compute and display
+signature clusters (clusters that characterize one subset of genomes
+from another).
+
+=head2 Parameters
+
+There are no positional parameters.
+
+Standard input is not used.
+
+=cut
+
 my $patric = "https://www.patricbrc.org/";
 my $hdg=1;
 my $f1;

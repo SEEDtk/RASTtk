@@ -10,6 +10,16 @@ parameters and the specification of additional columns if desired.
 There are no positional parameters.
 
 The command-line options are those given in L<P3Utils/data_options>.
+You can peruse
+
+     https://github.com/PATRIC3/patric_solr/blob/master/genome/conf/schema.xml
+
+to gain access to all of the supported fields.  There are quite a
+few, so do not panic.  You can use something like
+
+    p3-all-genomes -a genome_name -a genome_length -a contigs -a genome_status
+
+to get some commonly sought fields.
 
 =cut
 

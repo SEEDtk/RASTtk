@@ -9,6 +9,9 @@ use SeedUtils;
      p3-aggregate-sss -d DataDirectory > aggregated.clusters
 
 This tool takes as input an Output Directory created by p3-related-by-clusters.
+That tool produces a group of sample sets of genomes, along with
+the chromosomal clusters that can be computed from them.
+This tool takes the output for all of the samples and aggregates it.
 It aggregates tables from different samples
 
 =head2 Parameters
