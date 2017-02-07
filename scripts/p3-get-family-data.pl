@@ -2,7 +2,7 @@
 
     p3-get-family-data [options]
 
-This script returns the IDs of all the genomes in the PATRIC database. It supports standard filtering
+This script returns information about each given family. It supports standard filtering
 parameters and the specification of additional columns if desired.
 
 =head2 Parameters
