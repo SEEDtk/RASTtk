@@ -20,7 +20,7 @@ You can peruse
      to gain access to all of the supported fields.  There are quite a
      few, so do not panic.  You can use something like
 
-         p3-get-genome-features -e feature_type,CDS -a annotation -a start -a end -a product
+         p3-echo -t genome.genome_id 282669.3 | p3-get-genome-features -e feature_type,CDS -a annotation -a start -a end -a product
 
          to get some commonly sought fields.
 
