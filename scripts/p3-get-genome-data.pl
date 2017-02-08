@@ -134,6 +134,7 @@ salinity
 oxygen_requirement
 habitat
 disease
+public
 End_of_Usage
 print $usage;
 }
