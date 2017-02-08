@@ -33,7 +33,16 @@ use P3DataAPI;
 use P3Utils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options());
+
+my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
+    ['fields|f', 'Show available fields']);
+
+my $fields = ($opt->fields ? 1 : 0);
+if ($fields) {
+        print_usage();
+            exit();
+}
+
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Compute the output columns.
@@ -56,4 +65,55 @@ while (! eof $ih) {
     for my $result (@$resultList) {
         P3Utils::print_cols($result);
     }
+}
+sub print_usage {
+
+
+my $usage = <<"End_of_Usage";
+genome_id
+genome_name
+taxon_id
+sequence_id
+accession
+annotation
+annotation_sort
+feature_type
+feature_id
+p2_feature_id
+alt_locus_tag
+patric_id
+refseq_locus_tag
+protein_id
+gene_id
+gi
+start
+end
+strand
+location
+segments
+pos_group
+na_length
+aa_length
+na_sequence
+aa_sequence
+aa_sequence_md5
+gene
+product
+figfam_id
+plfam_id
+pgfam_id
+ec
+pathway
+go
+uniprotkb_accession
+text
+date_inserted
+date_modified
+public
+owner
+user_read
+user_write
+End_of_Usage
+
+print $usage;
 }
