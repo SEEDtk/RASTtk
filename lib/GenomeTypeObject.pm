@@ -1863,8 +1863,51 @@ sub flattened_feature_aliases
     return @aliases;
 }
 
-sub is_complete {
+=head3 metrics
+
+    my $metricHash = $gto->metrics();
+
+Return a hash of metrics about this GTO. The metrics returned will include N50, N70, N90, total DNA length, and
+probable completeness.
+
+=over 4
+
+=item RETURN
+
+Returns a reference to a hash with the following keys.
+
+=over 8
+
+=item N50
+
+The N50 of the contig lengths (see L</n_metric>).
+
+=item N70
+
+The N70 of the contig lengths.
+
+=item N90
+
+The N90 of the contig lengths.
+
+=item totlen
+
+The total DNA length.
+
+=item complete
+
+C<1> if the genome is mostly complete, else C<0>.
+
+=back
+
+=back
+
+=cut
+
+sub metrics {
     my ($self) = @_;
+    # This will be the return hash.
+    my %retVal;
     # Run through the contigs, collecting lengths.
     my $contigs = $self->{contigs};
     my $totLen = 0;
@@ -1874,24 +1917,99 @@ sub is_complete {
         $totLen += $dnaLength;
         push @lens, $dnaLength;
     }
+    # Save the total length.
+    $retVal{totlen} = $totLen;
+    # Create a hash of threshholds.
+    my %thresh = (N50 => 0.5 * $totLen, N70 => 0.7 * $totLen, N90 => 0.9 * $totLen);
+    # Sort the contig lengths from longest to shortest.
+    @lens = sort { $b <=> $a } @lens;
+    # We accumulate the contig length as we go through the sorted list until we break a
+    # threshold.
+    my $cumul = 0;
+    for my $len (@lens) {
+        $cumul += $len;
+        for my $type (keys %thresh) {
+            if ($cumul >= $thresh{$type}) {
+                # We have the desired metric. Save it in the return array.
+                $retVal{$type} = $len;
+                # Insure we don't test for it again.
+                delete $thresh{$type};
+            }
+        }
+    }
+    # Check for completeness.
+    $retVal{complete} = (($retVal{N70} >= 20000 && $totLen >= 300000) ? 1 : 0);
+    # Return the hash.
+    return \%retVal;
+}
+
+
+=head3 n_metric
+
+    my $length = $gto->n_metric($thresh);
+
+Compute the NI<XX> metric for the contig lengths, where I<XX> is a percentage (usually 50, 70, or 90). A higher value
+for the metric indicates a higher-quality assembly. The N70 metric is the length of the shortest contig in the set of
+longest contigs comprising 70% of the total contig lengths. Similarly, the N50 metric is the length of the shortest contig
+in the set of longest contigs comprising 50% of the total contig lengths.
+
+=over 4
+
+=item thresh
+
+The threshold to use for the desired metric. For example, specify C<70> for an N70 metric.
+
+=item RETURN
+
+Returns the length of the contig at the desired metric level.
+
+=back
+
+=cut
+
+sub n_metric {
+    my ($self, $thresh) = @_;
+    # Run through the contigs, collecting lengths.
+    my $contigs = $self->{contigs};
+    my $totLen = 0;
+    my @lens;
+    for my $contig (@$contigs) {
+        my $dnaLength = length $contig->{dna};
+        $totLen += $dnaLength;
+        push @lens, $dnaLength;
+    }
+    # Sort the contig lengths from longest to shortest.
+    @lens = sort { $b <=> $a } @lens;
+    # We accumulate the contig length as we go through the sorted list until we break the
+    # threshold.
+    my $threshold = $thresh * $totLen / 100;
+    my $cumul = 0;
+    my $retVal = 0;
+    for my $len (@lens) {
+        $cumul += $len;
+        $retVal = $len;
+        last if ($cumul >= $threshold);
+    }
+    # Return the length found.
+    return $retVal;
+}
+
+sub is_complete {
+    my ($self) = @_;
+    # Run through the contigs, computing the total length.
+    my $contigs = $self->{contigs};
+    my $totLen = 0;
+    for my $contig (@$contigs) {
+        my $dnaLength = length $contig->{dna};
+        $totLen += $dnaLength;
+    }
     # We can only be complete if the total length is 300K or more.
     my $retVal = 0;
     if ($totLen >= 300000) {
-        # We are looking for the L70, that is, the length of the shortest contig in the set of
-        # all the longest contigs that make up 70% of the total length. So, first, we sort the
-        # lengths from longest to shortest.
-        @lens = sort { $b <=> $a } @lens;
-        # We accumulate the contig length as we go through the sorted list until we break the
-        # 70% threshold.
-        my $threshold = 0.7 * $totLen;
-        my $cumul = 0;
-        my $last;
-        for my $len (@lens) {
-            $cumul += $len;
-            $last = $len;
-            last if ($cumul >= $threshold);
-        }
-        if ($last >= 20000) {
+        # Compute the N70.
+        my $metric = $self->n_metric(70);
+        # We are complete if the N70 is 20K or more than.
+        if ($metric >= 20000) {
             $retVal = 1;
         }
     }
