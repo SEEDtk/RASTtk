@@ -22,6 +22,7 @@ package P3Utils;
     use strict;
     use warnings;
     use Getopt::Long::Descriptive;
+    use Data::Dumper;
 
 =head1 PATRIC Script Utilities
 
@@ -781,7 +782,17 @@ Open output file handle. The default is the standard output.
 sub print_cols {
     my ($cols, $oh) = @_;
     $oh //= \*STDOUT;
-    print $oh join("\t", @$cols) . "\n";
+
+    my @r;
+    for my $r (@$cols) {
+        if (ref($r) eq "ARRAY") {
+            my $a = join(",", @{$r});
+            push(@r, $a);
+        } else {
+            push(@r, $r);
+        }
+    }
+    print $oh join("\t", @r) . "\n";
 }
 
 
