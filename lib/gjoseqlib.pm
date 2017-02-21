@@ -368,7 +368,7 @@ sub input_filehandle
 
     #  FILEHANDLE
 
-    return ( $file, $file, 0 ) if ( ref( $file ) eq "GLOB" );
+    return ( $file, $file, 0 ) if ( is_filehandle($file) );
 
     #  Null string or undef
 
@@ -474,7 +474,7 @@ the whole input into a string or array).
 sub slurp
 {
     my ( $fh, $close );
-    if ( $_[0] && ref $_[0] eq 'GLOB' )
+    if ( $_[0] && is_filehandle($_[0]))
     {
         $fh = shift;
     }
@@ -600,7 +600,7 @@ open, which can hit the file system limit for open files.  So, use
         {
             if ( ref $_[0] )
             {
-                return () if ref $_[0] ne 'GLOB';
+                return () if ! is_filehandle($_[0]);
                 $fh = $_[0];
             }
             else
@@ -852,7 +852,7 @@ sub output_filehandle
 
     #  FILEHANDLE
 
-    return ( $file, 0 ) if ( ref( $file ) eq "GLOB" );
+    return ( $file, 0 ) if ( is_filehandle($file) );
 
     #  Some other kind of reference; return the unused value
 
@@ -1098,7 +1098,7 @@ external interface.  To print a single sequence to a named file use:
 
 sub print_seq_as_fasta
 {
-    my $fh = ( ref $_[0] eq 'GLOB' ) ? shift : \*STDOUT;
+    my $fh = ( is_filehandle($_[0]) ) ? shift : \*STDOUT;
     return if ( @_ < 2 ) || ( @_ > 3 ) || ! ( defined $_[0] && defined $_[-1] );
     #  Print header line
     print $fh  ( @_ == 3 && defined $_[1] && $_[1] =~ /\S/ ) ? ">$_[0] $_[1]\n" : ">$_[0]\n";
@@ -2950,5 +2950,11 @@ sub is_array_of_sequence_triples
     $_ && ref( $_ ) eq 'ARRAY' && @$_ == grep { is_sequence_triple( $_ ) } @$_;
 }
 
+sub is_filehandle
+{
+    my($fh) = @_;
+    return ref($fh) && ((ref($fh) eq 'GLOB') || eval { $fh->can('print') });
+}
 
 1;
+

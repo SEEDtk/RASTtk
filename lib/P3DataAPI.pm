@@ -19,14 +19,14 @@ eval {
     require HTTP::Async;
     $have_async = 1;
 };
-#use IO::Socket::SSL;
+use IO::Socket::SSL;
 
-#$IO::Socket::SSL::DEBUG = 0;
+$IO::Socket::SSL::DEBUG = 0;
 
-#IO::Socket::SSL::set_ctx_defaults(
-#                                       SSL_verifycn_scheme => 'www',
-#                                       SSL_verify_mode => 0,
-#                                  );
+IO::Socket::SSL::set_ctx_defaults(
+                                       SSL_verifycn_scheme => 'www',
+                                       SSL_verify_mode => 0,
+                                  );
 
 no warnings 'once';
 
@@ -310,8 +310,8 @@ sub solr_query_raw
     my($s, $e);
     if ($self->debug)
     {
-        $s = gettimeofday;
-        print STDERR "SQ: $uri " . join(" ", map { "$_ = '$params{$_}'" } sort keys %params), "\n";
+	$s = gettimeofday;
+	print STDERR "SQ: $uri " . join(" ", map { "$_ = '$params{$_}'" } sort keys %params), "\n";
     }
     # print STDERR "Query url: $uri\n";
     my $res = $self->ua->post($uri,
@@ -481,6 +481,27 @@ sub retrieve_contigs_in_genomes {
 
 }
 
+sub retrieve_contigs_in_genome_to_temp {
+    my ($self, $genome_id) = @_;
+
+    my $temp = File::Temp->new();
+    
+    $self->query_cb("genome_sequence",
+		    sub {
+			my ($data) = @_;
+			for my $ent (@$data) {
+			    print_alignment_as_fasta($temp, 
+						     ["accn|$ent->{sequence_id}",
+						      "$ent->{description} [ $ent->{genome_name} | $ent->{genome_id} ]",
+						      $ent->{sequence}]);
+			}
+		    },
+		    [ "eq", "genome_id", $genome_id ]
+		   );
+    close($temp);
+    return($temp);
+}
+
 sub compute_contig_md5s_in_genomes {
     my ( $self, $genome_ids ) = @_;
 
@@ -549,6 +570,44 @@ sub retrieve_protein_features_in_genomes {
         print $id_map_fh join( "\t", $k, @$v ), "\n";
     }
     close($id_map_fh);
+}
+
+#
+# Side effect, returns list of features and family/function data.
+#
+sub retrieve_protein_features_in_genomes_to_temp {
+    my ( $self, $genome_ids ) = @_;
+
+    my $temp = File::Temp->new();
+
+    my %map;
+
+    my $ret_list;
+    $ret_list = [] if wantarray;
+    
+    for my $gid (@$genome_ids) {
+        $self->query_cb(
+            "genome_feature",
+            sub {
+                my ($data) = @_;
+                for my $ent (@$data) {
+		    print_alignment_as_fasta($temp, 
+					     [
+					      $ent->{patric_id}, $ent->{product},
+					      $ent->{aa_sequence}
+					      ]
+					    );
+		    push(@$ret_list, [@$ent{qw(patric_id product plfam_id pgfam_id)}]) if $ret_list;
+                }
+            },
+            [ "eq",     "feature_type", "CDS" ],
+ 	    [ "eq", "annotation", "PATRIC"],			
+            [ "eq",     "genome_id",    $gid ],
+            [ "select", "patric_id,product,aa_sequence,plfam_id,pgfam_id" ],
+        );
+    }
+    close($temp);
+    return wantarray ? ($temp, $ret_list) : $temp;
 }
 
 sub retrieve_protein_features_with_role {
