@@ -15,12 +15,12 @@ use gjoseqlib;
 my $family_service_url = "http://spruce.mcs.anl.gov:6100";
 
 my($opt, $usage) = describe_options("%c %o [input-file]",
-				    ["plfam", "Use PATRIC local families (default)"],
-				    ["pgfam", "Use PATRIC global families"],
-				    ["genus=s", "Limit results to this genus. Required for use with local families."],
-				    ["input|i=s", "FASTA input file of target protein sequence"],
-				    ["output|o=s", "Output file"],
-				    ["help|h", "Show this help message"]);
+                                    ["plfam", "Use PATRIC local families (default)"],
+                                    ["pgfam", "Use PATRIC global families"],
+                                    ["genus=s", "Limit results to this genus. Required for use with local families."],
+                                    ["input|i=s", "FASTA input file of target protein sequence"],
+                                    ["output|o=s", "Output file"],
+                                    ["help|h", "Show this help message"]);
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) if @ARGV > 1;
 
@@ -83,7 +83,7 @@ my($id, $def, $seq) = read_next_fasta_seq($in_fh);
 my $ua = LWP::UserAgent->new;
 my $uri = URI->new("$family_service_url/lookup");
 $uri->query_form(find_best_match => 1,
-		 $opt->genus ? (target_genus => $opt->genus) : ());
+                 $opt->genus ? (target_genus => $opt->genus) : ());
 
 my $res = $ua->post($uri, Content => ">$id\n$seq\n");
 
@@ -93,7 +93,8 @@ if (!$res->is_success)
 }
 
 my $txt = $res->content;
-my($id, $pgf, $pgf_score, $plf, $plf_score, $function, $score) = split(/\t/, $txt);
+my ($pgf, $pgf_score, $plf, $plf_score, $function, $score);
+($id, $pgf, $pgf_score, $plf, $plf_score, $function, $score) = split(/\t/, $txt);
 
 my $matching_family;
 my $db_query;
@@ -102,35 +103,35 @@ if ($fam_type eq 'PLFAM')
 {
     if ($plf)
     {
-	$matching_family = $plf;
-	$db_query = ["eq", "plfam_id", $matching_family];
+        $matching_family = $plf;
+        $db_query = ["eq", "plfam_id", $matching_family];
     }
     else
     {
-	warn "No matching family found\n";
-	exit;
+        warn "No matching family found\n";
+        exit;
     }
 }
 else
 {
     if ($pgf)
     {
-	$matching_family = $pgf;
-	$db_query = ["eq", "pgfam_id", $matching_family];
+        $matching_family = $pgf;
+        $db_query = ["eq", "pgfam_id", $matching_family];
     }
     else
     {
-	warn "No matching family found\n";
-	exit;
+        warn "No matching family found\n";
+        exit;
     }
 }
-		    
+
 my $api = P3DataAPI->new();
 
 my @res = $api->query("genome_feature",
-		      ["select", "patric_id,genome_id,genome_name"],
-		      ["eq", "annotation", "PATRIC"],
-		      $db_query);
+                      ["select", "patric_id,genome_id,genome_name"],
+                      ["eq", "annotation", "PATRIC"],
+                      $db_query);
 
 print $out_fh join("genome.patric_id", "genome.genome_id"), "\n";
 for my $ent (@res)
@@ -140,6 +141,6 @@ for my $ent (@res)
     my $g = $opt->genus;
     if (!$g || $genome_name =~ /^$g\s/)
     {
-	print $out_fh join("\t", $id, $genome), "\n";
+        print $out_fh join("\t", $id, $genome), "\n";
     }
 }
