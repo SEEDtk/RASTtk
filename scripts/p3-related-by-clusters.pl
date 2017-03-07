@@ -96,7 +96,7 @@ Type of protein family-- local, global, or
 
 =cut
 
-my ($opt, $helper) = P3Utils::script_opts('',
+my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
                                           ["gs1=s","a file containing genome set 1", { required => 1 }],
                                           ["gs2=s","a file containing genome set 2", { required => 1 }],
                                           ["sz1=i","size of sample from gs1", { default => 20 }],
@@ -124,10 +124,12 @@ File::Copy::Recursive::pathempty($csDir);
 # Get the two genome sets.
 my $ih;
 open($ih, "<$gs1") || die "Could not open $gs1: $!";
-my $genomes1 = P3Utils::get_col($ih, 0);
+my ($outHeaders1, $keycol1) = P3Utils::process_headers($ih, $opt);
+my $genomes1 = P3Utils::get_col($ih, $keycol1);
 close $ih; undef $ih;
 open($ih, "<$gs2") || die "Could not open $gs2: $!";
-my $genomes2 = P3Utils::get_col($ih, 0);
+my ($outHeaders2, $keycol2) = P3Utils::process_headers($ih, $opt);
+my $genomes2 = P3Utils::get_col($ih, $keycol2);
 my %pairCounts;
 my $i;
 
