@@ -785,7 +785,9 @@ sub print_cols {
 
     my @r;
     for my $r (@$cols) {
-        if (ref($r) eq "ARRAY") {
+        if (! defined $r) {
+            push(@r, '')
+        } elsif (ref($r) eq "ARRAY") {
             my $a = join(",", @{$r});
             push(@r, $a);
         } else {
