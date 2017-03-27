@@ -51,7 +51,7 @@ use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', '
                             feature => ['patric_id', 'feature_type', 'location', 'product'],
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
-                            contig => ['genome_id', 'accession'] };
+                            contig => ['genome_id', 'accession', 'length', 'taxon_id', 'sequence'] };
 
 =head3 IDCOL
 
