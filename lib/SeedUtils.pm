@@ -2162,6 +2162,92 @@ sub strip_func_comment {
     }
 }
 
+=head3 compute_metrics
+
+    my $metricHash = SeedUtils::compute_metrics(\@lens, $totLen);
+
+Compute metrics about a genome given a list of contig lengths. The metrics returned will include
+N50, N70, N90, total DNA length, and probable completeness.
+
+=over 4
+
+=item lens
+
+Reference to a list of contig lengths.
+
+=item totLen (optional)
+
+The total length of all the contigs.
+
+=item RETURN
+
+Returns a reference to a hash with the following keys.
+
+=over 8
+
+=item N50
+
+The N50 of the contig lengths (see L</n_metric>).
+
+=item N70
+
+The N70 of the contig lengths.
+
+=item N90
+
+The N90 of the contig lengths.
+
+=item totlen
+
+The total DNA length.
+
+=item complete
+
+C<1> if the genome is mostly complete, else C<0>.
+
+=back
+
+=back
+
+=cut
+
+sub compute_metrics {
+    my ($lens, $totLen) = @_;
+    # This will be the return hash.
+    my %retVal;
+    if (! defined $totLen) {
+        # Here we must compute the total length.
+        $totLen = 0;
+        for my $len (@$lens) {
+            $totLen += $len;
+        }
+    }
+    # Save the total length.
+    $retVal{totlen} = $totLen;
+    # Create a hash of threshholds.
+    my %thresh = (N50 => 0.5 * $totLen, N70 => 0.7 * $totLen, N90 => 0.9 * $totLen);
+    # Sort the contig lengths from longest to shortest.
+    my @lens = sort { $b <=> $a } @$lens;
+    # We accumulate the contig length as we go through the sorted list until we break a
+    # threshold.
+    my $cumul = 0;
+    for my $len (@lens) {
+        $cumul += $len;
+        for my $type (keys %thresh) {
+            if ($cumul >= $thresh{$type}) {
+                # We have the desired metric. Save it in the return array.
+                $retVal{$type} = $len;
+                # Insure we don't test for it again.
+                delete $thresh{$type};
+            }
+        }
+    }
+    # Check for completeness.
+    $retVal{complete} = (($retVal{N70} >= 20000 && $totLen >= 300000) ? 1 : 0);
+    # Return the hash.
+    return \%retVal;
+}
+
 =head3 canonical_function
 
     $clean_function = canonical_function($function);

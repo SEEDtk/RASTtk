@@ -66,6 +66,7 @@ use IDclient;
 use BasicLocation;
 use IO::Handle;
 use Data::Dumper;
+use SeedUtils qw();
 
 our $have_unbless;
 eval {
@@ -1906,8 +1907,6 @@ C<1> if the genome is mostly complete, else C<0>.
 
 sub metrics {
     my ($self) = @_;
-    # This will be the return hash.
-    my %retVal;
     # Run through the contigs, collecting lengths.
     my $contigs = $self->{contigs};
     my $totLen = 0;
@@ -1917,30 +1916,10 @@ sub metrics {
         $totLen += $dnaLength;
         push @lens, $dnaLength;
     }
-    # Save the total length.
-    $retVal{totlen} = $totLen;
-    # Create a hash of threshholds.
-    my %thresh = (N50 => 0.5 * $totLen, N70 => 0.7 * $totLen, N90 => 0.9 * $totLen);
-    # Sort the contig lengths from longest to shortest.
-    @lens = sort { $b <=> $a } @lens;
-    # We accumulate the contig length as we go through the sorted list until we break a
-    # threshold.
-    my $cumul = 0;
-    for my $len (@lens) {
-        $cumul += $len;
-        for my $type (keys %thresh) {
-            if ($cumul >= $thresh{$type}) {
-                # We have the desired metric. Save it in the return array.
-                $retVal{$type} = $len;
-                # Insure we don't test for it again.
-                delete $thresh{$type};
-            }
-        }
-    }
-    # Check for completeness.
-    $retVal{complete} = (($retVal{N70} >= 20000 && $totLen >= 300000) ? 1 : 0);
+    # Compute the metrics.
+    my $retVal = SeedUtils::compute_metrics(\@lens, $totLen);
     # Return the hash.
-    return \%retVal;
+    return $retVal;
 }
 
 
