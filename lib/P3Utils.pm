@@ -126,13 +126,18 @@ TRUE. The default is C<0>, which indicates the last column.
 Maximum number of lines to read in a batch. The default is C<100>. This option is only present if the B<$colFlag>
 parameter is TRUE.
 
+=item nohead
+
+Input file has no headers.
+
 =back
 
 =cut
 
 sub col_options {
     return (['col|c=s', 'column number (1-based) or name', { default => 0 }],
-                ['batchSize|b=i', 'input batch size', { default => 100 }]);
+                ['batchSize|b=i', 'input batch size', { default => 100 }],
+                ['nohead', 'file has no headers']);
 }
 
 =head3 get_couplets
@@ -270,8 +275,13 @@ column. If there is no key column, the second element of the list will be undefi
 sub process_headers {
     my ($ih, $opt) = @_;
     # Read the header line.
-    my $line = <$ih>;
-    die "Input file is empty.\n" if (! defined $line);
+    my $line;
+    if ($opt->nohead) {
+        $line = '';
+    } else {
+        $line = <$ih>;
+        die "Input file is empty.\n" if (! defined $line);
+    }
     # Remove the EOL characters.
     $line =~ s/[\r\n]+$//;
     # Split the line into fields.
