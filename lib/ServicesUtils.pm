@@ -284,10 +284,10 @@ sub get_batch {
     while (! eof $ih && $count != $batchSize) {
         # Get the line and strip off the line-end. We do some fancy dancy for Windows compatability.
         my $line = <$ih>;
-        $line =~ s/\r?\n$//;
         my @flds = split /\t/, $line;
         # Only proceed if the line is nonblank.
         if (@flds) {
+        $flds[$#flds] =~ s/[\r\n]+$//;
             # Extract the desired column.
             my $value = $flds[$col];
             # Store and count the result.
@@ -334,10 +334,11 @@ sub get_column {
     while (! eof $ih) {
         # Get the input line.
         my $line = <$ih>;
-        # Strip off the line-end characters.
-        $line =~ s/\r?\n$//;
         # Split into columns.
         my @cols = split /\t/, $line;
+        if (@cols) {
+            $cols[$#cols] =~ s/\r?\n$//;
+        }
         push @retVal, $cols[$col - 1];
     }
     return \@retVal;
@@ -373,10 +374,12 @@ sub get_cols {
     my ($ih, @cols) = @_;
     # Get the input line.
     my $line = <$ih>;
-    # Strip off the line-end characters.
-    $line =~ s/\r?\n$//;
     # Split into columns.
     my @values = split /\t/, $line;
+    # Strip off the line-end characters.
+    if (@values) {
+        $values[$#values] =~ s/\r?\n$//;
+    }
     # Extract the desired values.
     my @retVal;
     for my $col (@cols) {

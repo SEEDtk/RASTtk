@@ -186,10 +186,8 @@ sub get_couplets {
         while (! eof $ih && $count < $batchSize) {
             # Read the next line.
             my $line = <$ih>;
-            # Remove the EOL.
-            $line =~ s/[\r\n]+$//;
             # Split the line into fields.
-            my @fields = split /\t/, $line;
+            my @fields = get_fields($line);
             # Extract the key column.
             my $key = $fields[$colNum];
             # Store the couplet.
@@ -234,10 +232,8 @@ sub get_col {
     while (! eof $ih) {
         # Read the next line.
         my $line = <$ih>;
-        # Remove the EOL.
-        $line =~ s/[\r\n]+$//;
         # Split the line into fields.
-        my @fields = split /\t/, $line;
+        my @fields = get_fields($line);
         # Extract the key column.
         push @retVal, $fields[$colNum];
     }
@@ -282,10 +278,8 @@ sub process_headers {
         $line = <$ih>;
         die "Input file is empty.\n" if (! defined $line);
     }
-    # Remove the EOL characters.
-    $line =~ s/[\r\n]+$//;
     # Split the line into fields.
-    my @outHeaders = split /\t/, $line;
+    my @outHeaders = get_fields($line);
     # This will contain the key column number.
     my $keyCol;
     # Search for the key column.
@@ -959,8 +953,7 @@ sub find_headers {
     my ($ih, $fileType, @fields) = @_;
     # Read the column headers from the file.
     my $line = <$ih>;
-    $line =~ s/[\r\n]+$//;
-    my @headers = split /\t/, $line;
+    my @headers = get_fields($line);
     # Get a hash of the field names.
     my %fieldH = map { $_ => undef } @fields;
     # Loop through the headers, saving indices.
@@ -1017,12 +1010,43 @@ sub get_cols {
     my ($ih, $cols) = @_;
     # Read the input line.
     my $line = <$ih>;
-    $line =~ s/[\r\n]+$//;
     # Get the columns.
-    my @fields = split /\t/, $line;
+    my @fields = get_fields($line);
     # Extract the ones we want.
     my @retVal = map { $fields[$_] } @$cols;
     # Return the resulting values.
+    return @retVal;
+}
+
+=head3 get_fields
+
+    my @fields = P3Utils::get_fields($line);
+
+Split a tab-delimited line into fields.
+
+=over 4
+
+=item line
+
+Input line to split.
+
+=item RETURN
+
+Returns a list of the fields in the line.
+
+=back
+
+=cut
+
+sub get_fields {
+    my ($line) = @_;
+    # Split the line.
+    my @retVal = split /\t/, $line;
+    # Remove the EOL.
+    if (@retVal) {
+        $retVal[$#retVal] =~ s/[\r\n]+$//;
+    }
+    # Return the fields.
     return @retVal;
 }
 

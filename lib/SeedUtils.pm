@@ -177,8 +177,10 @@ sub fields_of {
     my @retVal;
     if (! eof $ih) {
         my $line = <$ih>;
-        chomp $line;
         @retVal = split /\t/, $line;
+        if (@retVal) {
+            $retVal[$#retVal] =~ s/[\r\n]+$//;
+        }
     }
     return @retVal;
 }

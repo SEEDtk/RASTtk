@@ -288,10 +288,11 @@ sub get_couplets {
     # Loop until done.
     while (! eof $ih && $count != $batchSize) {
         my $line = <$ih>;
-        $line =~ s/\r?\n$//;
         my @flds = split /\t/, $line;
         # Only proceed if the line is nonblank.
         if (@flds) {
+            # Fix the last column.
+            $flds[$#flds] =~ s/[\r\n]+$//;
             # Extract the desired column.
             my $value;
             if ($col) {
