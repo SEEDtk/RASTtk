@@ -310,8 +310,8 @@ sub solr_query_raw
     my($s, $e);
     if ($self->debug)
     {
-	$s = gettimeofday;
-	print STDERR "SQ: $uri " . join(" ", map { "$_ = '$params{$_}'" } sort keys %params), "\n";
+        $s = gettimeofday;
+        print STDERR "SQ: $uri " . join(" ", map { "$_ = '$params{$_}'" } sort keys %params), "\n";
     }
     # print STDERR "Query url: $uri\n";
     my $res = $self->ua->post($uri,
@@ -485,19 +485,19 @@ sub retrieve_contigs_in_genome_to_temp {
     my ($self, $genome_id) = @_;
 
     my $temp = File::Temp->new();
-    
+
     $self->query_cb("genome_sequence",
-		    sub {
-			my ($data) = @_;
-			for my $ent (@$data) {
-			    print_alignment_as_fasta($temp, 
-						     ["accn|$ent->{sequence_id}",
-						      "$ent->{description} [ $ent->{genome_name} | $ent->{genome_id} ]",
-						      $ent->{sequence}]);
-			}
-		    },
-		    [ "eq", "genome_id", $genome_id ]
-		   );
+                    sub {
+                        my ($data) = @_;
+                        for my $ent (@$data) {
+                            print_alignment_as_fasta($temp,
+                                                     ["accn|$ent->{sequence_id}",
+                                                      "$ent->{description} [ $ent->{genome_name} | $ent->{genome_id} ]",
+                                                      $ent->{sequence}]);
+                        }
+                    },
+                    [ "eq", "genome_id", $genome_id ]
+                   );
     close($temp);
     return($temp);
 }
@@ -584,24 +584,24 @@ sub retrieve_protein_features_in_genomes_to_temp {
 
     my $ret_list;
     $ret_list = [] if wantarray;
-    
+
     for my $gid (@$genome_ids) {
         $self->query_cb(
             "genome_feature",
             sub {
                 my ($data) = @_;
                 for my $ent (@$data) {
-		    print_alignment_as_fasta($temp, 
-					     [
-					      $ent->{patric_id}, $ent->{product},
-					      $ent->{aa_sequence}
-					      ]
-					    );
-		    push(@$ret_list, [@$ent{qw(patric_id product plfam_id pgfam_id)}]) if $ret_list;
+                    print_alignment_as_fasta($temp,
+                                             [
+                                              $ent->{patric_id}, $ent->{product},
+                                              $ent->{aa_sequence}
+                                              ]
+                                            );
+                    push(@$ret_list, [@$ent{qw(patric_id product plfam_id pgfam_id)}]) if $ret_list;
                 }
             },
             [ "eq",     "feature_type", "CDS" ],
- 	    [ "eq", "annotation", "PATRIC"],			
+             [ "eq", "annotation", "PATRIC"],
             [ "eq",     "genome_id",    $gid ],
             [ "select", "patric_id,product,aa_sequence,plfam_id,pgfam_id" ],
         );
@@ -1723,7 +1723,8 @@ sub gto_of {
                 "alt_locus_tag", "refseq_locus_tag",
                 "protein_id",    "gene_id",
                 "gi",            "gene",
-                "uniprotkb_accession"
+                "uniprotkb_accession",
+                "pgfam_id"
             ]
         );
 
@@ -1757,6 +1758,10 @@ sub gto_of {
                 if ( ref( $f->{uniprotkb_accession} ) ) {
                     push( @aliases, @{ $f->{uniprotkb_accession} } );
                 }
+                my @familyList;
+                if ($f->{pgfam_id}) {
+                    @familyList = (['PGF', $f->{pgfam_id}]);
+                }
                 $retVal->add_feature(
                     {
                         -annotator           => "PATRIC",
@@ -1767,6 +1772,7 @@ sub gto_of {
                         -function            => $f->{product},
                         -protein_translation => $f->{aa_sequence},
                         -aliases             => \@aliases,
+                        -family_assignments => \@familyList
                     }
                 );
                 $fids{$fid} = 1;
