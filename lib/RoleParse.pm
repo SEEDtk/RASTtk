@@ -194,6 +194,7 @@ sub FixupRole {
     # Fix spelling mistakes.
     $retVal =~ s/^\d{7}[a-z]\d{2}rik\b|\b(?:hyphothetical|hyothetical)\b/hypothetical/ig;
     # Trim spaces;
+    $retVal =~ s/\r/ /g;
     $retVal =~ s/^\s+//;
     $retVal =~ s/\s+$//;
     # Remove quoting.
