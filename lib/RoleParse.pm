@@ -21,6 +21,7 @@ package RoleParse;
     use strict;
     use warnings;
     use Digest::MD5;
+    use Encode qw(encode_utf8);
 
 =head1 Role Parser
 
@@ -160,7 +161,8 @@ sub Checksum {
     my ($role) = @_;
     my ($roleText) = Parse($role);
     my $normalized = Normalize($roleText);
-    my $retVal = Digest::MD5::md5_base64($normalized);
+    my $encoded = encode_utf8($normalized);
+    my $retVal = Digest::MD5::md5_base64($encoded);
     return $retVal;
 }
 
