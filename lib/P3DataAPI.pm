@@ -1784,6 +1784,43 @@ sub gto_of {
     return $retVal;
 }
 
+=head3 gto_of
+
+    my $triples = $d->fasta_of($genomeID);
+
+Return a set of contig triples for the specified genome. Each triple is [id, comment, sequence].
+
+=over 4
+
+=item genomeID
+
+ID of the source genome.
+
+=item RETURN
+
+Returns a reference to a list of 3-tuples, one per contig in the genome. Each tuple consists of (0) an ID, (1)
+an empty string (comment), and (2) the contig DNA sequence.
+
+=back
+
+=cut
+
+sub fasta_of {
+    my ( $self, $genomeID ) = @_;
+    my $retVal;
+
+    # Get the contigs.
+    my @contigs = $self->query(
+        "genome_sequence",
+        [ "eq",     "genome_id",   $genomeID ],
+        [ "select", "sequence_id", "sequence" ]
+    );
+    # Create the triples.
+    my @retVal = map { [$_->{sequence_id}, '', $_->{sequence}] } @contigs;
+    # Return the list of triples.
+    return \@retVal;
+}
+
 sub is_reference_genome
 {
     my($self, $genome) = @_;
