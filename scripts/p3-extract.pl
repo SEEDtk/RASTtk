@@ -24,7 +24,7 @@ die "No columns specified." if (! @cols);
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Process the headers.
-my ($inHeaders) = P3Utils::process_headers($ih, $opt);
+my ($inHeaders) = P3Utils::process_headers($ih, $opt, 'keyless');
 # Compute the column indices.
 my @idxes = map { P3Utils::find_column($_, $inHeaders) } @cols;
 # Compute the output headers.
