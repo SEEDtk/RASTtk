@@ -20,7 +20,6 @@ package FastQ;
 
     use strict;
     use warnings;
-    ## TODO more use clauses
 
 =head1 FASTQ Reader
 
@@ -143,6 +142,49 @@ sub norm_id {
         $retVal = $id;
     }
     return $retVal;
+}
+
+=head2 OrganizeFiles
+
+    my $filesL = FastQ::OrganizeFiles($iFlag, @fileParms);
+
+Organize the list of files containing FastQ data into a list of FastQ object parameter lists. If the files are interlaced, this
+means creating a list of singeltons; otherwise, it means creating a list of pairs. The output list can be processed sequentially
+to create a sequence of FastQ objects for input.
+
+=over 4
+
+=item iFlag
+
+TRUE if the input is interlaced, FALSE if it is paired.
+
+=item fileParms
+
+The list of files to process for input.
+
+=item RETURN
+
+Returns a reference to a list of specifications for FastQ constructors.
+
+=back
+
+=cut
+
+sub OrganizeFiles {
+    my ($iFlag, @fileParms) = @_;
+    my @retVal;
+    if ($iFlag) {
+        @retVal = map { [$_] } @fileParms;
+    } else {
+        my $n = scalar @fileParms;
+        if ($n & 1) {
+            die "Odd number of files specified in paired mode.";
+        }
+        for (my $i = 0; $i < $n; $i += 2) {
+            push @retVal, [$fileParms[$i], $fileParms[$i+1]];
+        }
+    }
+    return \@retVal;
 }
 
 

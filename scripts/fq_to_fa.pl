@@ -63,21 +63,10 @@ my $opt = ScriptUtils::Opts('file1 file2 .. fileN',
         ['interlaced|inter|i', 'files are in interlaced format']
         );
 # Get the file pairs.
-my @files;
-if ($opt->interlaced) {
-    @files = map { [$_] } @ARGV;
-} else {
-    my $n = scalar @ARGV;
-    if ($n & 1) {
-        die "Odd number of files specified in paired mode.";
-    }
-    for (my $i = 0; $i < $n; $i += 2) {
-        push @files, [$ARGV[$i], $ARGV[$i+1]];
-    }
-}
-# Now each element of @files contains all the parameters for the FastQ object invocation.
+my $files = FastQ::OrganizeFiles($opt->interlaced, @ARGV);
+# Now each element of @$files contains all the parameters for the FastQ object invocation.
 # Loop through the list.
-for my $filePair (@files) {
+for my $filePair (@$files) {
     my $fqh = FastQ->new(@$filePair);
     # Read through this file set.
     while ($fqh->next) {
