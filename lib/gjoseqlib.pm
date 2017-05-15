@@ -2953,7 +2953,7 @@ sub is_array_of_sequence_triples
 sub is_filehandle
 {
     my($fh) = @_;
-    return ref($fh) && ((ref($fh) eq 'GLOB') || eval { $fh->can('print') });
+    return ref($fh) && ref($fh) ne 'HASH' && ref($fh) ne 'ARRAY' && ((ref($fh) eq 'GLOB') || eval { $fh->can('print') });
 }
 
 1;
