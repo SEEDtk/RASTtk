@@ -1723,7 +1723,7 @@ sub gto_of {
                 "alt_locus_tag", "refseq_locus_tag",
                 "protein_id",    "gene_id",
                 "gi",            "gene",
-                "uniprotkb_accession"
+                "uniprotkb_accession", "genome_id"
             ]
         );
 
@@ -1731,9 +1731,9 @@ sub gto_of {
         my %fids;
         for my $f (@f) {
 
-            # Skip duplicates.
+            # Skip duplicates and nonstandard genome IDs.
             my $fid = $f->{patric_id};
-            if ( $fid && !$fids{$fid} ) {
+            if ($fid && ! $fids{$fid} && $fid =~ /fig\|(\d+\.\d+)/ && $1 eq $genomeID) {
                 my $prefix = $f->{sequence_id} . "_";
                 my $strand = $f->{strand};
                 my @locs;

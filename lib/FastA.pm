@@ -16,28 +16,24 @@
 #
 
 
-package FastQ;
+package FastA;
 
     use strict;
     use warnings;
 
-=head1 FASTQ Reader
+=head1 FASTA Reader
 
-This package facilitates reading paired-end FASTQ files. Such files are presented as a matched set or are interlaced.
-To begin using a FASTQ file, simply construct this object with a single file name (interlaced) or a pair (matched set). You can then input
-pairs of reads in a single operation.
+This package provides a mechanism for reading FASTA files that is compatible with the L<FastQ> reader. It allows input of FASTA
+files into FASTQ-oriented programs. A FASTA file is treated as high quality for its entire length, and the r-string is always
+empty.
 
 This object contains the following fields.
 
 =over 4
 
-=item lh
+=item ih
 
-Open file handle for the left reads, or for both if we are interlaced.
-
-=item rh
-
-Open file handle fo the right reads, or C<undef> if we are interlaced.
+Open file handle for the FASTA file.
 
 =item left
 
@@ -59,143 +55,54 @@ Right quality string.
 
 ID of the current node.
 
+=item next_id
+
+ID of the next node.
+
 =back
 
 =head2 Special Methods
 
 =head3 new
 
-    my $fqhandle = FastQ->new($left, $right);
+    my $fqhandle = FastA->new($file);
 
-or
-
-    my $fqhandle = FastQ->new($interlaced);
-
-Construct a new FASTQ handler using a matched pair of files or a single interlaced file. The handler may be used to retrieve matched pairs
-of reads from the file.
+Construct a new FASTA handler for the specified file.
 
 =over 4
 
-=item left
+=item file
 
-Name of the file containing the left-end reads, or an open file handle for it.
-
-=item right
-
-Name of the file containing the right-end reads, or an open file handle for it.
-
-=item interlaced
-
-Name of the file containing the interlaced reads.
+Name of the FASTA file, or an open file handle for it.
 
 =back
 
 =cut
 
 sub new {
-    my ($class, $left, $right) = @_;
+    my ($class, $file) = @_;
     # This will be the new object. It starts blank.
     my $retVal = {
         left => '',  right => '',
         lqual => '', rqual => '',
         id => undef
     };
-    # Store the handle for the left file.
-    my $lh;
-    if (ref $left eq 'GLOB') {
-        $lh = $left;
+    # Store the handle for the file.
+    my $ih;
+    if (ref $file eq 'GLOB') {
+        $ih = $file;
     } else {
-        open($lh, "<$left") || die "Could not open FASTQ file $left: $!";
+        open($ih, "<$file") || die "Could not open FASTA file $file: $!";
     }
-
-    $retVal->{lh} = $lh;
-    # Store the handle for the right file if we are not interlaced.
-    if ($right) {
-        my $rh;
-        if (ref $right eq 'GLOB') {
-            $rh = $right;
-        } else {
-            open($rh, "<$right") || die "Could not open FASTQ file $right: $!";
-        }
-        $retVal->{rh} = $rh;
+    $retVal->{ih} = $ih;
+    # Read the first header.
+    my $line = <$ih>;
+    if ($line =~ /^>(\S+)/) {
+        $retVal->{next_id} = $1;
     }
     # Bless and return this object.
     bless $retVal, $class;
     return $retVal;
-}
-
-=head3 norm_id
-
-    my $normalized = FastQ::norm_id($id);
-
-Strip off the direction indicator from a FASTQ file ID.
-
-=over 4
-
-=item id
-
-The ID to normalize.
-
-=item RETURN
-
-Returns the normalized sequence ID.
-
-=back
-
-=cut
-
-sub norm_id {
-    my ($id) = @_;
-    my $retVal;
-    if ($id =~ /(.+)\/\d/) {
-        $retVal = $1;
-    } else {
-        $retVal = $id;
-    }
-    return $retVal;
-}
-
-=head2 OrganizeFiles
-
-    my $filesL = FastQ::OrganizeFiles($iFlag, @fileParms);
-
-Organize the list of files containing FastQ data into a list of FastQ object parameter lists. If the files are interlaced, this
-means creating a list of singeltons; otherwise, it means creating a list of pairs. The output list can be processed sequentially
-to create a sequence of FastQ objects for input.
-
-=over 4
-
-=item iFlag
-
-TRUE if the input is interlaced, FALSE if it is paired.
-
-=item fileParms
-
-The list of files to process for input.
-
-=item RETURN
-
-Returns a reference to a list of specifications for FastQ constructors.
-
-=back
-
-=cut
-
-sub OrganizeFiles {
-    my ($iFlag, @fileParms) = @_;
-    my @retVal;
-    if ($iFlag) {
-        @retVal = map { [$_] } @fileParms;
-    } else {
-        my $n = scalar @fileParms;
-        if ($n & 1) {
-            die "Odd number of files specified in paired mode.";
-        }
-        for (my $i = 0; $i < $n; $i += 2) {
-            push @retVal, [$fileParms[$i], $fileParms[$i+1]];
-        }
-    }
-    return \@retVal;
 }
 
 
@@ -211,19 +118,38 @@ sub next {
     my ($self) = @_;
     # This will be set to TRUE if everything works.
     my $retVal;
-    # Get the file handles.
-    my ($lh, $rh) = ($self->{lh}, $self->{rh});
-    # Check for end-of-file.
-    if (! eof $lh) {
-        # Read the left record.
-        $self->_read_fastq($lh, 'left');
-        # Determine from where we will get the right record. If there is no right
-        # file, it will be the left file (interlaced mode).
-        $rh //= $lh;
-        # Read the right record.
-        $self->_read_fastq($rh, 'right');
+    # Get the file handle.
+    my $ih = $self->{ih};
+    # This will hold the current sequence.
+    my @seqs;
+    # Loop until we hit a new record or we hit the end of the file.
+    my $done;
+    while (! eof $ih && ! $done) {
+        # Read the data lines until we hit the end.
+        my $line = <$ih>;
+        if ($line =~ /^(\S+)/) {
+            # Here we have a header for a new record.
+            $retVal->{next_id} = $1;
+            $done = 1;
+        } else {
+            # Here we have sequence data.
+            $line =~ s/[\r\n]+$//;
+            push @seqs, $line;
+        }
+    }
+    # Did we find anything?
+    if (@seqs) {
         # Denote we have our data.
         $retVal = 1;
+        # Format the sequence and quality strings.
+        my $seq = join("", @seqs);
+        my $len = length $seq;
+        my $qual = '~' x $len;
+        # Store the input.
+        $retVal->{left} = $seq;
+        $retVal->{lqual} = $qual;
+        $retVal->{right} = '';
+        $retVal->{rqual} = '';
     }
     # Return the success indication.
     return $retVal;
