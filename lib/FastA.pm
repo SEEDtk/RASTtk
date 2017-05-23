@@ -155,9 +155,9 @@ sub next {
     return $retVal;
 }
 
-=head3 Echo
+=head3 Write
 
-    $fqhandle->Echo($oh);
+    $fqhandle->Write($oh);
 
 Write the current record to the specified file handle in FASTA format.
 
@@ -171,12 +171,12 @@ An open file handle onto which the current record's sequences should be written.
 
 =cut
 
-sub Echo {
+sub Write {
     my ($self, $oh) = @_;
     my $id = $self->id;
-    print $oh ">$id/1\n$self->{left}\n";
-    print $oh ">$id/2\n$self->{right}\n";
+    print $oh ">$id\n$self->{left}\n";
 }
+
 
 =head2 Data Access Methods
 
@@ -245,6 +245,18 @@ sub rqual {
     return $self->{rqual};
 }
 
+=head3 seqs
+
+    my @seqs = $fqhandle->seqs;
+
+Return a list of the sequences stored in the object. (There is only one.)
+
+=cut
+
+sub seqs {
+    my ($self) = @_;
+    return ($self->{left});
+}
 
 =head2 Internal Utilities
 

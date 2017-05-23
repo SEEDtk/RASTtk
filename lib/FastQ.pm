@@ -252,6 +252,31 @@ sub Echo {
     print $oh ">$id/2\n$self->{right}\n";
 }
 
+=head3 Write
+
+    $fqhandle->Write($oh);
+
+Write the current record to the specified file handle in interlaced FASTQ format.
+
+=over 4
+
+=item oh
+
+An open file handle onto which the current record's sequences should be written.
+
+=back
+
+=cut
+
+sub Write {
+    my ($self, $oh) = @_;
+    my $id = $self->id;
+    print $oh join("\n", "\@$id/1", $self->left, "+$id/1", $self->lqual,
+                         "\@$id/2", $self->right, "+$id/2", $self->rqual,
+                         "");
+}
+
+
 =head2 Data Access Methods
 
 =head3 id
@@ -317,6 +342,19 @@ Return the right quality string.
 sub rqual {
     my ($self) = @_;
     return $self->{rqual};
+}
+
+=head3 seqs
+
+    my @seqs = $fqhandle->seqs;
+
+Return a list of the sequences stored in the object. (There will always be two.)
+
+=cut
+
+sub seqs {
+    my ($self) = @_;
+    return ($self->{left}, $self->{right});
 }
 
 
