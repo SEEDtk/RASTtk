@@ -127,7 +127,7 @@ sub next {
     while (! eof $ih && ! $done) {
         # Read the data lines until we hit the end.
         my $line = <$ih>;
-        if ($line =~ /^(\S+)/) {
+        if ($line =~ /^>(\S+)/) {
             # Here we have a header for a new record.
             $retVal->{next_id} = $1;
             $done = 1;
@@ -146,10 +146,10 @@ sub next {
         my $len = length $seq;
         my $qual = '~' x $len;
         # Store the input.
-        $retVal->{left} = $seq;
-        $retVal->{lqual} = $qual;
-        $retVal->{right} = '';
-        $retVal->{rqual} = '';
+        $self->{left} = $seq;
+        $self->{lqual} = $qual;
+        $self->{right} = '';
+        $self->{rqual} = '';
     }
     # Return the success indication.
     return $retVal;
