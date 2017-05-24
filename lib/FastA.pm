@@ -129,7 +129,7 @@ sub next {
         my $line = <$ih>;
         if ($line =~ /^>(\S+)/) {
             # Here we have a header for a new record.
-            $retVal->{next_id} = $1;
+            ($self->{id}, $self->{next_id}) = ($self->{next_id}, $1);
             $done = 1;
         } else {
             # Here we have sequence data.
