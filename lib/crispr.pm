@@ -191,7 +191,7 @@ sub find_crisprs
             my $end = $locs[-1] + $replen - 1;
             $beg = 0 if $beg < 0;
             $end = length($seq) - 1 if $end >= length($seq);
-            my $len = $end - $beg + 1;
+            $len = $end - $beg + 1;
             my $loc = [ [ $id, $beg+1, '+', $len ] ];
 
             #  Split into repeats and spacers:
@@ -592,7 +592,7 @@ sub find_crisprs2
 
             my $beg = $locs[ 0];
             my $end = $locs[-1] + $replen2 - 1;
-            my $len = $end - $beg + 1;
+            $len = $end - $beg + 1;
             my $loc = [ $id, $beg, '+', $len ];
 
             #  Split into repeats and spacers:

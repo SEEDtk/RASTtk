@@ -2638,7 +2638,7 @@ sub write_encoded_object
 
     my ( $obj, $oh ) = @_;
 
-    $obj && ( ref( $obj ) eq 'HASH' )
+    $obj && ( ref( $obj ) eq 'HASH' || ref( $obj ) eq 'ARRAY' )
         or print STDERR "write_encoded_object() called without object.\n"
             and return undef;
 
