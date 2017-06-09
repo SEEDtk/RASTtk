@@ -109,11 +109,12 @@ my $crisprList = crispr::find_crisprs(\@contigList);
 #  @spacers = ( [ $loc, $spcseq ], ... )
 #  $loc     = [ [ $contig, $beg, $dir, $len ], ... ]
 print STDERR scalar(@$crisprList) . " CRISPR arrays found in genome.\n";
-my $idx = 1;
+my $idx = 0;
 for my $crispr (@$crisprList) {
     # Compute the CRISPR array locus.
     my ($locData, $consensus, $repeats, $spacers) = @$crispr;
     my $loc = BasicLocation->new(@$locData);
+    ++$idx;
     print "$idx. " . join(', ', $loc->String, "consensus $consensus",
         scalar(@$spacers) . " spacers") . ".\n\n";
     # Display the repeats.
@@ -123,6 +124,7 @@ for my $crispr (@$crisprList) {
     print "* SPACERS\n------------\n";
     show_dna_list($spacers);
     # Now get the features in the neighborhood.
+    my $header = "* CAS PROTEINS\n------------\n";
     for my $feature (@foundProteins) {
         my $locs = $feature->{location};
         my $locItem = pop @$locs;
@@ -131,6 +133,10 @@ for my $crispr (@$crisprList) {
             my $fGap = $loc->Distance($floc);
             if ($fGap <= $gap) {
                 # This is a neighborhood CAS protein. Print it.
+                if ($header) {
+                    print $header;
+                    undef $header;
+                }
                 print "$feature->{id} " . $floc->String . ": $feature->{function}\n";
                 # Stop the loop.
                 undef $locItem;
@@ -139,6 +145,10 @@ for my $crispr (@$crisprList) {
                 $locItem = pop @$locs;
             }
         }
+    }
+    # No nearby features? Print a message.
+    if ($header) {
+        print "No nearby CAS proteins found.\n";
     }
     # Space before the next CRISPR.
     print "\n\n";
