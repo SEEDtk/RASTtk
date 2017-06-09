@@ -1711,11 +1711,24 @@ sub genetic_code {
            ) {
         #...Do nothing
     }
+    elsif ($ncbi_genetic_code_num == 2) {
+        $code->{AGA} = '*';
+        $code->{AGG} = '*';
+        $code->{AUA} = 'M';
+        $code->{UGA} = 'W';
+    }
+    elsif ($ncbi_genetic_code_num == 3) {
+        $code->{AUA} = 'M';
+        $code->{CUU} = 'T';
+        $code->{CUC} = 'T';
+        $code->{CUG} = 'T';
+        $code->{UGA} = 'W';
+    }
     elsif ($ncbi_genetic_code_num ==  4) {
         $code->{TGA} = 'W';
     }
     else {
-        die "Sorry, only genetic codes 1, 4, and 11 are currently supported";
+        die "Sorry, only genetic codes 1, 2, 3, 4, and 11 are currently supported";
     }
 
     return $code;
@@ -1876,6 +1889,10 @@ sub strip_ec {
 
     my $aa_seq = translate($dna_seq, $code, $fix_start);
 
+or
+
+    my $aa_seq = translate(\$dna_seq, $offset, $code, $fix_start);
+
 Translate a DNA sequence to a protein sequence using the specified genetic code.
 If I<$fix_start> is TRUE, will translate an initial C<TTG> or C<GTG> code to
 C<M>. (In the standard genetic code, these two combinations normally translate
@@ -1885,8 +1902,13 @@ to C<V> and C<L>, respectively.)
 
 =item dna_seq
 
-DNA sequence to translate. Note that the DNA sequence can only contain
-known nucleotides.
+DNA sequence to translate. Note that unknown nucleotides will result in a
+translation to C<X>. May also be a reference to the sequence.
+
+=item offset
+
+Index of the first position at which to start translation (only if the dna sequence
+is a string reference).
 
 =item code
 
@@ -1913,26 +1935,31 @@ protein letter.
 #: Return Type $;
 sub translate {
 
-    my( $dna,$code,$start ) = @_;
+    my( $seq,$code,$start, $extra ) = @_;
     my( $i,$j,$ln );
     my( $x,$y );
     my( $prot );
+    my ($dna, $offset);
+    if (ref $seq) {
+        $dna = $seq;
+        ($offset, $code, $start) = ($code, $start, $extra);
+    } else {
+        $dna = \$seq;
+    }
 
     if (! defined($code)) {
         $code = &standard_genetic_code;
     }
-    $ln = length($dna);
-    $prot = "X" x ($ln/3);
-    $dna =~ tr/a-z/A-Z/;
-
-    for ($i=0,$j=0; ($i < ($ln-2)); $i += 3,$j++) {
-        $x = substr($dna,$i,3);
+    $ln = length($$dna);
+    $prot = "X" x (($ln - $offset)/3);
+    for ($i=$offset,$j=0; ($i < ($ln-2)); $i += 3,$j++) {
+        $x = uc substr($$dna,$i,3);
         if ($y = $code->{$x}) {
             substr($prot,$j,1) = $y;
         }
     }
 
-    if (($start) && ($ln >= 3) && (substr($dna,0,3) =~ /^[GT]TG$/)) {
+    if (($start) && ($ln >= 3) && (substr($$dna,$offset,3) =~ /^[GT]TG$/)) {
         substr($prot,0,1) = 'M';
     }
     return $prot;
@@ -2611,7 +2638,7 @@ sub write_encoded_object
 
     my ( $obj, $oh ) = @_;
 
-    $obj && ( ref( $obj ) eq 'HASH' )
+    $obj && ( ref( $obj ) eq 'HASH' || ref( $obj ) eq 'ARRAY' )
         or print STDERR "write_encoded_object() called without object.\n"
             and return undef;
 

@@ -1723,8 +1723,7 @@ sub gto_of {
                 "alt_locus_tag", "refseq_locus_tag",
                 "protein_id",    "gene_id",
                 "gi",            "gene",
-                "uniprotkb_accession",
-                "pgfam_id"
+                "uniprotkb_accession", "genome_id"
             ]
         );
 
@@ -1732,9 +1731,9 @@ sub gto_of {
         my %fids;
         for my $f (@f) {
 
-            # Skip duplicates.
+            # Skip duplicates and nonstandard genome IDs.
             my $fid = $f->{patric_id};
-            if ( $fid && !$fids{$fid} ) {
+            if ($fid && ! $fids{$fid} && $fid =~ /fig\|(\d+\.\d+)/ && $1 eq $genomeID) {
                 my $prefix = $f->{sequence_id} . "_";
                 my $strand = $f->{strand};
                 my @locs;
@@ -1784,7 +1783,7 @@ sub gto_of {
     return $retVal;
 }
 
-=head3 gto_of
+=head3 fasta_of
 
     my $triples = $d->fasta_of($genomeID);
 
@@ -1856,7 +1855,7 @@ sub representative_genome_filter
     {
         $cache = $self->fill_reference_gene_cache();
     }
-    my @list = grep { $cache->{$_} eq 'Representative' } keys %$cache;
+    my @list = grep { $cache->{$_}->{reference_genome} eq 'Representative' } keys %$cache;
     return "genome_id:(" . join(" OR ", @list) . ")";
 }
 
@@ -1869,7 +1868,7 @@ sub reference_genome_filter
     {
         $cache = $self->fill_reference_gene_cache();
     }
-    my @list = grep { $cache->{$_} eq 'Reference' } keys %$cache;
+    my @list = grep { $cache->{$_}->{reference_genome} eq 'Reference' } keys %$cache;
     return "genome_id:(" . join(" OR ", @list) . ")";
 }
 

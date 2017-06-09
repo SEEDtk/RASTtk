@@ -17,14 +17,14 @@ use strict;
 use P3Utils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options());
+my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(), ['nohead', 'file has no headers']);
 # Get the column identifiers.
 my @cols = @ARGV;
 die "No columns specified." if (! @cols);
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Process the headers.
-my ($inHeaders) = P3Utils::process_headers($ih);
+my ($inHeaders) = P3Utils::process_headers($ih, $opt, 'keyless');
 # Compute the column indices.
 my @idxes = map { P3Utils::find_column($_, $inHeaders) } @cols;
 # Compute the output headers.

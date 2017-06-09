@@ -253,11 +253,14 @@ Read the header line from a tab-delimited input, format the output headers and c
 
 Open input file handle.
 
-=item opt (optional)
+=item opt
 
-If specified, should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
-column or a string containing the key column name. If this parameter is undefined or omitted, it will be presumed
-there is no key column.
+Should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
+column or a string containing the key column name. At a minimum, it must support the C<nohead> option.
+
+=item keyless
+
+If TRUE, then it is presumed there is no key column.
 
 =item RETURN
 
@@ -269,7 +272,7 @@ column. If there is no key column, the second element of the list will be undefi
 =cut
 
 sub process_headers {
-    my ($ih, $opt) = @_;
+    my ($ih, $opt, $keyless) = @_;
     # Read the header line.
     my $line;
     if ($opt->nohead) {
@@ -283,7 +286,7 @@ sub process_headers {
     # This will contain the key column number.
     my $keyCol;
     # Search for the key column.
-    if (defined $opt) {
+    if (! $keyless) {
         my $col;
         if (ref $opt) {
             $col = $opt->col;
