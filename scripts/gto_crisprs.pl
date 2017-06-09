@@ -64,7 +64,7 @@ Longest permissible gap between a CRISPR array and a feature for the feature to 
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('', ScriptUtils::ih_options(),
         ['roles=s', 'CAS role file'],
-        ['gap=i', 'longest allowable gap between a CRISPR and an associated CAS feature', { default => 16000 }],
+        ['gap=i', 'longest allowable gap between a CRISPR and an associated CAS feature', { default => 30000 }],
         );
 # Get the gap size.
 my $gap = $opt->gap;
@@ -126,12 +126,12 @@ for my $crispr (@$crisprList) {
     # Now get the features in the neighborhood.
     my $header = "* CAS PROTEINS\n------------\n";
     for my $feature (@foundProteins) {
-        my $locs = $feature->{location};
-        my $locItem = pop @$locs;
+        my @locs = @{$feature->{location}};
+        my $locItem = pop @locs;
         while ($locItem) {
             my $floc = BasicLocation->new($locItem);
             my $fGap = $loc->Distance($floc);
-            if ($fGap <= $gap) {
+            if (defined $fGap && $fGap <= $gap) {
                 # This is a neighborhood CAS protein. Print it.
                 if ($header) {
                     print $header;
@@ -142,7 +142,7 @@ for my $crispr (@$crisprList) {
                 undef $locItem;
             } else {
                 # Not a neighboring protein. Keep looking.
-                $locItem = pop @$locs;
+                $locItem = pop @locs;
             }
         }
     }
