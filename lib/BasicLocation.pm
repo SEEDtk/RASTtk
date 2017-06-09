@@ -481,6 +481,41 @@ sub Matches {
     return $retVal;
 }
 
+=head3 Distance
+
+    my $dist = $loc->Distance($loc2);
+
+Compute the distance between the midpoints of two locations.
+
+=over 4
+
+=item loc2
+
+Other location to compare to this one.
+
+=item RETURN
+
+Returns the number of base pairs between the midpoints, or C<undef> if the locations are on different contigs.
+
+=back
+
+=cut
+
+sub Distance {
+    my ($self, $loc2) = @_;
+    # This will be the return value.
+    my $retVal;
+    # Insure the contigs are the same.
+    if ($self->Contig eq $loc2->Contig) {
+        # Compute the midpoint distance.
+        $retVal = ($self->Left + $self->Right) - ($loc2->Left + $loc2->Right);
+        if ($retVal < 0) { $retVal = -$retVal; }
+        $retVal >>= 1;
+    }
+    # Return the result.
+    return $retVal;
+}
+
 =head3 FixContig
 
     $loc->FixContig($genomeID);
