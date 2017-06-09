@@ -68,10 +68,10 @@ my $opt = ScriptUtils::Opts('', ScriptUtils::ih_options(),
         );
 # Get the gap size.
 my $gap = $opt->gap;
+print STDERR "Specified neighborhood gap is $gap.\n";
 # Get the role list.
 my %casRoles;
 if ($opt->roles) {
-    print STDERR "Reading role file.\n";
     open(my $rh, '<', $opt->roles) || die "Could not open role file: $!";
     while (! eof $rh) {
         my $line = <$rh>;
@@ -86,10 +86,8 @@ print STDERR scalar(keys %casRoles) . " roles found in CAS list.\n";
 # Open the input file.
 my $ih = ScriptUtils::IH($opt->input);
 # Read in the GTO. The create_from_file method blesses the object and indexes it.
-print STDERR "Reading genome from input.\n";
 my $gto = GenomeTypeObject->create_from_file($ih);
 # Run through the features.
-print STDERR "Searching for CAS features.\n";
 my $featureList = $gto->{features};
 my @foundProteins;
 for my $feature (@$featureList) {
@@ -108,7 +106,7 @@ my $crisprList = crispr::find_crisprs(\@contigList);
 #  @repeats = ( [ $loc, $repseq ], ... )
 #  @spacers = ( [ $loc, $spcseq ], ... )
 #  $loc     = [ [ $contig, $beg, $dir, $len ], ... ]
-print STDERR scalar(@$crisprList) . " CRISPR arrays found in genome.\n";
+print STDERR scalar(@$crisprList) . " CRISPR arrays found in genome.\n\n\n";
 my $idx = 0;
 for my $crispr (@$crisprList) {
     # Compute the CRISPR array locus.
