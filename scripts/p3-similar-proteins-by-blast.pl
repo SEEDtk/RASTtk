@@ -1,7 +1,11 @@
-#
-# Retrieve the proteins in PATRIC similar to the one provided, based on
-# a BLAST search to the target protein.
-#
+=head1  Retrieve the proteins in PATRIC similar to the one provided, based on  a BLAST search to the target protein.
+
+    p3-similar-proteins-by-blast [options] < fasta-file
+
+    Retrieve the proteins in PATRIC similar to the one provided, based on  a BLAST search to the target protein.
+
+=cut
+
 
 use Data::Dumper;
 use strict;

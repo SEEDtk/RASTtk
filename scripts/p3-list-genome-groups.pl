@@ -1,3 +1,10 @@
+=head1 List Genome Groups
+
+    p3-list-genome-groups [options]
+
+    List genome groups in your workspace
+
+=cut
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

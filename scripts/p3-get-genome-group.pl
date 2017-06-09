@@ -1,3 +1,9 @@
+=head1 Retrieve a genome group from a patric workspace
+
+    p3-get-genome-group group-name [options] 
+
+    Retrieve a genome group from a patric workspace
+=cut
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

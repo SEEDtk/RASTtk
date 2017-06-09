@@ -1,3 +1,10 @@
+=head1 Create a PATRIC login token.
+
+    p3-login username [options]
+
+    Create a PATRIC login token, used with workspace operations
+
+=cut
 
 #
 # Create a PATRIC login token.

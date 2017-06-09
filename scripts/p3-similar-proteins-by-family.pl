@@ -1,3 +1,10 @@
+=head1  Retrieve the proteins in PATRIC similar to the one provided, based on  PATRIC families
+
+    p3-similar-proteins-by-family [options] < fasta-file
+
+    Retrieve the proteins in PATRIC similar to the one provided, based on PATRIC families
+
+=cut
 #
 # Retrieve the proteins in PATRIC similar to the one provided, based on
 # PATRIC families.

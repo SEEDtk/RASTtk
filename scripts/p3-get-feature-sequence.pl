@@ -1,3 +1,10 @@
+=head1 Return the sequences for feature ids
+
+    p3-get-feature-sequence < feature-ids [options] 
+
+    Return sequences for patric feature ids. 
+=cut
+
 
 use strict;
 use P3Utils;

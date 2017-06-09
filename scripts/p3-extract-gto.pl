@@ -1,3 +1,10 @@
+=head1 Create a gto file of a Patric genome
+
+    p3-extract-gto genome-id [options] 
+
+    Create a gto file from a patric genome.
+=cut
+
 use strict;
 use P3DataAPI;
 use Data::Dumper;

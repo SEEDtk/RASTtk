@@ -1,3 +1,11 @@
+=head1 Retrieve a feature group from a Patric workspace
+
+    p3-get-feature-group group-name [options] 
+
+    Retrieve a feature group from a Patric workspace
+=cut
+
+
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

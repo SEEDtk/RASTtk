@@ -1,3 +1,12 @@
+=head1 Push ids to a Patric feature-group
+
+    p3-put-feature-group groupname [options] < feature-ids
+ 
+    Push ids to a Patric feature-group
+
+=cut
+
+
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

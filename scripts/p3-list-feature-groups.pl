@@ -1,3 +1,10 @@
+=head1 List Feature Groups
+
+    p3-list-feature-groups [options]
+
+    List feature groups in your workspace
+
+=cut
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

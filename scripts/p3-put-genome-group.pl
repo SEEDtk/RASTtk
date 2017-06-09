@@ -1,3 +1,12 @@
+=head1 Push ids to a Patric genome-group
+
+    p3-put-genome-group groupname [options] < genome-ids
+     
+    Push ids to a Patric genome-group
+
+=cut
+
+
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

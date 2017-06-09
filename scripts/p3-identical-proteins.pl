@@ -1,3 +1,10 @@
+=head1  Retrieve the proteins in PATRIC identical to the one provided.
+
+    p3-identical-proteins [options] < target-protein-sequence
+        
+    Retrieve the proteins in PATRIC identical to the one provided.
+=cut
+
 #
 # Retrieve the proteins in PATRIC identical to the one provided.
 #
