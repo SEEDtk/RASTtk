@@ -1,6 +1,6 @@
 use strict;
 
-=head1 NAME
+=head1 Merge Two Files
 
 p3-inAorB
 
@@ -10,7 +10,7 @@ p3-inAorB File1 File2 > set of lines in either A or B
 
 =head1 DESCRIPTION
 
-Finds the lines that are in File1 or File2. 
+Finds the lines that are in File1 or File2.
 
 Example:
 
@@ -42,11 +42,11 @@ my $rc = GetOptions('help' => \$help);
 if (!$rc || $help || @ARGV < 2) {
     seek(DATA, 0, 0);
     while (<DATA>) {
-	last if /^=head1 COMMAND-LINE /;
+        last if /^=head1 COMMAND-LINE /;
     }
     while (<DATA>) {
-	last if (/^=/);
-	print $_;
+        last if (/^=/);
+        print $_;
     }
     exit($help ? 0 : 1);
 }
