@@ -178,5 +178,60 @@ sub Annotate {
     return $retVal;
 }
 
+=head3 check
+
+    my $completed = RASTlib::check($jobID, $user, $pass);
+
+Return TRUE if the specified RAST job has completed, else FALSE. An error will be thrown if the job has failed.
+
+=over 4
+
+=item jobID
+
+ID of the job to check.
+
+=item user
+
+The RAST user name.
+
+=item password
+
+The RAST password.
+
+=item RETURN
+
+Returns TRUE if the job has completed, else FALSE.
+
+=back
+
+=cut
+
+sub check {
+    my ($jobID, $user, $pass) = @_;
+    # This will be the return value.
+    my $retVal = 0;
+    # Create an authorization header.
+    my $header = HTTP::Headers->new(Content_Type => 'text/plain');
+    my $userURI = "$user\@patricbrc.org";
+    $header->authorization_basic($userURI, $pass);
+    # Form a request for retreiving the job status.
+    my $url = join("/", RAST_URL, $jobID, 'status');
+    my $request = HTTP::Request->new(GET => $url, $header);
+    # Check the status.
+    my $ua = LWP::UserAgent->new();
+    my $response = $ua->request($request);
+    if ($response->code ne 200) {
+        die "Error response for RAST status: " . $response->message;
+    } else {
+         my $status = $response->content;
+         if ($status eq 'completed') {
+             $retVal = 1;
+         } elsif ($status ne 'in-progress' && $status ne 'queued') {
+             die "Error status for RAST: $status.";
+         }
+    }
+    # Return the status.
+    return $retVal;
+}
 
 1;
