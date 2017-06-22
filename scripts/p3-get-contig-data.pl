@@ -53,22 +53,6 @@ while (! eof $ih) {
 }
 
 sub print_usage {
-my $usage = <<"End_of_Usage";
-genome_id
-genome_name
-taxon_id
-sequence_id
-p2_sequence_id
-accession
-gi
-sequence_type
-topology
-description
-chromosome
-plasmid
-gc_content
-length
-sequence
-End_of_Usage
-print $usage;
+    my $fieldList = P3Utils::list_object_fields('contig');
+    print join("\n", @$fieldList, "");
 }

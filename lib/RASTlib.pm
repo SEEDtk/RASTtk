@@ -224,6 +224,7 @@ sub check {
         die "Error response for RAST status: " . $response->message;
     } else {
          my $status = $response->content;
+         print STDERR "Status = $status.\n";
          if ($status eq 'completed') {
              $retVal = 1;
          } elsif ($status ne 'in-progress' && $status ne 'queued') {

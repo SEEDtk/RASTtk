@@ -67,53 +67,6 @@ while (! eof $ih) {
     }
 }
 sub print_usage {
-
-
-my $usage = <<"End_of_Usage";
-genome_id
-genome_name
-taxon_id
-sequence_id
-accession
-annotation
-annotation_sort
-feature_type
-feature_id
-p2_feature_id
-alt_locus_tag
-patric_id
-refseq_locus_tag
-protein_id
-gene_id
-gi
-start
-end
-strand
-location
-segments
-pos_group
-na_length
-aa_length
-na_sequence
-aa_sequence
-aa_sequence_md5
-gene
-product
-figfam_id
-plfam_id
-pgfam_id
-ec
-pathway
-go
-uniprotkb_accession
-text
-date_inserted
-date_modified
-public
-owner
-user_read
-user_write
-End_of_Usage
-
-print $usage;
+    my $fieldList = P3Utils::list_object_fields('feature');
+    print join("\n", @$fieldList, "");
 }

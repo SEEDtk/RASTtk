@@ -23,6 +23,9 @@ package P3Utils;
     use warnings;
     use Getopt::Long::Descriptive;
     use Data::Dumper;
+    use LWP::UserAgent;
+    use HTTP::Request;
+    use SeedUtils;
 
 =head1 PATRIC Script Utilities
 
@@ -39,7 +42,8 @@ Mapping from user-friendly names to PATRIC names.
 =cut
 
 use constant OBJECTS => {   genome => 'genome', feature => 'genome_feature', family => 'protein_family_ref',
-                            genome_drug => 'genome_amr', contig =>  'genome_sequence' };
+                            genome_drug => 'genome_amr', contig =>  'genome_sequence',
+                            drug => 'antibiotics' };
 
 =head3 FIELDS
 
@@ -51,7 +55,8 @@ use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', '
                             feature => ['patric_id', 'feature_type', 'location', 'product'],
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
-                            contig => ['genome_id', 'accession', 'length', 'taxon_id', 'sequence'] };
+                            contig => ['genome_id', 'accession', 'length', 'taxon_id', 'sequence'],
+                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'] };
 
 =head3 IDCOL
 
@@ -60,7 +65,7 @@ Mapping from user-friendly object names to ID column names.
 =cut
 
 use constant IDCOL =>   {   genome => 'genome_id', feature => 'patric_id', family => 'family_id',
-                            genome_drug => 'id', contig => 'sequence_id' };
+                            genome_drug => 'id', contig => 'sequence_id', drug => 'cas_id' };
 
 =head2  Methods
 
@@ -1051,6 +1056,47 @@ sub get_fields {
     }
     # Return the fields.
     return @retVal;
+}
+
+=head3 list_object_fields
+
+    my $fieldList = P3Utils::list_object_fields($object);
+
+Return the list of field names for an object. The database schema is queried directly.
+
+=over 4
+
+=item object
+
+The name of the object whose field names are desired.
+
+=item RETURN
+
+Returns a reference to a list of the field names.
+
+=back
+
+=cut
+
+sub list_object_fields {
+    my ($object) = @_;
+    my @retVal;
+    # Get the real name of the object.
+    my $realName = OBJECTS->{$object};
+    # Ask for the JSON schema string.
+    my $ua = LWP::UserAgent->new();
+    my $url = "https://www.patricbrc.org/api/$realName/schema?http_content-type=application/solrquery+x-www-form-urlencoded&http_accept=application/solr+json";
+    my $request = HTTP::Request->new(GET => $url);
+    my $response = $ua->request($request);
+    if ($response->code ne 200) {
+        die "Error response from PATRIC: " . $response->message;
+    } else {
+        my $json = $response->content;
+        my $schema = SeedUtils::read_encoded_object(\$json);
+        @retVal = map { $_->{name} } @{$schema->{schema}{fields}};
+    }
+    # Return the list.
+    return \@retVal;
 }
 
 =head2 Internal Methods

@@ -53,23 +53,6 @@ while (! eof $ih) {
 }
 
 sub print_usage {
-my $usage = <<"End_of_Usage";
-genome_id
-genome_name
-taxon_id
-antibiotic
-resistant_phenotype
-measurement
-measurement_sign
-measurement_value
-measurement_unit
-laboratory_typing_method
-laboratory_typing_method_version
-laboratory_typing_platform
-vendor
-testing_standard
-testing_standard_year
-text
-End_of_Usage
-print $usage;
+    my $fieldList = P3Utils::list_object_fields('genome_drug');
+    print join("\n", @$fieldList, "");
 }
