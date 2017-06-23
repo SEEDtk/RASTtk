@@ -1,6 +1,6 @@
 =head1 Return AMR Data For Genomes in PATRIC
 
-    p3-drug-data [options]
+    p3-genome-amr-data [options]
 
 This script returns the anti-microbial resistance data about the genomes identified in the standard
 input. It supports standard filtering parameters and the specification of additional columns if desired.

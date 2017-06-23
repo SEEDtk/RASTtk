@@ -416,7 +416,7 @@ sub form_filter {
                 die "Invalid --$op specification $opSpec.";
             }
             # Apply the constraint.
-            push @retVal, ['$op', $field, $value];
+            push @retVal, [$op, $field, $value];
         }
     }
     # Get the inclusion constraints.
