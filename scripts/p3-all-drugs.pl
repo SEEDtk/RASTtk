@@ -35,8 +35,8 @@ my $p3 = P3DataAPI->new();
 my ($selectList, $newHeaders) = P3Utils::select_clause(drug => $opt, 1);
 # Compute the filter.
 my $filterList = P3Utils::form_filter($opt);
-# Add a safety check to remove null genomes.
-push @$filterList, ['ne', 'cas_id', 0];
+# Add a safety check to eliminate null drugs.
+push @$filterList, ['ne', 'pubchem_cid', 0];
 # Write the headers.
 P3Utils::print_cols($newHeaders);
 # Process the query.

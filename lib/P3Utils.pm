@@ -41,9 +41,12 @@ Mapping from user-friendly names to PATRIC names.
 
 =cut
 
-use constant OBJECTS => {   genome => 'genome', feature => 'genome_feature', family => 'protein_family_ref',
-                            genome_drug => 'genome_amr', contig =>  'genome_sequence',
-                            drug => 'antibiotics' };
+use constant OBJECTS => {   genome => 'genome',
+                            feature => 'genome_feature',
+                            family => 'protein_family_ref',
+                            genome_drug => 'genome_amr',
+                            contig =>  'genome_sequence',
+                            drug => 'antibiotics', };
 
 =head3 FIELDS
 
@@ -56,7 +59,7 @@ use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', '
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
                             contig => ['genome_id', 'accession', 'length', 'taxon_id', 'sequence'],
-                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'] };
+                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'], };
 
 =head3 IDCOL
 
@@ -64,8 +67,12 @@ Mapping from user-friendly object names to ID column names.
 
 =cut
 
-use constant IDCOL =>   {   genome => 'genome_id', feature => 'patric_id', family => 'family_id',
-                            genome_drug => 'id', contig => 'sequence_id', drug => 'cas_id' };
+use constant IDCOL =>   {   genome => 'genome_id',
+                            feature => 'patric_id',
+                            family => 'family_id',
+                            genome_drug => 'id',
+                            contig => 'sequence_id',
+                            drug => 'antibiotic_name' };
 
 =head2  Methods
 
@@ -81,6 +88,11 @@ options. These options are as follows.
 =item attr
 
 Names of the fields to return. Multiple field names may be specified by coding the option multiple times.
+Mutually exclusive with C<--count>.
+
+=item count
+
+If specified, a count of records found will be returned instead of the records themselves. Mutually exclusive with C<--attr>.
 
 =item equal
 
@@ -88,6 +100,11 @@ Equality constraints of the form I<field-name>C<,>I<value>. If the field is nume
 exact match. If the field is a string, the constraint will be a substring match. An asterisk in string values
 is interpreted as a wild card. Multiple equality constraints may be specified by coding the option multiple
 times.
+
+=item lt, le, gt, ge
+
+Inequality constraints of the form I<field-name>C<,>I<value>. Multiple constrains of each type may be specified
+by coding the option multiple times.
 
 =item in
 
@@ -106,7 +123,12 @@ fields may be specified by coding the option multiple times.
 
 sub data_options {
     return (['attr|a=s@', 'field(s) to return'],
+            ['count|K', 'if specified, a count of records returned will be displayed instead of the records themselves'],
             ['equal|eq|e=s@', 'search constraint(s) in the form field_name,value'],
+            ['lt=s@', 'less-than search constraint(s) in the form field_name,value'],
+            ['le=s@', 'less-or-equal search constraint(s) in the form field_name,value'],
+            ['gt=s@', 'greater-than search constraint(s) in the form field_name,value'],
+            ['ge=s@', 'greater-or-equal search constraint(s) in the form field_name,value'],
             ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
             ['required|r=s@', 'field(s) required to have values']);
 }
@@ -377,18 +399,25 @@ sub form_filter {
     my ($opt) = @_;
     # This will be the return list.
     my @retVal;
-    # Get the equality constraints.
-    my $eqList = $opt->equal // [];
-    for my $eqSpec (@$eqList) {
-        # Get the field name and value.
-        my ($field, $value);
-        if ($eqSpec =~ /(\w+),(.+)/) {
-            ($field, $value) = ($1, clean_value($2));
-        } else {
-            die "Invalid --equal specification $eqSpec.";
+    # Get the relational operator constraints.
+    my %opHash = ('eq' => ($opt->equal // []),
+                  'lt' => ($opt->lt // []),
+                  'le' => ($opt->le // []),
+                  'gt' => ($opt->gt // []),
+                  'ge' => ($opt->ge // []));
+    # Loop through them.
+    for my $op (keys %opHash) {
+        for my $opSpec (@{$opHash{$op}}) {
+            # Get the field name and value.
+            my ($field, $value);
+            if ($opSpec =~ /(\w+),(.+)/) {
+                ($field, $value) = ($1, clean_value($2));
+            } else {
+                die "Invalid --$op specification $opSpec.";
+            }
+            # Apply the constraint.
+            push @retVal, ['$op', $field, $value];
         }
-        # Apply the constraint.
-        push @retVal, ['eq', $field, $value];
     }
     # Get the inclusion constraints.
     my $inList = $opt->in // [];
@@ -439,7 +468,8 @@ explicitly specified, the ID column will be added if it is not present.
 =item RETURN
 
 Returns a two-element list consisting of a reference to a list of the names of the
-fields to retrieve, and a reference to a list of the proposed headers for the new columns.
+fields to retrieve, and a reference to a list of the proposed headers for the new columns. If the user wants a
+count, the first element will be undefined, and the second will be a singleton list of C<count>.
 
 =back
 
@@ -452,7 +482,15 @@ sub select_clause {
     die "Invalid object $object." if (! $realName);
     # Get the attribute option.
     my $attrList = $opt->attr;
-    if (! $attrList) {
+    if ($opt->count) {
+        # Here the user wants a count, not data.
+        if ($attrList) {
+            die "Cannot specify both --attr and --count.";
+        } else {
+            # Just return a count header.
+            $attrList = ['count'];
+        }
+    } elsif (! $attrList) {
         if ($idFlag) {
             $attrList = [IDCOL->{$object}];
         } else {
@@ -466,6 +504,10 @@ sub select_clause {
     }
     # Form the header list.
     my @headers = map { "$object.$_" } @$attrList;
+    # Clear the attribute list if we are counting.
+    if ($opt->count) {
+        undef $attrList;
+    }
     # Return the results.
     return ($attrList, \@headers);
 }
@@ -524,7 +566,7 @@ Reference to a list of filter clauses for the query.
 
 =item cols
 
-Reference to a list of the names of the fields to return from the object.
+Reference to a list of the names of the fields to return from the object, or C<undef> if a count is desired.
 
 =item fieldName (optional)
 
@@ -551,8 +593,14 @@ sub get_data {
     my @retVal;
     # Convert the object name.
     my $realName = OBJECTS->{$object};
-    # Now we need to form the query modifiers. We start with the column selector.
-    my @mods = (['select', @$cols], @$filter);
+    # Now we need to form the query modifiers. We start with the column selector. If we're counting, we use the ID column.
+    my @selected;
+    if (! $cols) {
+        @selected = IDCOL->{$object};
+    } else {
+        @selected = @$cols;
+    }
+    my @mods = (['select', @selected], @$filter);
     # Finally, we loop through the couplets, making calls. If there are no couplets, we make one call with
     # no additional filtering.
     if (! $fieldName) {
@@ -598,7 +646,7 @@ Reference to a list of filter clauses for the query.
 
 =item cols
 
-Reference to a list of the names of the fields to return from the object.
+Reference to a list of the names of the fields to return from the object, or C<undef> if a count is desired.
 
 =item couplets
 
@@ -681,7 +729,7 @@ Reference to a list of filter clauses for the query.
 
 =item cols
 
-Reference to a list of the names of the fields to return from the object.
+Reference to a list of the names of the fields to return from the object, or C<undef> if a count is desired.
 
 =item keys
 
@@ -1123,7 +1171,7 @@ Reference to a list of values to be prefixed to every output row.
 
 =item cols
 
-Reference to a list of the names of the columns to be put in the output row.
+Reference to a list of the names of the columns to be put in the output row, or C<undef> if the user wants a count.
 
 =back
 
@@ -1131,22 +1179,29 @@ Reference to a list of the names of the columns to be put in the output row.
 
 sub _process_entries {
     my ($retList, $entries, $row, $cols) = @_;
-    for my $entry (@$entries) {
-        my @outCols = map { $entry->{$_} } @$cols;
-        # Process the columns. If any are undefined, we change them
-        # to empty strings. If all are undefined, we throw away the
-        # record.
-        my $reject = 1;
-        for (my $i = 0; $i < @outCols; $i++) {
-            if (! defined $outCols[$i]) {
-                $outCols[$i] = '';
-            } else {
-                $reject = 0;
+    # Are we counting?
+    if (! $cols) {
+        # Yes. Pop on the count.
+        push @$retList, [@$row, scalar(@$entries)];
+    } else {
+        # No. Generate the data.
+        for my $entry (@$entries) {
+            my @outCols = map { $entry->{$_} } @$cols;
+            # Process the columns. If any are undefined, we change them
+            # to empty strings. If all are undefined, we throw away the
+            # record.
+            my $reject = 1;
+            for (my $i = 0; $i < @outCols; $i++) {
+                if (! defined $outCols[$i]) {
+                    $outCols[$i] = '';
+                } else {
+                    $reject = 0;
+                }
             }
-        }
-        # Output the record if it is NOT rejected.
-        if (! $reject) {
-            push @$retList, [@$row, @outCols];
+            # Output the record if it is NOT rejected.
+            if (! $reject) {
+                push @$retList, [@$row, @outCols];
+            }
         }
     }
 }
