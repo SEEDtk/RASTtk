@@ -958,7 +958,6 @@ WorkspacePerm is a string
 sub ls
 {
     my($self, @args) = @_;
-    print "Self type is $self.\n"; ##DEBUG
 # Authentication: optional
 
     if ((my $n = @args) != 1)
@@ -975,7 +974,6 @@ sub ls
             die($msg);
         }
     }
-    print Dumper($self) . "\n\n"; die; ##DEBUG
     my $result = $self->{client}->call($self->{url}, $self->{headers}, {
         method => "Workspace.ls",
         params => \@args,
