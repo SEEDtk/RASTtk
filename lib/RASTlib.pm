@@ -24,6 +24,8 @@ package RASTlib;
     use HTTP::Request;
     use SeedUtils;
     use URI;
+    use P3DataAPI;
+    use Crypt::RC4;
 
 =head1 Annotate a Genome Using RAST
 
@@ -107,10 +109,8 @@ sub Annotate {
         die "No genome name specified for RAST annotation.";
     }
     # Get the options.
-    my $user = $options{user} // $ENV{RASTUSER};
-    die "No RAST user name specified." if ! $user;
-    my $pass = $options{password} // $ENV{RASTPASS};
-    die "No RAST password specified." if ! $pass;
+    my $user = $options{user};
+    my $pass = $options{password};
     my $domain = $options{domain} // 'B';
     my $geneticCode = $options{geneticCode} // 11;
     my $sleepInterval = $options{sleep} || 60;
@@ -131,6 +131,22 @@ sub Annotate {
         domain => $domain
     );
     my $header = HTTP::Headers->new(Content_Type => 'text/plain');
+    if (! $user || ! $pass) {
+        my $passfile = $P3DataAPI::token_path . "-code";
+        open(my $ph, "<$P3DataAPI::token_path") || die "User not logged in: $!";
+        my $token = <$ph>;
+        if ($token =~ /un=([^|]+)\@patricbrc\.org/) {
+            $user = $1;
+        } else {
+            die "Invalid format in login token.";
+        }
+        undef $ph;
+        open($ph, "<$passfile") || die "User not logged in: $!";
+        my $unpacked = <$ph>;
+        my $encrypted = pack('H*', $unpacked);
+        my $ref = Crypt::RC4->new($user);
+        $pass = $ref->RC4($encrypted);
+    }
     my $userURI = "$user\@patricbrc.org";
     $header->authorization_basic($userURI, $pass);
     my $request = HTTP::Request->new(POST => "$url", $header, $contigString);

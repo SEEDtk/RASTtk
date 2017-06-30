@@ -80,15 +80,10 @@ my $opt = P3Utils::script_opts('genomeID name', P3Utils::ih_options(),
         ["gto|j", "input file is in JSON format"],
         ["domain|d=s", "domain (A or B) of the new genome", { default => 'B' }],
         ["geneticCode=i", "genetic code for the new genome", { default => 11 }],
-        ["user|u=s", "user name for RAST access", { default => $ENV{RASTUSER} }],
-        ["password|p=s", "password for RAST access", { default => $ENV{RASTPASS} }],
         ["sleep=i", "sleep interval for status polling", { default => 60 }],
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
-# Compute the login information.
-my $user = $opt->user;
-my $pass = $opt->password;
 # We will put the genome information in here. If the input is a GTO, it can be overridden.
 my $domain = $opt->domain;
 my $geneticCode = $opt->geneticcode;
@@ -118,7 +113,7 @@ if (! $genomeID || ! $name) {
     die "You must specify a genome ID and name somewhere.";
 }
 # Invoke the RAST service.
-my $annotation = RASTlib::Annotate($contigs, $genomeID, $name, user => $user, password => $pass,
+my $annotation = RASTlib::Annotate($contigs, $genomeID, $name, user => undef, password => undef,
         domain => $domain, geneticCode => $geneticCode, sleep => $opt->sleep);
 # Write the result.
 SeedUtils::write_encoded_object($annotation, \*STDOUT);

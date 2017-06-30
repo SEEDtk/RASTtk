@@ -34,6 +34,7 @@ use Term::ReadKey;
 use Data::Dumper;
 use P3DataAPI;
 use P3Utils;
+use Crypt::RC4;
 
 our $have_config_simple;
 eval {
@@ -91,7 +92,12 @@ if (! $opt->status && ! $opt->logout) {
             username => $username,
             password => $password,
         };
-
+        open(my $oh, ">$token_path-code") || die "Could not open code file: $!";
+        my $ref = Crypt::RC4->new($username);
+        my $encrypted = $ref->RC4($password);
+        my $unpacked = unpack('H*', $encrypted);
+        print $oh $unpacked;
+        close $oh;
         my $res = $ua->post($auth_url, $req);
         if ($res->is_success)
         {
