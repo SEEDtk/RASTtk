@@ -5,6 +5,22 @@
 Create a PATRIC login token, used with workspace operations. To use this script, specify your user name on
 the command line as a positional parameter. You will be asked for your password.
 
+The following command-line options are supported.
+
+=over 4
+
+=item logout
+
+The current user is logged out. If this option is specified, the user name is not required.
+
+=item status
+
+Display the name of the user currently logged in. If this option is specified, the user name is not required.
+
+=back
+
+If the command-line option C<--logout> is specified, you will be logged out. In this case, the user name is not required.
+
 =cut
 
 #
@@ -17,6 +33,7 @@ use Getopt::Long::Descriptive;
 use Term::ReadKey;
 use Data::Dumper;
 use P3DataAPI;
+use P3Utils;
 
 our $have_config_simple;
 eval {
@@ -28,67 +45,94 @@ my $auth_url = "https://user.patricbrc.org/authenticate";
 my $token_path = $P3DataAPI::token_path || "$ENV{HOME}/.patric_token";
 my $max_tries = 3;
 
-my($opt, $usage) = describe_options("%c %o username",
-                                    ["help|h" => "Show this help message."],
-                                    );
-print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 1;
+my $opt = P3Utils::script_opts('username', ['logout|logoff', 'log out of PATRIC'],
+        ['verbose|v', 'display debugging info'],
+        ['status|whoami|s', 'display login status']);
 
-my $username = shift;
+my ($username) = @ARGV;
+if ($opt->verbose) {
+    print "Token path is $token_path.\n";
+}
+if ($opt->status || $opt->verbose) {
+    if (! -f $token_path) {
+        print "You are currently logged out of PATRIC.\n";
+    } else {
+        open(my $ih, '<', $token_path) || die "Could not open token file: $!";
+        my $token = <$ih>;
+        if ($token =~ /un=([^\|\@]+\@patricbrc\.org)/) {
+            print "You are logged in as $1.\n";
+        } else {
+            die "Your PATRIC login token is improperly formatted. Please log out and try again.";
+        }
+    }
+}
+if ($opt->logout) {
+    if (-f $token_path) {
+        unlink($token_path) || die "Could not delete login file $token_path: $!";
+        print "Logged out of PATRIC.\n";
+    } else {
+        print "You are already logged out of PATRIC.\n";
+    }
+}
+if (! $opt->status && ! $opt->logout) {
+    if (! $username) {
+        die "A user name is required.\n";
+    }
+    # Insure we have the patricbrc.org suffix.
+    $username =~ s/\@patricbrc.org$//;
 
-$username =~ s/\@patricbrc.org$//;
+    my $ua = LWP::UserAgent->new;
 
-my $ua = LWP::UserAgent->new;
-
-for my $try (1..$max_tries)
-{
-    my $password = get_pass();
-
-    my $req = {
-        username => $username,
-        password => $password,
-    };
-
-    my $res = $ua->post($auth_url, $req);
-    if ($res->is_success)
+    for my $try (1..$max_tries)
     {
-        my $token = $res->content;
-        if ($token =~ /un=([^|]+)/)
-        {
-            my $un = $1;
-            open(T, ">", $token_path) or die "Cannot write token file $token_path: $!\n";
-            print T "$token\n";
-            # Protect the chmod with eval for Windows case.
-            eval { chmod 0600, \*T; };
-            close(T);
+        my $password = get_pass();
 
-            #
-            # Write to our config files too.
-            #
-            if ($have_config_simple)
+        my $req = {
+            username => $username,
+            password => $password,
+        };
+
+        my $res = $ua->post($auth_url, $req);
+        if ($res->is_success)
+        {
+            my $token = $res->content;
+            if ($token =~ /un=([^|]+)/)
             {
-                write_config("$ENV{HOME}/.patric_config", "P3Client.token", $token, "P3Client.user_id", $un);
-                write_config("$ENV{HOME}/.kbase_config", "authentication.token", $token, "authentication.user_id", $un);
+                my $un = $1;
+                open(T, ">", $token_path) or die "Cannot write token file $token_path: $!\n";
+                print T "$token\n";
+                # Protect the chmod with eval so it won't blow up in Windows.
+                eval { chmod 0600, \*T; };
+                close(T);
+
+                #
+                # Write to our config files too.
+                #
+                if ($have_config_simple)
+                {
+                    write_config("$ENV{HOME}/.patric_config", "P3Client.token", $token, "P3Client.user_id", $un);
+                    write_config("$ENV{HOME}/.kbase_config", "authentication.token", $token, "authentication.user_id", $un);
+                }
+                else
+                {
+                    warn "Perl library Config::Simple not available; not updating .patric_config or .kbase_config\n";
+                }
+                print "Logged in with username $un\n";
+                exit 0;
             }
             else
             {
-                warn "Perl library Config::Simple not available; not updating .patric_config or .kbase_config\n";
+                die "Token has unexpected format\n";
             }
-            print "Logged in with username $un\n";
-            exit 0;
         }
         else
         {
-            die "Token has unexpected format\n";
+            print "Sorry, try again.\n";
         }
     }
-    else
-    {
-        print "Sorry, try again.\n";
-    }
-}
 
-die "Too many incorrect login attempts; exiting.\n";
+    die "Too many incorrect login attempts; exiting.\n";
+}
 
 sub write_config
 {

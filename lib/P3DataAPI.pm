@@ -51,7 +51,8 @@ our %typemap = (CDS => 'peg');
 our $token_path;
 if ($^O eq 'MSWin32')
 {
-    $token_path = "$ENV{HOMEDRIVE}$ENV{HOMEPATH}/.patric_token";
+    my $dir = $ENV{HOME} || $ENV{HOMEPATH};
+    $token_path = "$dir/.patric_token";
 } else {
     $token_path = "$ENV{HOME}/.patric_token";
 }
