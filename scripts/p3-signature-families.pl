@@ -2,14 +2,15 @@ use Data::Dumper;
 use strict;
 use warnings;
 use P3Signatures;
- 
+use TraceObject;
+
 =head1 Compute Family Signatures
 
-     p3-signature-families --gs1=FileOfGenomeIds 
-                           --gs2=FileOfGenomeIds 
-			   [--min=MinGs1Frac]
-			   [--max=MaxGs2Frac]
-	> family.signatures		   
+     p3-signature-families --gs1=FileOfGenomeIds
+                           --gs2=FileOfGenomeIds
+                           [--min=MinGs1Frac]
+                           [--max=MaxGs2Frac]
+        > family.signatures
 
      This script produces a file in which the last field in each line
      is a family signature. The first field will be the number of hits against Gs1,
@@ -23,11 +24,14 @@ use P3Signatures;
 
 A tab-delimited file of genomes.  These are thought of as the genomes that have a
 given property (e.g. belong to a certain species, have resistance to a particular
-antibiotic).
+antibiotic). If omitted, the standard input is used. The genome IDs must be in the
+first column.
 
 =item gs2
 
 A tab-delimited file of genomes.  These are genomes that do not have the given property.
+If omitted, the standard input is used. The genome IDs must be in the first column.
+Any genomes present in the gs1 set will be automatically deleted from this list.
 
 =item min
 
@@ -37,37 +41,63 @@ Minimum fraction of genomes in Gs1 that occur in a signature family
 
 Maximum fraction of genomes in Gs2 that occur in a signature family
 
+=item verbose
+
+Write progress messages to STDERR.
+
 =back
 
 =cut
 
 my $opt = P3Utils::script_opts('',
-        ["gs1=s", "genomes with property",{required => 1}],
-        ["gs2=s", "genomes without property",{required => 1}],
+        ["gs1=s", "genomes with property"],
+        ["gs2=s", "genomes without property"],
         ["min|m=f","minimum fraction of Gs1",{default => 0.8}],
-        ["max|M=f","maximum fraction of Gs2",{default => 0.2}]);
+        ["max|M=f","maximum fraction of Gs2",{default => 0.2}],
+        ["verbose|v", "show progress on STDERR"]);
 
 # Get the command-line options.
 my $gs1 = $opt->gs1;
 my $gs2 = $opt->gs2;
 my $min_in = $opt->min;
 my $max_out = $opt->max;
-
+# Set up the progress object.
+my $tracer;
+if ($opt->verbose) {
+    $tracer = TraceObject->new();
+}
 # Read in both sets of genomes.
-open(GENOMES,"<$gs1") || die "could not open $gs1";
-my @gs1 = map { ($_ =~ /(\d+\.\d+)/) ? ($1) : () } <GENOMES>;
-close(GENOMES);
-
-open(GENOMES,"<$gs2") || die "could not open $gs2";
-my @gs2 = map { ($_ =~ /(\d+\.\d+)/) ? ($1) : () } <GENOMES>;
-close(GENOMES);
+my $gHash = read_genomes($gs1);
+my @gs1 = sort keys %$gHash;
+my $gHash2 = read_genomes($gs2);
+my @gs2 = sort grep { ! $gHash->{$_} } keys %$gHash2;
+undef $gHash;
+undef $gHash2;
 
 # Compute the output hash.
-my $dataH = P3Signatures::Process(\@gs1, \@gs2, $min_in, $max_out);
+my $dataH = P3Signatures::Process(\@gs1, \@gs2, $min_in, $max_out, $tracer);
 # Print the header.
 P3Utils::print_cols([qw(counts_in_set1 counts_in_set2 family.family_id family.product)]);
 # Output the data.
 foreach my $fam (sort keys %$dataH) {
     my ($x1, $x2, $role) = @{$dataH->{$fam}};
     P3Utils::print_cols([$x1,$x2,$fam, $role]);
+}
+
+sub read_genomes {
+    my ($fileSpec) = @_;
+    my %retVal;
+    my $gh;
+    if (! $fileSpec) {
+        $gh = \*STDIN;
+    } else {
+        open($gh, '<', $fileSpec) || die "Could not open genome file $fileSpec: $!";
+    }
+    while (! eof $gh) {
+        my $line = <$gh>;
+        if ($line =~ /^(\d+\.\d+)/) {
+            $retVal{$1} = 1;
+        }
+    }
+    return \%retVal;
 }

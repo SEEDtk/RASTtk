@@ -61,7 +61,7 @@ The fraction of genomes in set 2 that may contain a signature family. A value of
 
 =item jobObject (optional)
 
-If specified, a L<Job> object for reporting progress.
+If specified, an object for reporting progress. It must support a I<Progress> method that takes text messages.
 
 =item comment (optional)
 
@@ -105,7 +105,7 @@ sub Process {
             if ($jobObject) {
                 $jobObject->Progress("Reading features for $genome ($gCount of $gTotal).$comment");
             }
-            my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'plfam_id', '*']], ['plfam_id', 'product']);
+            my $resultList = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome], ['eq', 'pgfam_id', '*']], ['pgfam_id', 'product']);
             # Save the families and count the unique ones.
             my %uniques;
             for my $result (@$resultList) {

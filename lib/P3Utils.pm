@@ -975,9 +975,9 @@ sub match {
     return $retVal;
 }
 
-=head3 match_headers
+=head3 find_headers
 
-    my (\@headers, \@cols) = P3Utils::match_headers($ih, $fileType => @fields);
+    my (\@headers, \@cols) = P3Utils::find_headers($ih, $fileType => @fields);
 
 Search the headers of the specified input file for the named fields and return the list of headers plus a list of
 the column indices for the named fields.
@@ -1019,11 +1019,18 @@ sub find_headers {
             $fieldH{$header} = $i;
         }
     }
-    # Accumulate the headers that were not found.
+    # Accumulate the headers that were not found. We also handle numeric column indices in here.
     my @bad;
     for my $field (keys %fieldH) {
         if (! defined $fieldH{$field}) {
-            push @bad, $field;
+            # Is this a number?
+            if ($field =~ /^\d+$/) {
+                # Yes, convert it to an index.
+                $fieldH{$field} = $field - 1;
+            } else {
+                # No, we have a bad header.
+                push @bad, $field;
+            }
         }
     }
     # If any headers were not found, it is an error.

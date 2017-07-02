@@ -68,7 +68,8 @@ if ($opt->gfile) {
     my $genomeFile = $opt->gfile;
     # Get the headers from the genome file.
     open(my $gh, "<$genomeFile") || die "Could not open genome file: $!";
-    my ($gHeaders, $gCol) = P3Utils::process_headers($gh, $opt->gcol);
+    my ($gHeaders, $gCols) = P3Utils::find_headers($gh, genome => $opt->gcol);
+    my $gCol = $gCols->[0];
     # Read it in.
     my $genomeIDs = P3Utils::get_col($gh, $gCol);
     # Create the genome ID filter and add it to the existing filter data.
