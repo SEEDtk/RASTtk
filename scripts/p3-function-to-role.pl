@@ -7,6 +7,9 @@ replaces the functions with roles. In PATRIC, only subsystem roles count as role
 may be deleted. Conversely, some functions have multiple roles, so other features may be
 replicated.
 
+Currently, PATRIC does not have any roles defined, so the C<--roles> command-line option is
+required.
+
 =head2 Parameters
 
 There are no positional parameters.
