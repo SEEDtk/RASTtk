@@ -1,6 +1,6 @@
 =head1 Return Data From Contigs in PATRIC
 
-    p3-get-contigs-data [options]
+    p3-get-genome-contigs [options]
 
 This script returns data about the contigs for the genomes identified in the standard input. It supports standard filtering
 parameters and the specification of additional columns if desired.

@@ -1,17 +1,27 @@
-=head1 Return AMR Data For Genomes in PATRIC
+=head1 Return AMR Data for Drugs From PATRIC
 
-    p3-genome-amr-data [options]
+    p3-get-drug-genomes [options]
 
-This script returns the anti-microbial resistance data about the genomes identified in the standard
-input. It supports standard filtering parameters and the specification of additional columns if desired.
+This script returns general anti-microbial resistance data given an input column of drug names. It supports
+standard filtering parameters and the specification of additional output columns if desired.
 
 =head2 Parameters
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input should contain drug names in the key column. You may specify the standard input using
+the options in L<P3Utils/ih_options>.
 
-Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options>.
+Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plud
+the following
+
+=over 4
+
+=item fields
+
+Show available fields.
+
+=back
 
 =cut
 
@@ -45,7 +55,7 @@ P3Utils::print_cols($outHeaders);
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Get the output rows for these input couplets.
-    my $resultList = P3Utils::get_data($p3, genome_drug => $filterList, $selectList, genome_id => $couplets);
+    my $resultList = P3Utils::get_data($p3, genome_drug => $filterList, $selectList, antibiotic => $couplets);
     # Print them.
     for my $result (@$resultList) {
         P3Utils::print_cols($result);
