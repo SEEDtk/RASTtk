@@ -79,9 +79,14 @@ while (! eof $ih) {
         $objectMap{$obj1} = $group2;
         push @{$groupList[$group2]}, $obj1;
     } elsif (! defined $group1 && ! defined $group2) {
-        # Both are new. Create a new group.
+        # Both are new. Create a new group. Note we have special code for the case where the same
+        # object has occurred twice.
         $group1 = scalar @groupList;
-        push @groupList, [$obj1, $obj2];
+        my @newGroup = ($obj1);
+        if ($obj2 ne $obj1) {
+            push @newGroup, $obj2;
+        }
+        push @groupList, \@newGroup;
         $objectMap{$obj1} = $group1;
         $objectMap{$obj2} = $group1;
     } elsif ($group1 != $group2) {
