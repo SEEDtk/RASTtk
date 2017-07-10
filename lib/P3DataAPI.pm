@@ -1637,7 +1637,7 @@ ID of the source genome.
 
 =item RETURN
 
-Returns a L<GenomeTypeObject> for the genome, or C<undef> if the genome was not found.
+Returns a blessed L<GenomeTypeObject> for the genome, or C<undef> if the genome was not found.
 
 =back
 
