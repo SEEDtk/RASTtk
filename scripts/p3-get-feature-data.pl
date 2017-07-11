@@ -35,7 +35,7 @@ my ($selectList, $newHeaders) = P3Utils::select_clause(feature => $opt);
 # Compute the filter.
 my $filterList = P3Utils::form_filter($opt);
 # Add a safety check to remove null features.
-push @$filterList, ['ne', 'patric_id', ''];
+push @$filterList, ['eq', 'patric_id', '*'];
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
