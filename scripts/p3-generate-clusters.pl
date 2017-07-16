@@ -20,16 +20,12 @@ would indicate the first two columns contain the paired object names. An invocat
 
 would process the output from L<p3-generate-close-roles.pl>.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overwritten using the options in L<P3Utils/ih_options>. Use the options in L<P3Utils/delim_options> to
+specify the delimiter.
 
 Additional command-line options are as follows.
 
 =over 4
-
-=item delim
-
-The delimiter to use between object names. The default is C<::>. Specify C<tab> for tab-delimited output, C<space> for
-space-delimited output, or C<comma> for comma-delimited output.
 
 =item title
 
@@ -39,13 +35,11 @@ Title to give to the output column. The default is <cluster>.
 
 =cut
 
-use constant DELIMS => { space => ' ', tab => "\t", comma => ',', '::' => '::' };
 use strict;
 use P3Utils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('col1 col2', P3Utils::ih_options(),
-        ['delim=s', 'delimiter to place between object names', { default => '::' }],
+my $opt = P3Utils::script_opts('col1 col2', P3Utils::ih_options(), P3Utils::delim_options(),
         ['title|t=s', 'output column title', { default => 'cluster'} ]
         );
 # Verify the positional parameters.
@@ -54,7 +48,7 @@ if (! $col1 || ! $col2) {
     die "Two column names/indices are required.";
 }
 # Compute the delimiter.
-my $delim = DELIMS->{$opt->delim} // $opt->delim;
+my $delim = P3Utils::delim($opt);
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Find the object name columns.

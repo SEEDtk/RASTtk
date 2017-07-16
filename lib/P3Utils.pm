@@ -167,6 +167,53 @@ sub col_options {
                 ['nohead', 'file has no headers']);
 }
 
+=head3 delim_options
+
+    my @options = P3Utils::delim_options();
+
+This method returns a list of options related to delimiter specification for multi-valued fields.
+
+=over 4
+
+=item delim
+
+The delimiter to use between object names. The default is C<::>. Specify C<tab> for tab-delimited output, C<space> for
+space-delimited output, or C<comma> for comma-delimited output.
+
+=back
+
+=cut
+
+sub delim_options {
+    return (['delim=s', 'delimiter to place between object names', { default => '::' }],
+    );
+}
+
+=head3 delim
+
+    my $delim = P3Utils::delim($opt);
+
+Return the delimiter to use between the elements of multi-valued fields.
+
+=over 4
+
+=item opt
+
+A L<Getopts::Long::Descriptive::Opt> object containing the delimiter specification.
+
+=back
+
+=cut
+
+use constant DELIMS => { space => ' ', tab => "\t", comma => ',', '::' => '::' };
+
+sub delim {
+    my ($opt) = @_;
+    my $retVal = DELIMS->{$opt->delim} // $opt->delim;
+    return $retVal;
+}
+
+
 =head3 get_couplets
 
     my $couplets = P3Utils::get_couplets($ih, $colNum, $opt);
