@@ -27,10 +27,6 @@ If specified, the features containing each role will be listed on the output.
 
 If specified, all roles will be displayed, rather than only the roles that differ between genomes.
 
-=item pure
-
-Do not include the Feature and DNA comparison statistics in the standard output.
-
 =back
 
 =cut
@@ -45,8 +41,7 @@ use Stats;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('gto1 gto2 ... gtoN', P3Utils::delim_options(),
         ['features|f', 'display feature IDs'],
-        ['verbose|v', 'display all roles'],
-        ['pure|R', 'only display role comparison']);
+        ['verbose|v', 'display all roles']);
 # Create the statistics object.
 my $stats = Stats->new();
 # Get the GTO files.
@@ -137,10 +132,10 @@ my @colTitles = ('Role name', @gtoFiles);
 if ($showF) {
     push @colTitles, 'Features containing role';
 }
+my $titled;
 my $delim = P3Utils::delim($opt);
 my $pure = $opt->pure;
 # Loop through the role table, producing output.
-P3Utils::print_cols(\@colTitles);
 my @roleList = sort { $roles{$a} cmp $roles{$b} } keys %roleCounts;
 for my $role (@roleList) {
     my $array = $roleCounts{$role};
@@ -165,15 +160,26 @@ for my $role (@roleList) {
             push @flist, join($delim, sort @$features);
         }
         # Print the counts and the features.
-        P3Utils::print_cols([$roles{$role}, @$array, @flist]);
+        print_line([$roles{$role}, @$array, @flist], \@colTitles, \*STDOUT, \$titled);
     }
 }
-# Write the feature and DNA statistics. If we are in pure mode, they go to STDERR, not STDOUT
-my $oh = ($pure ? \*STDERR : \*STDOUT);
-P3Utils::print_cols(['* Features', @feats], $oh);
-P3Utils::print_cols(['* DNA', @dna], $oh);
+# Write the feature and DNA statistics. If we are in pure mode, they go to STDERR, not STDOUT. Only do this if there are multiple genomes.
+if (scalar(@gtoFiles) > 1) {
+    P3Utils::print_cols(['* Features', @feats], \*STDERR);
+    P3Utils::print_cols(['* DNA', @dna], \*STDERR);
+}
 # Write the run statistics.
 print STDERR "All done.\n" . $stats->Show();
+
+## Print a line, showing titles if it is the first.
+sub print_line {
+    my ($list, $titles, $oh, $flagPointer) = @_;
+    if (! $$flagPointer) {
+        P3Utils::print_cols($titles, $oh);
+        $$flagPointer = 1;
+    }
+    P3Utils::print_cols($list, $oh);
+}
 
 ## Increment an entry in an array inside a hash. Fill zeroes into the missing spaces.
 sub Increment {
