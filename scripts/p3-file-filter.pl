@@ -45,8 +45,8 @@ if (! $filterFile) {
 }
 # Open the filter file.
 open(my $fh, '<', $filterFile) || die "Could not open filter file: $!";
-# Read its headers.
-my ($filterHeaders) = P3Utils::process_headers($fh);
+# Read its headers. Note we bypass key-column processing.
+my ($filterHeaders) = P3Utils::process_headers($fh, $opt, 1);
 # Find the key column.
 my $fCol = P3Utils::find_column($filterCol, $filterHeaders);
 # Create a hash of the acceptable field values.
