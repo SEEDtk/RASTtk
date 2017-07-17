@@ -12,24 +12,14 @@ The positional parameters are the indices (1-based) or names of the key columns.
 
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
-The following additional options are suppported.
-
-=over 4
-
-=item count
-
-If specified, the output will consist only of the key fields with a count column added.
-
-=back
-
 =cut
 
 use strict;
 use P3Utils;
 
+
 # Get the command-line options.
-my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
-        ['count|K', 'count instead of sorting']
+my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options()
         );
 # Verify the parameters.
 my @sortCols;
@@ -39,19 +29,13 @@ if (! @ARGV) {
 } else {
     @sortCols = @ARGV;
 }
-# Get the options.
-my $count = $opt->count;
+
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers and compute the key columns.
 my ($headers, $cols) = P3Utils::find_headers($ih, 'sort input' => @sortCols);
 # Write out the headers.
-if ($count) {
-    my @sortHeaders = P3Utils::get_cols($headers, $cols);
-    P3Utils::print_cols([@sortHeaders, 'count']);
-} else {
-    P3Utils::print_cols($headers);
-}
+P3Utils::print_cols($headers);
 # We will use this hash to facilitate the sort. It is keyed on the first column.
 my %sorter;
 # Loop through the input.
@@ -63,29 +47,11 @@ while (! eof $ih) {
     my $key1 = shift @key;
     push @{$sorter{$key1}}, [\@key, $line];
 }
-# Now process each group.
+# Now sort each group.
 for my $key1 (sort keys %sorter) {
-    # Sort the items.
     my $subList = $sorter{$key1};
     my @sorted = sort { list_cmp($a->[0], $b->[0]) } @$subList;
-    if (! $count) {
-        # Print the sorted items.
-        print map { $_->[1] } @sorted;
-    } else {
-        # Count the items for each key combination and print them.
-        my $first = shift @sorted;
-        my ($key, $tally) = (join("\t", $key1, @{$first->[0]}), 1);
-        for my $item (@sorted) {
-            my $key0 = join("\t", $key1, @{$item->[0]});
-            if ($key0 ne $key) {
-                print "$key\t$tally\n";
-                ($key, $tally) = ($key0, 1);
-            } else {
-                $tally++;
-            }
-        }
-        print "$key\t$tally\n";
-    }
+    print map { $_->[1] } @sorted;
 }
 
 # Compare two lists.
