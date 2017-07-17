@@ -2,13 +2,12 @@
 
     p3-function-to-role [options] <features.with.functions.tbl >features.with.roles.tbl
 
-This script takes a file of features with functional asasignments (products) included and
-replaces the functions with roles. In PATRIC, only subsystem roles count as roles, so some features
+This script takes a file of features with functional assignments (products) included and
+replaces the functions with roles. Hypothetical roles are not considered real, so some features
 may be deleted. Conversely, some functions have multiple roles, so other features may be
 replicated.
 
-Currently, PATRIC does not have any roles defined, so the C<--roles> command-line option is
-required.
+If a strict subset of roles is desired, the C<--roles> option should be used.
 
 =head2 Parameters
 
@@ -53,9 +52,11 @@ my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Form the full header set and write it out.
 $outHeaders->[$keyCol] = 'feature.role';
 P3Utils::print_cols($outHeaders);
-# Now we need to get the role database. Currently, we can only do this using a role file.
+# Now we need to get the role database. If opt->roles is specified, the role
+# database is strict and cannot be expanded.
+my $strict = ($opt->roles ? 1 : 0);
 my %roleDB;
-if ($opt->roles) {
+if ($strict) {
     open(my $rh, '<', $opt->roles) || die "Could not open role file: $!";
     while (! eof $rh) {
         my $line = <$rh>;
@@ -63,8 +64,6 @@ if ($opt->roles) {
             $roleDB{$2} = $3;
         }
     }
-} else {
-    die "PATRIC has no roles yet. You must specify a role file.";
 }
 # Loop through the input.
 while (! eof $ih) {
@@ -77,7 +76,12 @@ while (! eof $ih) {
         # Loop through the roles.
         for my $role (@roles) {
             my $checkSum = RoleParse::Checksum($role);
+            if (! exists $roleDB{$checkSum} && ! $strict & ! SeedUtils::hypo($role)) {
+                # We need to add this role.
+                $roleDB{$checkSum} = $role;
+            }
             if (exists $roleDB{$checkSum}) {
+                # We can use this role.
                 $line->[$keyCol] = $roleDB{$checkSum};
                 print join("\t", @$line) . "\n";
             }
