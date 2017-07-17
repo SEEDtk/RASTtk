@@ -27,7 +27,7 @@ use P3DataAPI;
 
 =head1 Blast FASTA Data
 
-    svc_blast.pl [ options ] type blastdb
+    p3-blast.pl [ options ] type blastdb
 
 Blast the input against a specified blast database. The input should be a FASTA file. The blast database
 can also be a FASTA file, the input itself, or it can be a genome ID.
