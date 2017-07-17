@@ -1095,14 +1095,15 @@ sub find_headers {
 
     my @values = P3Utils::get_cols($ih, $cols);
 
-This method returns all the values in the specified columns of the input file, in order. It is meant to be used
-as a companion to L</find_headers>.
+This method returns all the values in the specified columns of the next line of the input file, in order. It is meant to be used
+as a companion to L</find_headers>. A list reference can be used in place of an open file handle, in which case the columns will
+be used to index into the list.
 
 =over 4
 
 =item ih
 
-Open input file handle.
+Open input file handle, or alternatively a list reference.
 
 =item cols
 
@@ -1118,10 +1119,16 @@ Returns a list containing the fields in the specified columns, in order.
 
 sub get_cols {
     my ($ih, $cols) = @_;
-    # Read the input line.
-    my $line = <$ih>;
-    # Get the columns.
-    my @fields = get_fields($line);
+    # Get the list of field values according to the input type.
+    my @fields;
+    if (ref $ih eq 'ARRAY') {
+        @fields = @$ih;
+    } else {
+        # Read the input line.
+        my $line = <$ih>;
+        # Get the columns.
+        @fields = get_fields($line);
+    }
     # Extract the ones we want.
     my @retVal = map { $fields[$_] } @$cols;
     # Return the resulting values.
