@@ -27,7 +27,7 @@ use P3Utils;
 
 =head1 Annotate a Genome Using RAST
 
-    p3-rast.pl [ options ] genomeID name
+    p3-rast.pl [ options ] taxonID name
 
 This script invokes the RAST service over the web to annotate a genome. It will submit a FASTA
 file to RAST, wait for the job to finish, and then format the results into a JSON-form L<GenomeTypeObject>.
@@ -35,7 +35,7 @@ file to RAST, wait for the job to finish, and then format the results into a JSO
 =head2 Parameters
 
 The input can be a contig-only GenomeTypeObject in JSON format or a contig FASTA file. The
-two positional parameters are the genome ID and the genome name. The command-line options in
+two positional parameters are the proposed taxonomic ID and the genome name. The command-line options in
 L<P3Utils/ih_options> are used to specify the standard input. The additional command-line
 options are as follows.
 
