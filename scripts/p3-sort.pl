@@ -8,7 +8,12 @@ first column only.
 
 =head2 Parameters
 
-The positional parameters are the indices (1-based) or names of the key columns.
+The positional parameters are the indices (1-based) or names of the key columns. Columns to be sorted numerically
+are indicated by a slash-n (C</n>) at the end of the column index or name. So,
+
+    p3-sort genome.genome_id feature.start/n
+
+Would indicate two key columns, the second of which is to be sorted numerically.
 
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
@@ -31,13 +36,23 @@ use P3Utils;
 my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
         ['count|K', 'count instead of sorting']
         );
-# Verify the parameters.
+# Verify the parameters. We need to separate the column names from the sort types.
 my @sortCols;
+my @sortTypes;
 if (! @ARGV) {
     # No sort key. Sort by first column.
     @sortCols = 1;
+    @sortTypes = 0;
 } else {
-    @sortCols = @ARGV;
+    for my $sortCol (@ARGV) {
+        if ($sortCol =~ /^(.+)\/n$/) {
+            push @sortCols, $1;
+            push @sortTypes, 1;
+        } else {
+            push @sortCols, $sortCol;
+            push @sortTypes, 0;
+        }
+    }
 }
 # Get the options.
 my $count = $opt->count;
@@ -60,41 +75,37 @@ while (! eof $ih) {
     my @fields = P3Utils::get_fields($line);
     # Form the key.
     my @key = map { $fields[$_] } @$cols;
-    my $key1 = shift @key;
-    push @{$sorter{$key1}}, [\@key, $line];
+    my $key1 = join("\t", @key);
+    push @{$sorter{$key1}}, $line;
 }
 # Now process each group.
-for my $key1 (sort keys %sorter) {
+
+for my $key (sort { tab_cmp($a, $b) } keys %sorter) {
     # Sort the items.
-    my $subList = $sorter{$key1};
-    my @sorted = sort { list_cmp($a->[0], $b->[0]) } @$subList;
+    my $subList = $sorter{$key};
     if (! $count) {
         # Print the sorted items.
-        print map { $_->[1] } @sorted;
+        print @$subList;
     } else {
         # Count the items for each key combination and print them.
-        my $first = shift @sorted;
-        my ($key, $tally) = (join("\t", $key1, @{$first->[0]}), 1);
-        for my $item (@sorted) {
-            my $key0 = join("\t", $key1, @{$item->[0]});
-            if ($key0 ne $key) {
-                print "$key\t$tally\n";
-                ($key, $tally) = ($key0, 1);
-            } else {
-                $tally++;
-            }
-        }
-        print "$key\t$tally\n";
+        my $count = scalar @$subList;
+        print "$key\t$count\n";
     }
 }
 
 # Compare two lists.
-sub list_cmp {
+sub tab_cmp {
     my ($a, $b) = @_;
-    my $n = scalar @$a;
+    my @a = split /\t/, $a;
+    my @b = split /\t/, $b;
+    my $n = scalar @a;
     my $retVal = 0;
     for (my $i = 0; $i < $n && ! $retVal; $i++) {
-        $retVal = $a->[$i] cmp $b->[$i];
+        if ($sortTypes[$i]) {
+            $retVal = $a[$i] <=> $b[$i];
+        } else {
+            $retVal = $a[$i] cmp $b[$i];
+        }
     }
     return $retVal;
 }
