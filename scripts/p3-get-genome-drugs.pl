@@ -11,7 +11,21 @@ There are no positional parameters.
 
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
-Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options>.
+Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plus the following.
+
+=over 4
+
+=item fields
+
+List the fields of the table.
+
+=item resistant
+
+Filter for drugs to which the genome is resistant.
+
+=item susceptible
+
+Filter for drugs to which the genome is susceptible.
 
 =cut
 
@@ -21,6 +35,8 @@ use P3Utils;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
+    ['resistant|resist|strong', 'filter for drugs to which the genome is resistant'],
+    ['susceptible|suscept|weak', 'filter for drugs to which the genome is susceptible'],
     ['fields|f', 'Show available fields']);
 
 my $fields = ($opt->fields ? 1 : 0);
@@ -34,6 +50,13 @@ my $p3 = P3DataAPI->new();
 my ($selectList, $newHeaders) = P3Utils::select_clause(genome_drug => $opt);
 # Compute the filter.
 my $filterList = P3Utils::form_filter($opt);
+# Add the special filters.
+if ($opt->resistant) {
+    push @$filterList, ['eq', 'resistant_phenotype', 'resistant'];
+}
+if ($opt->susceptible) {
+    push @$filterList, ['eq', 'resistant_phenotype', 'susceptible'];
+}
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.

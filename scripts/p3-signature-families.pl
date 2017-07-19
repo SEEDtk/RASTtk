@@ -73,6 +73,11 @@ my $gHash2 = read_genomes($gs2);
 my @gs2 = sort grep { ! $gHash->{$_} } keys %$gHash2;
 undef $gHash;
 undef $gHash2;
+if (! @gs1) {
+    die "No genomes found in group 1.";
+} elsif (! @gs2) {
+    die "No genomes found in group 2.";
+}
 
 # Compute the output hash.
 my $dataH = P3Signatures::Process(\@gs1, \@gs2, $min_in, $max_out, $tracer);
