@@ -1,4 +1,4 @@
-=head1 Description
+=head1 Filter a File Against Contents of a Second File
 
     p3-file-filter.pl [options] filterFile filterCol
 

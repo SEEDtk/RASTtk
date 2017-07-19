@@ -9,17 +9,15 @@ parameters and the specification of additional columns if desired.
 
 There are no positional parameters.
 
-The command-line options are those given in L<P3Utils/data_options>.
-You can peruse
+The command-line options are those given in L<P3Utils/data_options> plus the following.
 
-     https://github.com/PATRIC3/patric_solr/blob/master/antibiotics/conf/schema.xml
+=over 4
 
-to gain access to all of the supported fields.  There are quite a
-few, so do not panic.  You can use something like
+=item fields
 
-    p3-all-drugs -a antibiotic_name -a description -a canonical_smiles
+List the names of the available fields.
 
-to get some commonly sought fields.
+=back
 
 =cut
 
