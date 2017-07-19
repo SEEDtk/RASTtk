@@ -50,9 +50,11 @@ my $p3 = P3DataAPI->new();
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-# Form the full header set and write it out.
-push @$outHeaders, $type;
-P3Utils::print_cols($outHeaders);
+if (! $opt->nohead) {
+    # Form the full header set and write it out.
+    push @$outHeaders, $type;
+    P3Utils::print_cols($outHeaders);
+}
 # We will stash contigs in here for re-use.
 my %contigs;
 # Loop through the input.

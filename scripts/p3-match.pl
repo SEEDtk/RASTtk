@@ -53,7 +53,9 @@ if ($opt->discards) {
     P3Utils::print_cols($outHeaders, $dh);
 }
 # Write out the headers.
-P3Utils::print_cols($outHeaders);
+if (! $opt->nohead) {
+    P3Utils::print_cols($outHeaders);
+}
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);

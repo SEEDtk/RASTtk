@@ -11,20 +11,15 @@ There are no positional parameters.
 
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
-Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options>.
+Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plus the following.
 
-The command-line options are those given in L<P3Utils/data_options>.
-You can peruse
+=over 4
 
-    https://github.com/PATRIC3/patric_solr/blob/master/genome_feature/conf/schema.xml
-     to gain access to all of the supported fields.  There are quite a
-     few, so do not panic.  You can use something like
+=item fields
 
-         p3-echo -t genome.genome_id 282669.3 | p3-get-genome-features -e feature_type,CDS -a annotation -a start -a end -a product
+List the available fields.
 
-         to get some commonly sought fields.
-
-
+=back
 
 =cut
 
@@ -56,8 +51,10 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Form the full header set and write it out.
-push @$outHeaders, @$newHeaders;
-P3Utils::print_cols($outHeaders);
+if (! $opt->nohead) {
+    push @$outHeaders, @$newHeaders;
+    P3Utils::print_cols($outHeaders);
+}
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);

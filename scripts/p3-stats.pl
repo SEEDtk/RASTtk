@@ -36,7 +36,8 @@ if (! defined $statCol) {
 }
 my $targetCol = P3Utils::find_column($statCol, $inHeaders);
 # Form the full header set and write it out.
-my @outHeaders = ($inHeaders->[$keyCol], qw(count average min max stdev));
+my $colName = ($opt->nohead ? 'key' : $inHeaders->[$keyCol]);
+my @outHeaders = ($colName, qw(count average min max stdev));
 P3Utils::print_cols(\@outHeaders);
 # This is our tally hash. For each key value, it will contain [count, sum, min, max, square-sum].
 my %tally;

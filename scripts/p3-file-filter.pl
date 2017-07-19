@@ -60,7 +60,9 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Write the output headers.
-P3Utils::print_cols($outHeaders);
+if (! $opt->nohead) {
+    P3Utils::print_cols($outHeaders);
+}
 # Determine the mode.
 my $reverse = $opt->reverse;
 # Loop through the input.

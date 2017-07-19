@@ -56,7 +56,7 @@ for my $arg (@ARGV) {
         # Open the input file.
         my $ih = P3Utils::ih($opt);
         # Read the incoming headers.
-        my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
+        my (undef, $keyCol) = P3Utils::process_headers($ih, $opt);
         # Extract the genomes from the input.
         my $column = P3Utils::get_col($ih, $keyCol);
         my $total = scalar(@$column);

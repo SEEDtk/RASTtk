@@ -11,7 +11,15 @@ There are no positional parameters.
 
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
-Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options>.
+Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plus the following.
+
+=over 4
+
+=item fields
+
+List the available field names.
+
+=back
 
 =cut
 
@@ -39,8 +47,10 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Form the full header set and write it out.
-push @$outHeaders, @$newHeaders;
-P3Utils::print_cols($outHeaders);
+if (! $opt->nohead) {
+    push @$outHeaders, @$newHeaders;
+    P3Utils::print_cols($outHeaders);
+}
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);

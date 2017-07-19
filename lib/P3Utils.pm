@@ -317,7 +317,7 @@ sub get_col {
 
 =head3 process_headers
 
-    my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
+    my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt, $keyless);
 
 Read the header line from a tab-delimited input, format the output headers and compute the index of the key column.
 
@@ -332,7 +332,7 @@ Open input file handle.
 Should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
 column or a string containing the key column name. At a minimum, it must support the C<nohead> option.
 
-=item keyless
+=item keyless (optional)
 
 If TRUE, then it is presumed there is no key column.
 

@@ -52,9 +52,11 @@ if ($opt->all) {
     # Compute the column indices.
     my @idxes = map { P3Utils::find_column($_, $inHeaders) } @cols;
     # Compute the output headers.
-    my @outHeaders = map { $inHeaders->[$_] } @idxes;
-    # Write out the headers.
-    P3Utils::print_cols(\@outHeaders);
+    if (! $opt->nohead) {
+        my @outHeaders = map { $inHeaders->[$_] } @idxes;
+        # Write out the headers.
+        P3Utils::print_cols(\@outHeaders);
+    }
     # Loop through the input.
     while (! eof $ih) {
         my @row =  P3Utils::get_cols($ih, \@idxes);

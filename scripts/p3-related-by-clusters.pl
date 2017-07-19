@@ -124,11 +124,11 @@ File::Copy::Recursive::pathempty($csDir);
 # Get the two genome sets.
 my $ih;
 open($ih, "<$gs1") || die "Could not open $gs1: $!";
-my ($outHeaders1, $keycol1) = P3Utils::process_headers($ih, $opt);
+my (undef, $keycol1) = P3Utils::process_headers($ih, $opt);
 my $genomes1 = P3Utils::get_col($ih, $keycol1);
 close $ih; undef $ih;
 open($ih, "<$gs2") || die "Could not open $gs2: $!";
-my ($outHeaders2, $keycol2) = P3Utils::process_headers($ih, $opt);
+my (undef, $keycol2) = P3Utils::process_headers($ih, $opt);
 my $genomes2 = P3Utils::get_col($ih, $keycol2);
 my %pairCounts;
 my $i;
@@ -144,11 +144,11 @@ for my $gid (@$genomes1)
 {
     if ($names->{$gid})
     {
-	push(@$ids, $gid);
+        push(@$ids, $gid);
     }
     else
     {
-	warn "Genome $gid does not appear in PATRIC\n";
+        warn "Genome $gid does not appear in PATRIC\n";
     }
 }
 $genomes1 = $ids;
@@ -158,11 +158,11 @@ for my $gid (@$genomes2)
 {
     if ($names->{$gid})
     {
-	push(@$ids, $gid);
+        push(@$ids, $gid);
     }
     else
     {
-	warn "Genome $gid does not appear in PATRIC\n";
+        warn "Genome $gid does not appear in PATRIC\n";
     }
 }
 $genomes2 = $ids;

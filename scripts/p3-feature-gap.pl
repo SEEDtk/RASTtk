@@ -45,10 +45,12 @@ my $ih = P3Utils::ih($opt);
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Get the second key column (feature 2).
 my $k2Col = P3Utils::find_column($opt->col2, $outHeaders);
-# Add a header for the gap output.
-push @$outHeaders, 'gap';
-# Print the header line.
-P3Utils::print_cols($outHeaders, \*STDOUT);
+if (! $opt->nohead) {
+    # Add a header for the gap output.
+    push @$outHeaders, 'gap';
+    # Print the header line.
+    P3Utils::print_cols($outHeaders, \*STDOUT);
+}
 # Now we pull in the feature pairs.
 while (! eof $ih) {
     my $line = <$ih>;
