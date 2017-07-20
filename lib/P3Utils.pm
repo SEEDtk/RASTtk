@@ -540,10 +540,15 @@ sub select_clause {
         } else {
             $attrList = FIELDS->{$object};
         }
-    } elsif ($idFlag) {
-        my $idCol = IDCOL->{$object};
-        if (! scalar(grep { $_ eq $idCol } @$attrList)) {
-            unshift @$attrList, $idCol;
+    } else {
+        # Handle comma-splicing.
+        $attrList = [ map { split /,/, $_ } @$attrList ];
+        # If we need an ID field, be sure it's in there.
+        if ($idFlag) {
+            my $idCol = IDCOL->{$object};
+            if (! scalar(grep { $_ eq $idCol } @$attrList)) {
+                unshift @$attrList, $idCol;
+            }
         }
     }
     # Form the header list.
