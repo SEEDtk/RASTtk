@@ -35,8 +35,12 @@ The command-line options are as follows.
 
 =item title
 
-The value to use for the header line. If more than one value is specified, then the output file is multi-column. This
-option is required.
+The value to use for the header line. If more than one value is specified, then the output file is multi-column. If
+omitted, the single column header C<id> is assumed.
+
+=item nohead
+
+If this option is specified, then no column headers are output. The value is the number of columns desired.
 
 =back
 
@@ -46,14 +50,21 @@ use strict;
 use P3Utils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('value1 value2 ... valueN', 
-        ['title|header|hdr|t=s@', 'header value(s) to use in first output record', { required => 1 }]);
+my $opt = P3Utils::script_opts('value1 value2 ... valueN',
+        ['title|header|hdr|t=s@', 'header value(s) to use in first output record', { default => ['id'] }],
+        ['nohead=i', 'file has no header and the specified number of columns']);
 # Get the titles.
-my $titles = $opt->title;
-# Compute the column count.
-my $cols = scalar @$titles;
+my $cols;
+if ($opt->nohead) {
+    # User does not want a header line.
+    $cols = $opt->nohead;
+} else {
+    my $titles = $opt->title;
+    # Compute the column count.
+    $cols = scalar @$titles;
+    P3Utils::print_cols($titles);
+}
 my @values = @ARGV;
-P3Utils::print_cols($titles);
 # We will accumulate the current line in here.
 my @line;
 for my $value (@values) {

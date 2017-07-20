@@ -54,11 +54,11 @@ Mapping from user-friendly object names to default fields.
 
 =cut
 
-use constant FIELDS =>  {   genome => ['genome_id', 'genome_name', 'taxon_id', 'genome_status', 'gc_content'],
-                            feature => ['patric_id', 'feature_type', 'location', 'product'],
+use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_status', 'sequences', 'patric_cds', 'isolation_country', 'host_name', 'disease', 'collection_year', 'completion_date'],
+                            feature => ['patric_id', 'refseq_locus_tag', 'gene_id', 'plfam_id', 'pgfam_id', 'product'],
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
-                            contig => ['genome_id', 'accession', 'length', 'taxon_id', 'sequence'],
+                            contig => ['genome_id', 'accession', 'length', 'gc_content', 'sequence_type', 'topology'],
                             drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'], };
 
 =head3 IDCOL
@@ -361,21 +361,7 @@ sub process_headers {
     my $keyCol;
     # Search for the key column.
     if (! $keyless) {
-        my $col;
-        if (ref $opt) {
-            $col = $opt->col;
-        } else {
-            $col = $opt;
-        }
-        if ($col =~ /^\-?\d+$/) {
-            # Here we have a column number.
-            $keyCol = $col - 1;
-        } else {
-            # Here we have a header name.
-            my $n = scalar @outHeaders;
-            for ($keyCol = 0; $keyCol < $n && $outHeaders[$keyCol] ne $col; $keyCol++) {};
-            die "\"$col\" not found in headers." if ($keyCol >= $n);
-        }
+        $keyCol = find_column($opt->col, \@outHeaders);
     }
     # Return the results.
     return (\@outHeaders, $keyCol);
@@ -416,7 +402,18 @@ sub find_column {
         # Here we have a header name.
         my $n = scalar @$headers;
         for ($retVal = 0; $retVal < $n && $headers->[$retVal] ne $col; $retVal++) {};
-        die "\"$col\" not found in headers." if ($retVal >= $n);
+        # If our quick search failed, check for a match past the dot.
+        if ($retVal >= $n) {
+            undef $retVal;
+            for (my $i = 0; $i < $n && ! $retVal; $i++) {
+                if ($headers->[$i] =~ /\.(.+)$/ && $1 eq $col) {
+                    $retVal = $i;
+                }
+            }
+            if (! defined $retVal) {
+                die "\"$col\" not found in headers.";
+            }
+        }
     }
     return $retVal;
 
