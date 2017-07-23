@@ -1068,6 +1068,14 @@ sub find_headers {
             $fieldH{$header} = $i;
         }
     }
+    # Now one more time, looking for abbreviated header names.
+    for (my $i = 0; $i < @headers; $i++) {
+        my @headers = split /\./, $headers[$i];
+        my $header = pop @headers;
+        if (exists $fieldH{$header} && ! defined $fieldH{$header}) {
+            $fieldH{$header} = $i;
+        }
+    }
     # Accumulate the headers that were not found. We also handle numeric column indices in here.
     my @bad;
     for my $field (keys %fieldH) {
