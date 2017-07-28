@@ -13,7 +13,13 @@ There are no positional parameters.
 The standard input can be overwritten using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> which specifies the input
-column.
+column and the following.
+
+=over 4
+
+=item idCol
+
+The index (1-based) or name of the column containing the cluster ID. If omitted, the cluster IDs are generated internally.
 
 =cut
 
@@ -24,11 +30,17 @@ use P3Utils;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::ih_options(), P3Utils::col_options(),
+        ['idCol=s', 'index (1-based) or name of cluster ID column']
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
+# Find the ID column.
+my $idCol = $opt->idcol;
+if (defined $idCol) {
+    $idCol = P3Utils::find_column($idCol, $outHeaders);
+}
 # Write the output headers.
 print "id\telement\n";
 # Initialize the ID.
@@ -39,7 +51,11 @@ while (! eof $ih) {
     for my $couplet (@$couplets) {
         my $cluster = $couplet->[0];
         # Compute this cluster's ID.
-        $id++;
+        if (defined $idCol) {
+            $id = $couplet->[1][$idCol];
+        } else {
+            $id++;
+        }
         my @items = split /::/, $cluster;
         for my $item (sort @items) {
             P3Utils::print_cols([$id, $item]);

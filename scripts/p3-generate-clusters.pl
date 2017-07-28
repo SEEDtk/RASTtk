@@ -96,7 +96,10 @@ while (! eof $ih) {
 # Delete the empty groups and sort from largest to smallest.
 my @sorted = sort { scalar(@$b) <=> scalar(@$a) } grep { scalar(@$_) } @groupList;
 # Output the groups.
-print $opt->title . "\n";
+my $title = $opt->title;
+P3Utils::print_cols([$title . "_id", 'size', $title]);
+my $cluster_id = 1;
 for my $group (@sorted) {
-    print join($delim, @$group) . "\n";
+    P3Utils::print_cols([$cluster_id, scalar @$group, join($delim, @$group)]);
+    $cluster_id++;
 }

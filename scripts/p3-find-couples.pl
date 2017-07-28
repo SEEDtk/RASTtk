@@ -117,7 +117,7 @@ while (! eof $ih) {
         # Here we get the start and end.
         if (defined $locCol) {
             my $loc = $line->[$locCol];
-            if ($loc =~ /(\d+)\.\.(d+)/) {
+            if ($loc =~ /(\d+)\.\.(\d+)/) {
                 ($start, $end) = ($1, $2);
             } else {
                 die "Invalid location string \'$loc\'.";
