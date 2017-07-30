@@ -178,7 +178,7 @@ This method returns a list of options related to delimiter specification for mul
 =item delim
 
 The delimiter to use between object names. The default is C<::>. Specify C<tab> for tab-delimited output, C<space> for
-space-delimited output, or C<comma> for comma-delimited output.
+space-delimited output, or C<comma> for comma-delimited output. Other values might have unexpected results.
 
 =back
 
@@ -213,6 +213,29 @@ sub delim {
     return $retVal;
 }
 
+=head3 undelim
+
+    my $undelim = P3Utils::undelim($opt);
+
+Return the pattern to use to split the elements of multi-valued fields.
+
+=over 4
+
+=item opt
+
+A L<Getopts::Long::Descriptive::Opt> object containing the delimiter specification.
+
+=back
+
+=cut
+
+use constant UNDELIMS => { space => ' ', tab => '\t', comma => ',', '::' => '::' };
+
+sub undelim {
+    my ($opt) = @_;
+    my $retVal = UNDELIMS->{$opt->delim} // $opt->delim;
+    return $retVal;
+}
 
 =head3 get_couplets
 
