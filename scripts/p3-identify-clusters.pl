@@ -118,15 +118,16 @@ while (! eof $ih) {
     my ($fid, $sequence, $location, $role) = P3Utils::get_cols($ih, [$idCol, $seqCol, $locCol, $keyCol]);
     # Compute the start and end.
     my ($start, $end) = $location =~ /(\d+)\.\.(\d+)/;
-    die "Invalid location format for $fid" if (! defined $start || ! defined $end);
-    # Compute the genome.
-    my ($genome) = $fid =~ /(\d+\.\d+)/;
-    # Only proceed if we found a genome ID. Sometimes bad features sneak in.
-    if (defined $genome) {
-        # If this role is in a cluster, save it for this sequence.
-        my $clusterID = $roles{$role};
-        if (defined $clusterID) {
-            push @{$sequences{"$genome:$sequence"}}, [$fid, $start, $end, $clusterID];
+    if (defined $start && defined $end) {
+        # Compute the genome.
+        my ($genome) = $fid =~ /(\d+\.\d+)/;
+        # Only proceed if we found a genome ID. Sometimes bad features sneak in.
+        if (defined $genome) {
+            # If this role is in a cluster, save it for this sequence.
+            my $clusterID = $roles{$role};
+            if (defined $clusterID) {
+                push @{$sequences{"$genome:$sequence"}}, [$fid, $start, $end, $clusterID];
+            }
         }
     }
 }
