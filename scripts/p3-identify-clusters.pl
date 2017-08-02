@@ -47,6 +47,14 @@ The maximum gap between features for them to be considered part of a cluster. Th
 
 The minimum number of features for a group to be considered a cluster. The default is C<3>.
 
+=item showRoles
+
+If specified, the roles found in the cluster will be displayed in a column of the output.
+
+=item showFids
+
+If specified, the features found in the cluster will be displayed in a column of the output.
+
 =back
 
 =cut
@@ -61,7 +69,9 @@ my $opt = P3Utils::script_opts('clusterFile', P3Utils::col_options(), P3Utils::i
         ['idCol|id|idcol=s', 'index (1-based) or name of column containing feature ID', { default => 'patric_id' }],
         ['seqCol|sequence|seqcol|seq=s', 'index (1-based) or name of column containing sequence ID', { default => 'sequence_id' }],
         ['maxGap|maxgap|max|gap=i', 'maximum distance between adjacent clustered features', { default => 2000 }],
-        ['minItems|minitems|min=i', 'minimum number of features in a cluster', { default => 3 }]
+        ['minItems|minitems|min=i', 'minimum number of features in a cluster', { default => 3 }],
+        ['showRoles|showroles|roles', 'display roles found in cluster'],
+        ['showFids|showfids|fids', 'display features found in cluster']
         );
 # Get the delimiter. We need it normally and as a search pattern for -split-.
 my $delimP = P3Utils::undelim($opt);
@@ -69,6 +79,8 @@ my $delim = P3Utils::delim($opt);
 # Get the options.
 my $maxGap = $opt->maxgap;
 my $minItems = $opt->minitems;
+my $showRoles = $opt->showroles;
+my $showFids = $opt->showfids;
 # This will hold the title of the cluster ID column.
 my $clidColTitle = 'cluster_id';
 # This will map roles to cluster IDs.
@@ -107,7 +119,9 @@ my $idCol = P3Utils::find_column($opt->idcol, $outHeaders);
 my $seqCol = P3Utils::find_column($opt->seqcol, $outHeaders);
 # Compute the headers and write them out.
 if (! $opt->nohead) {
-    my @cols = ($clidColTitle, 'genome_id', 'sequence_id', 'start', 'end', 'features');
+    my @cols = ($clidColTitle, 'genome_id', 'sequence_id', 'start', 'end');
+    push @cols, 'features' if $showFids;
+    push @cols, 'roles' if $showRoles;
     P3Utils::print_cols(\@cols);
 }
 # First we sort the features into sequences.
@@ -126,7 +140,7 @@ while (! eof $ih) {
             # If this role is in a cluster, save it for this sequence.
             my $clusterID = $roles{$role};
             if (defined $clusterID) {
-                push @{$sequences{"$genome:$sequence"}}, [$fid, $start, $end, $clusterID];
+                push @{$sequences{"$genome:$sequence"}}, [$fid, $start, $end, $clusterID, $role];
             }
         }
     }
@@ -143,7 +157,7 @@ for my $sequence (sort keys %sequences) {
         my $feature = shift @features;
         my ($fid, $start, $end, $clusterID) = @$feature;
         # This will hold the cluster.
-        my @cluster = ($fid);
+        my @cluster = $feature;
         # This will hold the skipped features, which we'll want to process again.
         my @skipped;
         # Loop until we run out of features or find a gap that's too big.
@@ -151,7 +165,7 @@ for my $sequence (sort keys %sequences) {
             # We want to look at this feature. It either goes in the cluster or the skip list.
             $feature = shift @features;
             if ($feature->[3] eq $clusterID) {
-                push @cluster, $feature->[0];
+                push @cluster, $feature;
                 $end = $feature->[2];
             } else {
                 push @skipped, $feature;
@@ -159,10 +173,16 @@ for my $sequence (sort keys %sequences) {
         }
         # If the cluster is big enough, write it out.
         if (scalar @cluster >= $minItems) {
-            P3Utils::print_cols([$clusterID, $genomeID, $sequenceID, $start, $end, join($delim, @cluster)]);
+            my @row = ($clusterID, $genomeID, $sequenceID, $start, $end);
+            if ($showRoles) {
+                push @row, join($delim, map { $_->[4] } @cluster);
+            }
+            if ($showFids) {
+                push @row, join($delim, map { $_->[0] } @cluster);
+            }
+            P3Utils::print_cols(\@row);
         }
         # Set up for the next pass by pasting the unchecked features to the skipped ones.
         @features = (@skipped, @features);
     }
 }
-

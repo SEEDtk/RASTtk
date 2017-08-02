@@ -41,7 +41,7 @@ use P3Utils;
 my $opt = P3Utils::script_opts('realClusterFile', P3Utils::col_options(), P3Utils::ih_options(),
         ['maxGap|maxgap|maxG|maxg|g=i', 'maximum feature gap', { default => 2000 }],
         ['location|loc|l=s', 'index (1-based) or name of column containing feature location', { default => 'location' }],
-        ['sequence|seq|s=s', 'index (1-based) or name of column containing the ID of the contig containing the feature', { default => 'sequence_id' }],
+        ['sequence|seq|s=s', 'index (1-based) or name of column containing the ID of the contig containing the feature', { default => 'sequence_id' }]
         );
 # Compute the gap.
 my $maxGap = $opt->maxgap;
@@ -49,6 +49,7 @@ my $maxGap = $opt->maxgap;
 # will be extended by the gap distance.
 my %sequences;
 # Get the cluster file.
+my $clHeaders;
 my ($realClusterFile) = @ARGV;
 if (! $realClusterFile) {
     die "No cluster file specified.";
@@ -56,13 +57,15 @@ if (! $realClusterFile) {
     die "Cluster file $realClusterFile missing, invalid, or empty.";
 } else {
     open(my $ch, '<', $realClusterFile) || die "Could not open $realClusterFile: $!";
-    # Skip the header line.
+    # Process the header line. We don't look for a key column.
+    ($clHeaders) = P3Utils::process_headers($ch, $opt, 1);
     my $line = <$ch>;
     # Loop through the cluster data.
     while (! eof $ch) {
         my $line = <$ch>;
-        my ($clusterID, $genomeID, $sequenceID, $start, $end) = P3Utils::get_fields($line);
-        push @{$sequences{"$genomeID:$sequenceID"}}, [$clusterID, $start - $maxGap, $end + $maxGap];
+        my @fields = P3Utils::get_fields($line);
+        my ($clusterID, $genomeID, $sequenceID, $start, $end) = @fields;
+        push @{$sequences{"$genomeID:$sequenceID"}}, [\@fields, $start - $maxGap, $end + $maxGap];
     }
 }
 # Open the input file.
@@ -74,7 +77,7 @@ my $locCol = P3Utils::find_column($opt->location, $outHeaders);
 my $seqCol = P3Utils::find_column($opt->sequence, $outHeaders);
 # Form the full header set and write it out.
 if (! $opt->nohead) {
-    push @$outHeaders, 'cluster';
+    push @$outHeaders, @$clHeaders;
     P3Utils::print_cols($outHeaders);
 }
 # Loop through the input.
@@ -94,10 +97,10 @@ while (! eof $ih) {
                 if ($clusters) {
                     for my $cluster (@$clusters) {
                         # Determine if this feature is in this cluster.
-                        my ($clID, $clStart, $clEnd) = @$cluster;
+                        my ($clData, $clStart, $clEnd) = @$cluster;
                         if ($start < $clEnd && $end > $clStart) {
                             # Yes, it is!
-                            push @$line, $clID;
+                            push @$line, @$clData;
                             P3Utils::print_cols($line);
                         }
                     }
