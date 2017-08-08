@@ -31,7 +31,7 @@ use P3Utils;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('filterFile filterCol', P3Utils::col_options(), P3Utils::ih_options(),
-        ['reverse|v', 'only keep non-matching records']
+        ['reverse|invert|v', 'only keep non-matching records']
         );
 # Get the filter parameters.
 my ($filterFile, $filterCol) = @ARGV;
