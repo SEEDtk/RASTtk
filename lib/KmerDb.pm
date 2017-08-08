@@ -196,25 +196,22 @@ sub Finalize {
     my ($self) = @_;
     # Get the common-kmer threshold.
     my $maxFound = $self->{maxFound};
-    # Only proceed if it is nonzero. Zero means we don't care about common kmers.
-    if ($maxFound > 0) {
-        # Loop through the kmers.
-        my $kmerHash = $self->{kmerHash};
-        for my $kmer (keys %$kmerHash) {
-            # Get this kmer's list.
-            my $groupHash = $kmerHash->{$kmer};
-            my $count = 0;
-            for my $group (keys %$groupHash) {
-                $count += $groupHash->{$group};
-            }
-            # Are we keeping it?
-            if ($count > $maxFound) {
-                # No, it is too common.
-                delete $kmerHash->{$kmer};
-            } else {
-                # Yes. Remove the duplicates.
-                $kmerHash->{$kmer} = [keys %$groupHash];
-            }
+    # Loop through the kmers.
+    my $kmerHash = $self->{kmerHash};
+    for my $kmer (keys %$kmerHash) {
+        # Get this kmer's list.
+        my $groupHash = $kmerHash->{$kmer};
+        my $count = 0;
+        for my $group (keys %$groupHash) {
+            $count += $groupHash->{$group};
+        }
+        # Are we keeping it? Note we keep everything if $maxFound is zero.
+        if ($maxFound && $count > $maxFound) {
+            # No, it is too common.
+            delete $kmerHash->{$kmer};
+        } else {
+            # Yes. Remove the duplicates.
+            $kmerHash->{$kmer} = [keys %$groupHash];
         }
     }
     # Denote this database is finalized.

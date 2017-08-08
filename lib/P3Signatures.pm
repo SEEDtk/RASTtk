@@ -186,7 +186,7 @@ sub PegInfo {
     my @couplets;
     for my $fam (@$families) {
         if (scalar(@couplets) > $batchSize) {
-            my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
+            my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'pgfam_id');
             push @retVal, @$batch;
             @couplets = ();
         }

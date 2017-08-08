@@ -62,6 +62,9 @@ if ($mode eq 'contig') {
     my $sequenceField = ($mode eq 'protein' ? 'aa_sequence' : 'na_sequence');
     $fastaLines = P3Utils::get_data($p3, 'feature', $filter, ['patric_id', 'product', $sequenceField]);
 }
+if (! @$fastaLines) {
+    die "Genome $genomeID not found or empty.";
+}
 # $fastaLines is now a list of triples. Write out the triples as a FASTA file.
 for my $fastaLine (@$fastaLines) {
     my ($id, $comment, $seq) = @$fastaLine;
