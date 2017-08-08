@@ -11,7 +11,7 @@ file that do NOT match, use the C<--reverse> option,
 The positional parameters are the name of the filter file and the index (1-based) or name of the key column in the filter file.
 If the latter parameter is absent, the value of the C<--col> parameter will be used (same name or index as the input file).
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> plus the following.
 

@@ -20,7 +20,7 @@ would indicate the first two columns contain the paired object names. An invocat
 
 would process the output from L<p3-generate-close-roles.pl>.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>. Use the options in L<P3Utils/delim_options> to
+The standard input can be overriddn using the options in L<P3Utils/ih_options>. Use the options in L<P3Utils/delim_options> to
 specify the delimiter.
 
 Additional command-line options are as follows.

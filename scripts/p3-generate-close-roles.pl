@@ -44,7 +44,7 @@ Given a set of genome IDs in the file C<genomes.tbl>, you can generate the prope
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are
 

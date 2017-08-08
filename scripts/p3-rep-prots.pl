@@ -11,7 +11,7 @@ C<complete.genomes> and a FASTA of the seed proteins in C<6.1.1.20.fasta>.
 
 The positional parameter is the name of the output directory. If it does not exist, it will be created.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> plus the following
 options.

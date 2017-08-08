@@ -18,7 +18,7 @@ The output will be three columns-- the two category IDs and the number of times 
 
 The positional parameter is the index (1-based) or name of the column containing the category information.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> (to specify the column containing
 feature IDs) plus the following.

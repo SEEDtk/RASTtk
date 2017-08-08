@@ -13,7 +13,7 @@ If a strict subset of roles is desired, the C<--roles> option should be used.
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 The command-line options in L<P3Utils/col_options> can be used to select the input column. The
 input column should contain functional assignments. This column will be replaced with role

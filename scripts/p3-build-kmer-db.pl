@@ -16,7 +16,7 @@ The positional parameters are the column identifier for the column containing th
 kmer database is to be stored. The constant string C<fasta> can be used for the group ID column if a FASTA file is input. In that case, the sequence ID
 is the group ID and the comment is the group name.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 The options in L<P3Utils/col_options> can be used to specify the input column containing the sequence text. The default is the last input column.
 

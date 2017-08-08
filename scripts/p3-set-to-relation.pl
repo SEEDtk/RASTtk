@@ -10,7 +10,7 @@ one set element on each line along with its set number, thus improving readabili
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> which specifies the input
 column and the following.

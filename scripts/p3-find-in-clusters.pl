@@ -11,7 +11,7 @@ The positional parameter is the name of the file containing the cluster informat
 columns-- (1) cluster ID, (2) genome ID, (3) sequence ID, (4) start location, and (5) end location. This is the output format from
 L<p3-identify-clusters.pl>.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>. The standard input should contain feature IDs in the
+The standard input can be overriddn using the options in L<P3Utils/ih_options>. The standard input should contain feature IDs in the
 key column (specified using the options in L<P3Utils/col_options>) plus the feature location and the ID of the containing sequence.
 The following additional options are supported.
 

@@ -9,7 +9,7 @@ input. It supports standard filtering parameters and the specification of additi
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plus the following.
 

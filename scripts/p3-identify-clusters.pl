@@ -17,7 +17,7 @@ the sequence ID, start and end locations, and a cluster ID number.
 The positional parameter is the name of a tab-delimited file containing the clusters. The clusters must be in the first column,
 and consist of multiple clustered identifiers (roles or family IDs) separated by item delimiters (C<::>).
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>. The standard input must be a tab-delimited file
+The standard input can be overriddn using the options in L<P3Utils/ih_options>. The standard input must be a tab-delimited file
 containing features. By default, the feature ID should be in a column named C<patric_id>, the location in a column named C<location>,
 the sequence ID in a column named C<sequence_id>, and the clustered identifier (role or family) should be in the last column.
 The clustered identifier is considered the key column.

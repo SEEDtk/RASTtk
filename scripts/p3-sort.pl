@@ -15,7 +15,7 @@ are indicated by a slash-n (C</n>) at the end of the column index or name. So,
 
 Would indicate two key columns, the second of which is to be sorted numerically.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 The following additional options are suppported.
 

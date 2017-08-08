@@ -12,7 +12,7 @@ will be skipped.
 The positional parameters are the names of the two files. If only one file is specified, the second file
 will be taken from the standard input.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are the following.
 

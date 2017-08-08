@@ -11,7 +11,7 @@ families belonging to the specified genomes.
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 The additional command-line option is
 

@@ -10,7 +10,7 @@ the standard input; the FASTA file will be the standard output.
 The positional parameters are the index (1-based) or name of the column containing the sequence IDs and the index or name of the column
 containing the sequences.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 The following additional command-line options are supported.
 

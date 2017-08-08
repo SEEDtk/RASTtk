@@ -10,7 +10,7 @@ will be sorted from most frequent to least. This can lead to very small output f
 
 There are no positional parameters.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> (to select the column containing the sequences).
 

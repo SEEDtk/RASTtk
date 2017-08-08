@@ -9,7 +9,7 @@ parameter). It outputs the mean, standard deviation, minimum, maximum, and count
 
 The positional parameter is the name of the column to be analyzed. It must contain only numbers.
 
-The standard input can be overwritten using the options in L<P3Utils/ih_options>.
+The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> (to specify the key column).
 
