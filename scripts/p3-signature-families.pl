@@ -20,17 +20,22 @@ use TraceObject;
 
 =over 4
 
+=item col
+
+Specifies the (1-based) column index or name of the genome ID column in the two
+genome input files. The default is C<0>, indicating the last colummn.
+
 =item gs1
 
 A tab-delimited file of genomes.  These are thought of as the genomes that have a
 given property (e.g. belong to a certain species, have resistance to a particular
 antibiotic). If omitted, the standard input is used. The genome IDs must be in the
-first column.
+last column.
 
 =item gs2
 
 A tab-delimited file of genomes.  These are genomes that do not have the given property.
-If omitted, the standard input is used. The genome IDs must be in the first column.
+If omitted, the standard input is used. The genome IDs must be in the last column.
 Any genomes present in the gs1 set will be automatically deleted from this list.
 
 =item min
