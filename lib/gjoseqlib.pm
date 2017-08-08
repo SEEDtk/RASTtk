@@ -22,6 +22,13 @@ Legacy interface:
 Reading sequences one at a time to conserve memory.  Calls to different
 files can be intermixed.
 
+  @entry = next_fasta( \*FILEHANDLE )
+ \@entry = next_fasta( \*FILEHANDLE )
+  @entry = next_fasta(  $filename )
+ \@entry = next_fasta(  $filename )
+  @entry = next_fasta()                   # STDIN
+ \@entry = next_fasta()                   # STDIN
+
   @entry = read_next_fasta( \*FILEHANDLE )
  \@entry = read_next_fasta( \*FILEHANDLE )
   @entry = read_next_fasta(  $filename )
@@ -71,6 +78,8 @@ Write a fasta format file from sequences.
   write_fasta(  $filename,    @seq_entry_list );
   write_fasta(  $filename,   \@seq_entry_list );
 
+Legacy interface:
+
   print_alignment_as_fasta(                @seq_entry_list ); # STDOUT
   print_alignment_as_fasta(               \@seq_entry_list ); # STDOUT
   print_alignment_as_fasta( \*FILEHANDLE,  @seq_entry_list );
@@ -89,6 +98,19 @@ to an open file:
   print_seq_as_fasta(               $id, $desc, $seq );
   print_seq_as_fasta( \*FILEHANDLE, $id,        $seq );
   print_seq_as_fasta(               $id,        $seq );
+
+Write an interleaved alignment to a file (or string)
+
+  $n_seq = write_alignment_as_text(         \@seqs, \%opts );  # STDOUT
+  $n_seq = write_alignment_as_text( \*FH,   \@seqs, \%opts );  # open file handle
+  $n_seq = write_alignment_as_text(  $file, \@seqs, \%opts );  # file
+  $n_seq = write_alignment_as_text( \$str,  \@seqs, \%opts );  # string
+
+  Options:
+
+     columns     => int   #  Alignment columns for line
+     definitions => bool  #  Include definition with each ID (ugly)
+     legend      => bool  #  Add a legend with the definition of each ID
 
 Write PHYLIP alignment.  Names might be altered to fit 10 character limit:
 
@@ -144,10 +166,10 @@ Basic sequence manipulation functions:
 
   @entry  = subseq_DNA_entry( @seq_entry, $from, $to [, $fix_id] )
   @entry  = subseq_RNA_entry( @seq_entry, $from, $to [, $fix_id] )
-  $DNAseq = DNA_subseq(  $seq, $from, $to )
-  $DNAseq = DNA_subseq( \$seq, $from, $to )
-  $RNAseq = RNA_subseq(  $seq, $from, $to )
-  $RNAseq = RNA_subseq( \$seq, $from, $to )
+  $DNAseq = DNA_subseq(  $seq, $from, $to, $dir )   # In these functions, $dir
+  $DNAseq = DNA_subseq( \$seq, $from, $to, $dir )   # only matters if $from == $to,
+  $RNAseq = RNA_subseq(  $seq, $from, $to, $dir )   # in which case the direction
+  $RNAseq = RNA_subseq( \$seq, $from, $to, $dir )   # would be ambiguous.
   @entry  = complement_DNA_entry( @seq_entry [, $fix_id] )
   @entry  = complement_RNA_entry( @seq_entry [, $fix_id] )
   $DNAseq = complement_DNA_seq( $NA_seq )
@@ -166,7 +188,7 @@ Basic sequence manipulation functions:
 User-supplied genetic code.  The supplied code needs to be complete in
 RNA and/or DNA, and upper and/or lower case.  The program guesses based
 on lysine and phenylalanine codons.
-#
+
   $aa = translate_seq_with_user_code( $nt, $gen_code_hash, $met_start )
   $aa = translate_seq_with_user_code( $nt, $gen_code_hash )
 
@@ -204,19 +226,30 @@ Evaluate alignments:
   ( $npos, $nid, $ndif, $ngap, $nopen, $tgap, $topen ) = interpret_nt_align( $seq1, $seq2 )
   ( $npos, $nid, $ndif, $ngap, $nopen, $tgap, $topen ) = interpret_aa_align( $seq1, $seq2 )
 
+Remove alignment columns with a nonvalid character or shared gaps
+
+  ( $seq1, $seq2 ) = useful_nt_align( $seq1, $seq2 );
+  ( $seq1, $seq2 ) = useful_aa_align( $seq1, $seq2 );
+
+Remove columns with terminal gaps
+
+  ( $seq1, $seq2 ) = trim_terminal_gap_columns( $seq1, $seq2 );
+
+Analysis of shared oligomers
+
   @sims = oligomer_similarity( $seq1, $seq2, \%opts )
 
 Guess type of a sequence:
 
   $type = guess_seq_type( $sequence )
-  $bool = is_dna( $sequence )   # not RNA or prot
-  $bool = is_rna( $sequence )   # not DNA or prot
-  $bool = is_na( $sequence )    # nucleic acid, not prot
-  $bool = is_prot( $sequence )  # not DNA or RNA
+  $bool = is_dna(  $sequence )   # not RNA or prot
+  $bool = is_rna(  $sequence )   # not DNA or prot
+  $bool = is_na(   $sequence )   # nucleic acid, not prot
+  $bool = is_prot( $sequence )   # not DNA or RNA
 
-$sequence can be a sequence string, a reference to a sequence string,
-or a [$id, $def, $seq] triple.
-$type will be keyword 'DNA', 'RNA' or 'protein', or undef in case of error.
+  $sequence can be a sequence string, a reference to a sequence string,
+      or a [$id, $def, $seq] triple.
+  $type will be keyword 'DNA', 'RNA' or 'protein', or undef in case of error.
 
 Verify the structure of an [ id, desc, sequence ] triple and
 the structure of an array of sequence triples:
@@ -254,6 +287,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
         read_fasta
         read_next_fasta
+        next_fasta
         close_fasta
 
         read_fasta_seqs
@@ -268,6 +302,7 @@ our @EXPORT = qw(
         print_seq_list_as_fasta
         print_alignment_as_fasta
         write_fasta
+        write_alignment_as_text
         print_alignment_as_phylip
         print_alignment_as_nexus
         print_seq_as_fasta
@@ -590,9 +625,11 @@ open, which can hit the file system limit for open files.  So, use
         1;
     }
 
-    sub read_next_fasta_seq { read_next_fasta( @_ ) }
+    sub read_next_fasta_seq { next_fasta( @_ ) }
 
-    sub read_next_fasta
+    sub read_next_fasta { next_fasta( @_ ) }
+
+    sub next_fasta
     {
         $_[0] ||= \*STDIN;               #  Undefined $_[0] fails with use warn
         my $fh = $file_handle{ $_[0] };
@@ -925,6 +962,87 @@ sub write_fasta
     foreach my $seq_ptr ( @_ ) { print_seq_as_fasta( $fh, @$seq_ptr ) }
 
     close( $fh ) if $close;
+}
+
+
+=head2 write_alignment_as_text
+
+ Write an interleaved alignment to a file (or string)
+
+   $n_seq = write_alignment_as_text(         \@seqs, \%opts );  # STDOUT
+   $n_seq = write_alignment_as_text( \*FH,   \@seqs, \%opts );  # open file handle
+   $n_seq = write_alignment_as_text(  $file, \@seqs, \%opts );  # file
+   $n_seq = write_alignment_as_text( \$str,  \@seqs, \%opts );  # string
+
+Options:
+
+     columns     => int   #  Alignment columns for line
+     definitions => bool  #  Include definition with each ID (ugly)
+     legend      => bool  #  Add a legend with the definition of each ID
+
+=cut
+
+sub write_alignment_as_text
+{
+    my $opts = ref($_[-1]) eq 'HASH' ? pop : {};
+
+    my ( $outFH, $close, $unused ) = output_filehandle( shift );
+
+    ( unshift @_, $unused ) if $unused;
+
+    ref( $_[0] ) eq 'ARRAY'
+        or die "Bad sequence alignment format.";
+    my @seq = @{ scalar shift };
+
+    my $col_per_line = $opts->{ columns     } || 60;  # Alignment columns
+    my $show_def     = $opts->{ definitions };        # Show id and def (ugly)
+    my $legend       = $opts->{ legend      };        # Add legend with id and def
+
+    my @ids;
+    my $id_len;
+    if ( $legend )
+    {
+        @ids    = map { $_->[0] } @seq;
+        $id_len = 0;
+        foreach ( @ids ) { $id_len = length( $_ ) if length( $_ ) > $id_len }
+
+        my $fmt = "%-${id_len}s  %s\n";
+        printf $outFH $fmt, 'ID', 'Definition';
+        for ( my $i = 0; $i < @ids; $i++ )
+        {
+            printf $outFH $fmt, $ids[$i], $seq[$i]->[1];
+        }
+        print $outFH "\n\n";
+
+        #  Fix the IDs if they need to be ugly
+        if ( $show_def )
+        {
+            @ids  = map { "$_->[0] $_->[1]" } @seq;
+            $id_len = 0;
+            foreach ( @ids ) { $id_len = length( $_ ) if length( $_ ) > $id_len }
+        }
+    }
+    else
+    {
+        @ids    = map { $show_def ? "$_->[0] $_->[1]" : $_->[0] } @seq;
+        $id_len = 0;
+        foreach ( @ids ) { $id_len = length( $_ ) if length( $_ ) > $id_len }
+    }
+
+    my @segs = map { [ $_->[2] =~ m/(.{1,$col_per_line})/go ] } @seq;
+    my $fmt = "%-${id_len}s  %s\n";
+    while ( @{ $segs[0] } )
+    {
+        for ( my $i = 0; $i < @ids; $i++ )
+        {
+            printf $outFH $fmt, $ids[$i], shift @{$segs[$i]};
+        }
+        print $outFH "\n";
+    }
+
+    close( $outFH ) if $close;
+
+    scalar @seq;
 }
 
 
@@ -1521,7 +1639,8 @@ sub subseq_RNA_entry
 }
 
 
-sub subseq_nt {
+sub subseq_nt
+{
     my ($DNA, $id, $seq, $from, $to, $fix_id) = @_;
     $fix_id ||= 0;     #  fix undef value
 
@@ -1563,23 +1682,21 @@ sub subseq_nt {
 
 sub DNA_subseq
 {
-    my ( $seq, $from, $to ) = @_;
+    my $seqR = ref( $_[0] ) eq 'SCALAR' ? $_[0] : \$_[0];
+    my ( $from, $to, $dir ) = @_[1,2,3];
 
-    my $len = ref( $seq ) eq 'SCALAR' ? length( $$seq )
-                                      : length(  $seq );
+    my $len = length( $$seqR );
     if ( ( $from eq '$' ) || ( $from eq "" ) ) { $from = $len }
     if ( ( $to   eq '$' ) || ( ! $to       ) ) { $to   = $len }
 
-    my $left  = ( $from < $to ) ? $from : $to;
-    my $right = ( $from < $to ) ? $to   : $from;
-    if ( ( $right < 1 ) || ( $left > $len ) ) { return "" }
-    if ( $right > $len ) { $right = $len }
-    if ( $left  < 1    ) { $left  =    1 }
+    my ( $left, $right ) = min_max( $from, $to );
+    return undef  if ( $left < 1 ) || ( $right > $len );
 
-    my $subseq = ref( $seq ) eq 'SCALAR' ? substr( $$seq, $left-1, $right-$left+1 )
-                                         : substr(  $seq, $left-1, $right-$left+1 );
+    my $subseq = substr( $$seqR, $left-1, $right-$left+1 );
 
-    if ( $from > $to )
+    #  $dir is only used if the direction is ambiguous
+
+    if ( $from > $to || ( $from == $to && $dir =~ /^-/ ) )
     {
         $subseq = reverse $subseq;
         $subseq =~ tr[ACGTUKMRSWYBDHVNacgtukmrswybdhvn]
@@ -1592,23 +1709,21 @@ sub DNA_subseq
 
 sub RNA_subseq
 {
-    my ( $seq, $from, $to ) = @_;
+    my $seqR = ref( $_[0] ) eq 'SCALAR' ? $_[0] : \$_[0];
+    my ( $from, $to, $dir ) = @_[1,2,3];
 
-    my $len = ref( $seq ) eq 'SCALAR' ? length( $$seq )
-                                      : length(  $seq );
+    my $len = length( $$seqR );
     if ( ( $from eq '$' ) || ( $from eq "" ) ) { $from = $len }
     if ( ( $to   eq '$' ) || ( ! $to       ) ) { $to   = $len }
 
-    my $left  = ( $from < $to ) ? $from : $to;
-    my $right = ( $from < $to ) ? $to   : $from;
-    if ( ( $right < 1 ) || ( $left > $len ) ) { return "" }
-    if ( $right > $len ) { $right = $len }
-    if ( $left  < 1    ) { $left  =    1 }
+    my ( $left, $right ) = min_max( $from, $to );
+    return undef  if ( $left < 1 ) || ( $right > $len );
 
-    my $subseq = ref( $seq ) eq 'SCALAR' ? substr( $$seq, $left-1, $right-$left+1 )
-                                         : substr(  $seq, $left-1, $right-$left+1 );
+    my $subseq = substr( $$seqR, $left-1, $right-$left+1 );
 
-    if ( $from > $to )
+    #  $dir is only used if the direction is ambiguous
+
+    if ( $from > $to || ( $from == $to && $dir =~ /^-/ ) )
     {
         $subseq = reverse $subseq;
         $subseq =~ tr[ACGTUKMRSWYBDHVNacgtukmrswybdhvn]
@@ -1619,17 +1734,20 @@ sub RNA_subseq
 }
 
 
+sub min_max { $_[0] <= $_[1] ? @_[0,1] : @_[1,0] }
+
+
 sub aa_subseq
 {
-    my ( $seq, $from, $to ) = @_;
+    my $seqR = ref( $_[0] ) eq 'SCALAR' ? $_[0] : \$_[0];
+    my ( $from, $to ) = @_[1,2];
 
-    my $len = ref( $seq ) eq 'SCALAR' ? length( $$seq ) : length(  $seq );
+    my $len = length( $$seqR );
     $from = $from =~ /(\d+)/ && $1        ? $1 :    1;
     $to   = $to   =~ /(\d+)/ && $1 < $len ? $1 : $len;
-    return '' if $from > $to;
+    return undef  if $from > $to;
 
-    ref( $seq ) eq 'SCALAR' ? substr( $$seq, $from-1, $to-$from+1 )
-                            : substr(  $seq, $from-1, $to-$from+1 );
+    substr( $$seqR, $from-1, $to-$from+1 );
 }
 
 
@@ -2802,7 +2920,13 @@ sub interpret_aa_align
 }
 
 
-#  Remove alignment columns with a nonvalid character or shared gaps
+=head2 useful_aa_align
+
+Remove alignment columns with a nonvalid character or shared gaps
+
+    ( $seq1, $seq2 ) = useful_aa_align( $seq1, $seq2 );
+
+=cut
 
 sub useful_aa_align
 {
@@ -2825,6 +2949,36 @@ sub useful_aa_align
     $s2 =~ tr/\000//d;      # Delete nulls in sequence 2
     ( $s1, $s2 );
 }
+
+
+=head2 trim_terminal_gap_columns
+
+Remove columns with terminal gaps
+
+    ( $seq1, $seq2 ) = trim_terminal_gap_columns( $seq1, $seq2 );
+
+=cut
+
+sub trim_terminal_gap_columns
+{
+    defined( $_[0] ) && defined( $_[1] ) or return ();
+
+    my $beg = max( $_[0] =~ /^(-+)/ ? length( $1 ) : 0,
+                   $_[1] =~ /^(-+)/ ? length( $1 ) : 0
+                 );
+    my $end = max( $_[0] =~ /(-+)$/ ? length( $1 ) : 0,
+                   $_[1] =~ /(-+)$/ ? length( $1 ) : 0
+                 );
+    my $len0 = length( $_[0] );
+    my $len  = $len0 - ( $beg + $end );
+
+    return $len == $len0 ? @_[0,1]
+         : $len > 0      ? ( substr( $_[0], $beg, $len ), substr( $_[1], $beg, $len ) )
+         :                 ( '', '' );
+}
+
+
+sub max { $_[0] >= $_[1] ? $_[0] : $_[1] }
 
 
 =head2 oligomer_similarity
@@ -2950,11 +3104,14 @@ sub is_array_of_sequence_triples
     $_ && ref( $_ ) eq 'ARRAY' && @$_ == grep { is_sequence_triple( $_ ) } @$_;
 }
 
+
 sub is_filehandle
 {
-    my($fh) = @_;
-    return ref($fh) && ref($fh) ne 'HASH' && ref($fh) ne 'ARRAY' && ((ref($fh) eq 'GLOB') || eval { $fh->can('print') });
+    my( $fh ) = @_;
+    ref($fh) && ref($fh) ne 'HASH'
+             && ref($fh) ne 'ARRAY'
+             && ref($fh) ne 'SCALAR'
+             && ((ref($fh) eq 'GLOB') || eval { $fh->can('print') });
 }
 
 1;
-

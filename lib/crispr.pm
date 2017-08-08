@@ -12,6 +12,24 @@ require Exporter;
 our @ISA    = qw( Exporter );
 our @EXPORT = qw( find_crisprs );
 
+#
+#  2017-07-19
+#
+#  Made several improvements, including improved repeat expansion
+#    
+#
+#  2017-07-20
+#
+#  Based on missed repeat arrays in Bacteroidetes and tests on the complete
+#  set of CoreSEED genomes:
+#
+#  Change default maximum repeat length to 55
+#  Change default minimum spacer length to 25
+#
+#  Substantial playing around with the first stage of getting repeat consensus
+#  and array estimate.  It is still fooled when this starts at the tail of the
+#  array, and has eroded consensus, and variation in spacer length.
+#    
 #===============================================================================
 #  Find CRISPR repeat regions in DNA sequences:
 #
@@ -22,8 +40,7 @@ our @EXPORT = qw( find_crisprs );
 #
 #  Options:
 #
-#    maxperiod   => int       #  Maximum repeat period
-#    maxreplen   => int       #  Maximum length of repeat (D = 40)
+#    maxreplen   => int       #  Maximum length of repeat (D = 55)
 #    maxsplen    => int       #  Maximum distance between repeats (D = 50)
 #    minperiod   => int       #  Minimum repeat period
 #    minreplen   => int       #  Minimum length of repeat (D = 24)
@@ -50,19 +67,21 @@ sub find_crisprs
 
     my $minrep      = $opts->{ mintimes    } ||  3;      #  Min number of repeats
 
-    my $maxperiod   = $opts->{ maxperiod   } ||  0;      #  Max period (maxreplen + maxsplen)
-
     my $minreplen   = $opts->{ minreplen   }
                    || $opts->{ repeatlen   } || 24;      #  Min length of repeat unit
-    my $maxreplen   = $opts->{ maxreplen   } || 40;      #  Max length of repeat unit
+    #  2017-07-20  GJO
+    my $maxreplen   = $opts->{ maxreplen   } || 55;      #  Max length of repeat unit
+    # my $maxreplen   = $opts->{ maxreplen   } || 40;      #  Max length of repeat unit
 
-    my $minsp       = $opts->{ minsplen    } || 30;      #  Min distance between repeats
+    #  2017-07-20  GJO
+    my $minsp       = $opts->{ minsplen    } || 25;      #  Min distance between repeats
+    # my $minsp       = $opts->{ minsplen    } || 30;      #  Min distance between repeats
     my $maxsp       = $opts->{ maxsplen    } || 54;      #  Max spacer length
 
     my $min_mat_id  = $opts->{ minmatchid  } ||  0;      #  Minimum match identity (D = P-val based)
     my $p_match     = $opts->{ pmatch      } ||  0.0001; #  Maximum match P-value
 
-    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0;
+    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0; 
 
     my $min_nid = $min_mat_id ? int( $min_mat_id * $minreplen )
                               : gjostat::binomial_critical_value_m_ge( $minreplen, 0.3, $p_match );
@@ -86,13 +105,46 @@ sub find_crisprs
             my $n2      = $+[0];
             my $rept    = $1;
             my $rest    = $2;
-            my @parts   = $rest =~ m/([acgt]{$minsp,$maxgap}$rept)/g;
-            my @hits    = $rest =~ m/$rept/g;
-            print STDERR "  *** low complexity repeat skipped\n\n" if $debug && ( @hits > @parts );
-            next if ( @hits > @parts );              # Poor man's test for simple repeat
 
+            #  This test gives a false alarm if there is one really short spacer in the array.
+            #
+            # my @parts   = $rest =~ m/([acgt]{$minsp,$maxgap}$rept)/g;
+            # my @hits    = $rest =~ m/$rept/g;
+            # print STDERR "  *** low complexity repeat skipped\n\n" if $debug && ( @hits > @parts );
+            # next if ( @hits > @parts );              # Poor man's test for simple repeat
+
+            #  Redo split with any spacer length, and then analyze the products.
+
+            my @parts   = $rest =~ m/([acgt]{0,$maxgap}$rept)/g;
             my $len     = length( $rest );
             my $period  = int( $len / @parts + 0.5 );
+
+            #  Do a quick extension of repeat into @parts
+
+            my $i = 0;
+            my $approx_replen = $minreplen;
+            while ( $approx_replen + $minsp <= $period )
+            {
+                my %cnt;
+                my $n = 0;
+                foreach ( @parts )
+                {
+                    $i < length( $_ ) or next;
+                    $cnt{ substr($_,$i,1) }++;
+                    $n++;
+                }
+                my ( $nconsen ) = sort { $b <=> $a } values %cnt;
+                #  Require 90% consensus to extend the repeat
+                last if $nconsen < int( 0.9 * $n + 0.5 );
+                $approx_replen++;
+                $i++;
+            }
+
+            if ( $period < ( $approx_replen + $minsp ) )
+            {
+                print STDERR "  *** repeat spacer is too short at $n1-$n2\n\n" if $debug;
+                next;
+            }
 
             #  @locs are offsets to starts of repeats in the sequence string
 
@@ -103,8 +155,7 @@ sub find_crisprs
                          ( map { sprintf "%12d\n", $_ } @locs ),
                          "\n" if $debug;
 
-            #  Find framing of repeat sequence that maximizes the number of
-            #  repeats.
+            #  Find framing of repeat sequence that maximizes the number of repeats.
 
             my $best_locs = [];
             my $max_shift = $maxreplen - $minreplen + 4;
@@ -135,12 +186,16 @@ sub find_crisprs
             #  Find the repeat profile:
 
             my @data;
-            for ( my $i = -$max_shift; $i <= $maxreplen+4; $i++ )
+            #  Not sure why this window was so small, but it sometimes failed
+            #  to extend to the end of the repeat.
+            # for ( my $i = -$max_shift; $i <= $maxreplen + 4; $i++ )
+            for ( my $i = -$max_shift; $i <= $maxreplen + 14; $i++ )
             {
                 # ( $nt, $n_change, $ttl ) = consensus_at_offset( \$seq, \@locs, $i )
 
                 push @data, [ $i, consensus_at_offset( \$seq, \@locs, $i ) ];
             }
+            # print STDERR Dumper( \@data );
 
             my $max_chg = int( 0.25 * @locs + 0.5 );
             my @runs;
@@ -161,12 +216,12 @@ sub find_crisprs
             my $repseq = join( '', map { $_->[1] } @$run );
             if ( $replen < $minreplen )
             {
-                print STDERR "Consensus length ($replen) is less than $minreplen.\n" if $debug;
+                print STDERR "Consensus length ($replen) is less than $minreplen.\n\n" if $debug;
                 next;
             }
             if ( $replen > $maxreplen )
             {
-                print STDERR "Consensus length ($replen) is greater than $maxreplen.\n" if $debug;
+                print STDERR "Consensus length ($replen) is greater than $maxreplen.\n\n" if $debug;
                 next;
             }
 
@@ -178,7 +233,8 @@ sub find_crisprs
             }
             if ( $badsp > 0.5 * ( @locs - 2 ) )
             {
-                print STDERR "Too many bad spacer lengths.\n" if $debug;
+                my $ntest = @locs-2;
+                print STDERR "Too many bad spacer lengths ($badsp of $ntest).\n\n" if $debug;
                 next;
             }
 
@@ -191,7 +247,7 @@ sub find_crisprs
             my $end = $locs[-1] + $replen - 1;
             $beg = 0 if $beg < 0;
             $end = length($seq) - 1 if $end >= length($seq);
-            $len = $end - $beg + 1;
+            my $len = $end - $beg + 1;
             my $loc = [ [ $id, $beg+1, '+', $len ] ];
 
             #  Split into repeats and spacers:
@@ -227,7 +283,6 @@ sub find_crisprs
 
             my %kmers;
             my $klen = 6;
-            my $nmax = 0.7 * @spcs;
             foreach my $sp ( map { $_->[1] } @spcs )
             {
                 my %k = map { $_ => 1 }                              # hash
@@ -235,9 +290,14 @@ sub find_crisprs
                         map { substr( $sp, $_ ) } ( 0 .. $klen-1 );  # frames
                 foreach ( keys %k ) { $kmers{$_}++ }
             }
-            my ( $maxcnt ) = sort { $b <=> $a } values %kmers;
 
-            if ( $maxcnt <= $nmax )
+            #  Number of kmers in 60% or more of the spacers.  Threshold set
+            #  here to catch presence in 2 of 3 spacer sequences.
+
+            my $nmax   = 0.6 * @spcs;
+            my $nrecur = grep { $_ >= $nmax } values %kmers;
+
+            if ( $nrecur < 5 )
             {
                 #  Save location, repeat consensus, repeats and spacers:
                 #  $crispr = [ $loc, $repseq, \@repeats, \@spacers ];
@@ -245,8 +305,8 @@ sub find_crisprs
             }
             elsif ( $debug )
             {
-                print STDERR "=========================================================\n";
-                print STDERR "Repeats in the spacers:\n";
+                print STDERR "---------------------------------------------------------\n";
+                print STDERR "Repeated sequences in the spacers:\n";
                 print STDERR map { "    $_->[1]\n" } @spcs;
                 print STDERR "=========================================================\n\n";
             }
@@ -402,6 +462,88 @@ sub consensus_at_offset
 
 
 #===============================================================================
+#  Produce a pairing proposal for CRISPR repeat (maximizes number of canonical
+#  pairs with no bulges or asymmetrical loops)
+#
+#       $pairing = crispr_palindrome( $seq )
+#
+#  Example:
+#
+#      seq      'gtttcaatccctaatagggatttaagttaattgcaac'
+#      pairing  '  << <<<<<<<   >>>>>>> >>            '
+#
+#===============================================================================
+sub crispr_palindrome
+{
+    my $seq = shift;    my $cmp = gjoseqlib::complement_DNA_seq( $seq );
+    my $len = length( $seq );
+
+    my $max_id = 0;
+    my $i_max;
+
+    #  Explore alignments with sequence shifted to right ($i_max < 0)
+    #
+    #  seq     ------------------
+    #  cmp  ------------------
+
+    for ( my $i = 1; $i <= $len - 10; $i++ )
+    {
+        my $ident = ( gjoseqlib::interpret_nt_align( substr( $seq,  0, $len-$i ),
+                                                     substr( $cmp, $i, $len-$i ) ) )[1];
+        if ( $ident > $max_id ) { ( $max_id, $i_max ) = ( $ident, -$i ) }
+    }
+
+    #  Explore alignments with complement shifted to right ($i_max >= 0)
+    #
+    #  seq  ------------------
+    #  cmp     ------------------
+
+    for ( my $i = 0; $i <= $len - 20; $i++ )
+    {
+        my $ident = ( gjoseqlib::interpret_nt_align( substr( $seq, $i, $len-$i ),
+                                                     substr( $cmp,  0, $len-$i ) ) )[1];
+        if ( $ident > $max_id ) { ( $max_id, $i_max ) = ( $ident, $i ) }
+    }
+
+    my $pairs = ' ' x $len;
+    if ( $i_max < 0 )
+    {
+        #  seq     ------------------
+        #  cmp  ------------------
+        $cmp = substr( $cmp, -$i_max );     # Shift the complement of simplify comparison
+        my $over_end  = $len + $i_max - 1;  # End coordinate (0-based) of alignment
+        my $j_mid     = 0.5 * $over_end;    # Midpoint of alignment
+        for ( my $j = 0; $j < $j_mid - 1; $j++ )
+        {
+            if ( substr($seq,$j,1) eq substr($cmp,$j,1) )
+            {
+                substr( $pairs, $j,             1 ) = '<';
+                substr( $pairs, $over_end - $j, 1 ) = '>';
+            }
+        }
+    }
+    else
+    {
+        #  seq  ------------------
+        #  cmp     ------------------
+        $cmp = scalar( ' ' x $i_max ) . $cmp;         # Shift the complement of simplify comparison
+        my $over_end = $len - 1;                      # End coordinate (0-based) of alignment
+        my $j_mid    = 0.5 * ( $over_end + $i_max );  # Midpoint of alignment
+        for ( my $j = $i_max; $j < $j_mid - 1; $j++ )
+        {
+            if ( substr( $seq, $j, 1 ) eq substr( $cmp, $j, 1 ) )
+            {
+                substr( $pairs, $j,                      1 ) = '<';
+                substr( $pairs, $over_end - $j + $i_max, 1 ) = '>';
+            }
+        }
+    }
+
+    $pairs;
+}
+
+
+#===============================================================================
 #  Find CRISPR repeat regions in DNA sequences:
 #
 #     @crisprs = find_crisprs2( \@seq_entries, \%opts )
@@ -411,7 +553,6 @@ sub consensus_at_offset
 #
 #  Options:
 #
-#    maxperiod   => int       #  Maximum repeat period
 #    maxreplen   => int       #  Maximum length of repeat (D = 40)
 #    maxsplen    => int       #  Maximum distance between repeats (D = 50)
 #    minperiod   => int       #  Minimum repeat period
@@ -439,8 +580,6 @@ sub find_crisprs2
 
     my $minrep      = $opts->{ mintimes    } ||  3;     #  Min number of repeats
 
-    my $maxperiod   = $opts->{ maxperiod   } ||  0;     #  Max period (maxreplen + maxsplen)
-
     my $minreplen   = $opts->{ minreplen   }
                    || $opts->{ repeatlen   } || 24;     #  Min length of repeat unit
     my $maxreplen   = $opts->{ maxreplen   }            #  Max length of repeat unit
@@ -454,7 +593,7 @@ sub find_crisprs2
     my $min_mat_id  = $opts->{ minmatchid  } ||  0;     #  Minimum match identity (D = P-val based)
     my $p_match     = $opts->{ pmatch      } ||  0.001; #  Maximum match P-value
 
-    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0;
+    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0; 
 
     my $replen  = $minreplen;
     my $min_nid = $min_mat_id ? int( $min_mat_id * $replen )
@@ -592,7 +731,7 @@ sub find_crisprs2
 
             my $beg = $locs[ 0];
             my $end = $locs[-1] + $replen2 - 1;
-            $len = $end - $beg + 1;
+            my $len = $end - $beg + 1;
             my $loc = [ $id, $beg, '+', $len ];
 
             #  Split into repeats and spacers:
@@ -732,6 +871,10 @@ sub extend_array_forward_2
     @locs;
 }
 
+
+#  Search for another occurence of the repeat.  Start with the estimated
+#  position, and then jump back and forth around it until there is a match
+#  to the repeat sequence at or above the threshold.
 
 sub search_vicinity
 {

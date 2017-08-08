@@ -573,6 +573,29 @@ sub retrieve_protein_features_in_genomes {
     close($id_map_fh);
 }
 
+sub retrieve_protein_features_in_genome_in_export_format {
+    my ( $self, $genome_id, $fasta_fh ) = @_;
+
+    $self->query_cb("genome_feature",
+		    sub {
+			my ($data) = @_;
+			for my $ent (@$data) {
+			    my $def = "  $ent->{product} [$ent->{genome_name} | $genome_id]";
+			    print_alignment_as_fasta($fasta_fh,
+						     [
+						      $ent->{patric_id},
+						      $def,
+						      $ent->{aa_sequence}
+						      ]
+						    );
+			}
+                    },
+		    [ "eq",     "feature_type", "CDS" ],
+		    [ "eq",     "genome_id",    $genome_id ],
+		    [ "select", "patric_id,aa_sequence,genome_name,product" ],
+		   );
+}
+
 #
 # Side effect, returns list of features and family/function data.
 #
@@ -1601,6 +1624,47 @@ sub members_of_family
     }
     return $res;
 }
+
+sub genetic_code_bulk
+{
+    my($self, @gids) = @_;
+    my %tax_of;
+    my %to_find;
+
+    for my $g (@gids)
+    {
+	my($tax) = $g =~ /^(\d+)/;
+	$tax_of{$g} = $tax;
+	$to_find{$tax} = 1;
+    }
+    my @to_find = keys %to_find;
+    undef %to_find;
+    my %code_for;
+    while (@to_find)
+    {
+	my @b = splice(@to_find, 0, 100);
+	my $q = join(",", @b);
+
+	print "q=$q\n";
+	my @code = $self->query("taxonomy",
+				[ "in",   "taxon_id",  "($q)" ],
+				[ "select", "taxon_id,genetic_code" ]
+			       );
+	for my $ent (@code)
+	{
+	    $code_for{$ent->{taxon_id}} = $ent->{genetic_code};
+	}
+    }
+
+    my $ret = {};
+    for my $g (@gids)
+    {
+	$ret->{$g} = $code_for{$tax_of{$g}} // 11;
+    }
+    return $ret;
+}
+    
+
 
 sub function_of
 {
