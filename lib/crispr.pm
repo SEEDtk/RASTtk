@@ -16,7 +16,7 @@ our @EXPORT = qw( find_crisprs );
 #  2017-07-19
 #
 #  Made several improvements, including improved repeat expansion
-#    
+#
 #
 #  2017-07-20
 #
@@ -29,7 +29,7 @@ our @EXPORT = qw( find_crisprs );
 #  Substantial playing around with the first stage of getting repeat consensus
 #  and array estimate.  It is still fooled when this starts at the tail of the
 #  array, and has eroded consensus, and variation in spacer length.
-#    
+#
 #===============================================================================
 #  Find CRISPR repeat regions in DNA sequences:
 #
@@ -81,7 +81,7 @@ sub find_crisprs
     my $min_mat_id  = $opts->{ minmatchid  } ||  0;      #  Minimum match identity (D = P-val based)
     my $p_match     = $opts->{ pmatch      } ||  0.0001; #  Maximum match P-value
 
-    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0; 
+    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0;
 
     my $min_nid = $min_mat_id ? int( $min_mat_id * $minreplen )
                               : gjostat::binomial_critical_value_m_ge( $minreplen, 0.3, $p_match );
@@ -247,7 +247,7 @@ sub find_crisprs
             my $end = $locs[-1] + $replen - 1;
             $beg = 0 if $beg < 0;
             $end = length($seq) - 1 if $end >= length($seq);
-            my $len = $end - $beg + 1;
+            $len = $end - $beg + 1;
             my $loc = [ [ $id, $beg+1, '+', $len ] ];
 
             #  Split into repeats and spacers:
@@ -593,7 +593,7 @@ sub find_crisprs2
     my $min_mat_id  = $opts->{ minmatchid  } ||  0;     #  Minimum match identity (D = P-val based)
     my $p_match     = $opts->{ pmatch      } ||  0.001; #  Maximum match P-value
 
-    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0; 
+    my $debug       = defined $opts->{ debug } ? $opts->{ debug } : 0;
 
     my $replen  = $minreplen;
     my $min_nid = $min_mat_id ? int( $min_mat_id * $replen )
@@ -731,7 +731,7 @@ sub find_crisprs2
 
             my $beg = $locs[ 0];
             my $end = $locs[-1] + $replen2 - 1;
-            my $len = $end - $beg + 1;
+            $len = $end - $beg + 1;
             my $loc = [ $id, $beg, '+', $len ];
 
             #  Split into repeats and spacers:

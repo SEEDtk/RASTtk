@@ -81,14 +81,14 @@ use constant IDCOL =>   {   genome => 'genome_id',
     my @opts = P3Utils::data_options();
 
 This method returns a list of the L<Getopt::Long::Descriptive> specifications for the common data retrieval
-options. These options are as follows.
+options. These options include L</delim_options> plus the following.
 
 =over 4
 
 =item attr
 
-Names of the fields to return. Multiple field names may be specified by coding the option multiple times.
-Mutually exclusive with C<--count>.
+Names of the fields to return. Multiple field names may be specified by coding the option multiple times or
+separating the field names with commas.  Mutually exclusive with C<--count>.
 
 =item count
 
@@ -130,7 +130,8 @@ sub data_options {
             ['gt=s@', 'greater-than search constraint(s) in the form field_name,value'],
             ['ge=s@', 'greater-or-equal search constraint(s) in the form field_name,value'],
             ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
-            ['required|r=s@', 'field(s) required to have values']);
+            ['required|r=s@', 'field(s) required to have values'],
+            delim_options());
 }
 
 =head3 col_options
@@ -178,7 +179,8 @@ This method returns a list of options related to delimiter specification for mul
 =item delim
 
 The delimiter to use between object names. The default is C<::>. Specify C<tab> for tab-delimited output, C<space> for
-space-delimited output, or C<comma> for comma-delimited output. Other values might have unexpected results.
+space-delimited output, C<semi> for a semicolon followed by a space, or C<comma> for comma-delimited output.
+Other values might have unexpected results.
 
 =back
 
@@ -199,13 +201,13 @@ Return the delimiter to use between the elements of multi-valued fields.
 
 =item opt
 
-A L<Getopts::Long::Descriptive::Opt> object containing the delimiter specification.
+A L<Getopts::Long::Descriptive::Opts> object containing the delimiter specification.
 
 =back
 
 =cut
 
-use constant DELIMS => { space => ' ', tab => "\t", comma => ',', '::' => '::' };
+use constant DELIMS => { space => ' ', tab => "\t", comma => ',', '::' => '::', semi => '; ' };
 
 sub delim {
     my ($opt) = @_;
@@ -223,13 +225,13 @@ Return the pattern to use to split the elements of multi-valued fields.
 
 =item opt
 
-A L<Getopts::Long::Descriptive::Opt> object containing the delimiter specification.
+A L<Getopts::Long::Descriptive::Opts> object containing the delimiter specification.
 
 =back
 
 =cut
 
-use constant UNDELIMS => { space => ' ', tab => '\t', comma => ',', '::' => '::' };
+use constant UNDELIMS => { space => ' ', tab => '\t', comma => ',', '::' => '::', semi => '; ' };
 
 sub undelim {
     my ($opt) = @_;
@@ -257,7 +259,7 @@ Index of the key column.
 
 =item opt
 
-A L<Getopts::Long::Descriptive::Opt> object containing the batch size specification.
+A L<Getopts::Long::Descriptive::Opts> object containing the batch size specification.
 
 =item RETURN
 
@@ -352,7 +354,7 @@ Open input file handle.
 
 =item opt
 
-Should be a L<Getopts::Long::Descriptive::Opt> object containing the specifications for the key
+Should be a L<Getopts::Long::Descriptive::Opts> object containing the specifications for the key
 column or a string containing the key column name. At a minimum, it must support the C<nohead> option.
 
 =item keyless (optional)
@@ -525,7 +527,7 @@ Name of the object being retrieved-- C<genome>, C<feature>, C<protein_family>, o
 
 =item opt
 
-L<Getopt::Long::Descriptive::Opt> object for the command-line options, including the C<--attr> option.
+L<Getopt::Long::Descriptive::Opts> object for the command-line options, including the C<--attr> option.
 
 =item idFlag
 
@@ -753,7 +755,7 @@ sub get_data_batch {
     }
     my @mods = (['select', @keyList, @$cols], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
-    my @keys = map { $_->[0] } @$couplets;
+    my @keys = grep { $_ ne '' } map { $_->[0] } @$couplets;
     # Create a filter for the keys.
     my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
     # Next we run the query and create a hash mapping keys to return sets.
@@ -893,7 +895,7 @@ sub script_opts {
 
 =head3 print_cols
 
-    P3Utils::print_cols(\@cols, $oh);
+    P3Utils::print_cols(\@cols, %options);
 
 Print a tab-delimited output row.
 
@@ -903,29 +905,56 @@ Print a tab-delimited output row.
 
 Reference to a list of the values to appear in the output row.
 
-=item oh (optional)
+=item options
 
-Open output file handle. The default is the standard output.
+A hash of options, including zero or more of the following.
+
+=over 8
+
+=item oh
+
+Open file handle for the output stream. The default is \*STDOUT.
+
+=item opt
+
+A L<Getopt::Long::Descriptive::Opts> object containing the delimiter option, for computing the delimiter in multi-valued fields.
+
+=item delim
+
+The delimiter to use in multi-valued fields (overrides C<opt>). The default, if neither this nor C<opt> is specified, is a comma (C<,>).
+
+=back
 
 =back
 
 =cut
 
 sub print_cols {
-    my ($cols, $oh) = @_;
-    $oh //= \*STDOUT;
-
+    my ($cols, %options) = @_;
+    # Compute the options.
+    my $oh = $options{oh} || \*STDOUT;
+    my $opt = $options{opt};
+    my $delim = $options{delim};
+    if (! defined $delim) {
+        if (defined $opt && $opt->delim) {
+            $delim = P3Utils::delim($opt);
+        } else {
+            $delim = ',';
+        }
+    }
+    # Loop through the columns, formatting.
     my @r;
     for my $r (@$cols) {
         if (! defined $r) {
             push(@r, '')
         } elsif (ref($r) eq "ARRAY") {
-            my $a = join(",", @{$r});
+            my $a = join($delim, @{$r});
             push(@r, $a);
         } else {
             push(@r, $r);
         }
     }
+    # Print the columns.
     print $oh join("\t", @r) . "\n";
 }
 
@@ -941,7 +970,7 @@ opens the standard input.
 
 =item opt
 
-L<Getopt::Long::Descriptive::Opt> object for the current command-line options.
+L<Getopt::Long::Descriptive::Opts> object for the current command-line options.
 
 =item RETURN
 
@@ -1004,8 +1033,8 @@ sub ih_options {
 
 Test a match pattern against a key value and return C<1> if there is a match and C<0> otherwise.
 If the key is numeric, a numeric equality match is performed. If the key is non-numeric, then
-we have a match if any substring of the key is equal to the pattern (case-insensitive). The goal
-here is to more or less replicate the SOLR B<eq> operator.
+we have a match if any subsequence of the words in the key is equal to the pattern (case-insensitive).
+The goal here is to more or less replicate the SOLR B<eq> operator.
 
 =over 4
 
@@ -1037,10 +1066,18 @@ sub match {
         }
     } else {
         # Here we have a substring match.
-        my $patternI = lc $pattern;
-        my $keyI = lc $key;
-        if (index($keyI, $patternI) >= 0) {
-            $retVal = 1;
+        my @patternI = split ' ', lc $pattern;
+        my @keyI = split ' ', lc $key;
+        for (my $i = 0; ! $retVal && $i < scalar @keyI; $i++) {
+            if ($patternI[0] eq $keyI[$i]) {
+                my $possible = 1;
+                for (my $j = 1; $possible && $j < scalar @patternI; $j++) {
+                    if ($patternI[$j] ne $keyI[$i+$j]) {
+                        $possible = 0;
+                    }
+                }
+                $retVal = $possible;
+            }
         }
     }
     # Return the determination indicator.

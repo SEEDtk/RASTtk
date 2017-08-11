@@ -134,7 +134,6 @@ if ($showF) {
 }
 my $titled;
 my $delim = P3Utils::delim($opt);
-my $pure = $opt->pure;
 # Loop through the role table, producing output.
 my @roleList = sort { $roles{$a} cmp $roles{$b} } keys %roleCounts;
 for my $role (@roleList) {
@@ -157,7 +156,7 @@ for my $role (@roleList) {
         my @flist;
         if ($showF) {
             my $features = $roleFeats{$role} // [];
-            push @flist, join($delim, sort @$features);
+            push @flist, [sort @$features];
         }
         # Print the counts and the features.
         print_line([$roles{$role}, @$array, @flist], \@colTitles, \*STDOUT, \$titled);
@@ -165,8 +164,8 @@ for my $role (@roleList) {
 }
 # Write the feature and DNA statistics. If we are in pure mode, they go to STDERR, not STDOUT. Only do this if there are multiple genomes.
 if (scalar(@gtoFiles) > 1) {
-    P3Utils::print_cols(['* Features', @feats], \*STDERR);
-    P3Utils::print_cols(['* DNA', @dna], \*STDERR);
+    P3Utils::print_cols(['* Features', @feats], oh => \*STDERR);
+    P3Utils::print_cols(['* DNA', @dna], oh => \*STDERR);
 }
 # Write the run statistics.
 print STDERR "All done.\n" . $stats->Show();
@@ -175,10 +174,10 @@ print STDERR "All done.\n" . $stats->Show();
 sub print_line {
     my ($list, $titles, $oh, $flagPointer) = @_;
     if (! $$flagPointer) {
-        P3Utils::print_cols($titles, $oh);
+        P3Utils::print_cols($titles, oh => $oh);
         $$flagPointer = 1;
     }
-    P3Utils::print_cols($list, $oh);
+    P3Utils::print_cols($list, oh => $oh, opt => $opt);
 }
 
 ## Increment an entry in an array inside a hash. Fill zeroes into the missing spaces.

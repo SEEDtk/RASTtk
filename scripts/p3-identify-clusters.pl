@@ -73,9 +73,8 @@ my $opt = P3Utils::script_opts('clusterFile', P3Utils::col_options(), P3Utils::i
         ['showRoles|showroles|roles', 'display roles found in cluster'],
         ['showFids|showfids|fids', 'display features found in cluster']
         );
-# Get the delimiter. We need it normally and as a search pattern for -split-.
+# Get the delimiter. We need itas a search pattern for -split-.
 my $delimP = P3Utils::undelim($opt);
-my $delim = P3Utils::delim($opt);
 # Get the options.
 my $maxGap = $opt->maxgap;
 my $minItems = $opt->minitems;
@@ -175,12 +174,12 @@ for my $sequence (sort keys %sequences) {
         if (scalar @cluster >= $minItems) {
             my @row = ($clusterID, $genomeID, $sequenceID, $start, $end);
             if ($showRoles) {
-                push @row, join($delim, map { $_->[4] } @cluster);
+                push @row, [map { $_->[4] } @cluster];
             }
             if ($showFids) {
-                push @row, join($delim, map { $_->[0] } @cluster);
+                push @row, [map { $_->[0] } @cluster];
             }
-            P3Utils::print_cols(\@row);
+            P3Utils::print_cols(\@row, opt => $opt);
         }
         # Set up for the next pass by pasting the unchecked features to the skipped ones.
         @features = (@skipped, @features);

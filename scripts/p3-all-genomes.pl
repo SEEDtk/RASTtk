@@ -75,6 +75,6 @@ if ($opt->fields) {
     my $results = P3Utils::get_data($p3, genome => $filterList, $selectList);
     # Print the results.
     for my $result (@$results) {
-        P3Utils::print_cols($result);
+        P3Utils::print_cols($result, opt => $opt);
     }
 }

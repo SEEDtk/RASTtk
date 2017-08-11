@@ -168,5 +168,5 @@ for my $contig (keys %contigs) {
 # Sort the couples and output them.
 my @couples = sort { $couples{$b} <=> $couples{$a} } grep { $couples{$_} >= $minCount } keys %couples;
 for my $couple (@couples) {
-    print "$couple\t$couples{$couple}\n";
+    P3Utils::print_cols([$couple, $couples{$couple}]);
 }

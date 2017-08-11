@@ -73,7 +73,7 @@ while (! eof $ih) {
     my $resultList = P3Utils::get_data($p3, genome_drug => $filterList, $selectList, genome_id => $couplets);
     # Print them.
     for my $result (@$resultList) {
-        P3Utils::print_cols($result);
+        P3Utils::print_cols($result, opt => $opt);
     }
 }
 

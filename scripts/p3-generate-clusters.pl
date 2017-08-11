@@ -100,6 +100,6 @@ my $title = $opt->title;
 P3Utils::print_cols([$title . "_id", 'size', $title]);
 my $cluster_id = 1;
 for my $group (@sorted) {
-    P3Utils::print_cols([$cluster_id, scalar @$group, join($delim, @$group)]);
+    P3Utils::print_cols([$cluster_id, scalar @$group, $group], opt => $opt);
     $cluster_id++;
 }

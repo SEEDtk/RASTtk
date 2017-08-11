@@ -8,8 +8,8 @@ it can create a second output file containing the rejected rows.
 =head2 Parameters
 
 The single positional parameter is the value on which to match. If the value is numeric, the match will be
-exact. If it is non-numeric, then the match will be case-insensitive, and a record will match if any substring of
-the value in the key column matches the input value.
+exact. If it is non-numeric, then the match will be case-insensitive, and a record will match if any subsequence of
+the words in the key column match the words in the input value.
 
 The standard input may be overridden by the command-line options given in L<P3Utils/ih_options>.
 
@@ -50,7 +50,7 @@ my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 my $dh;
 if ($opt->discards) {
     open($dh, '>', $opt->discards) || die "Could not open discard file: $!";
-    P3Utils::print_cols($outHeaders, $dh);
+    P3Utils::print_cols($outHeaders, oh => $dh);
 }
 # Write out the headers.
 if (! $opt->nohead) {
@@ -67,7 +67,7 @@ while (! eof $ih) {
         if (P3Utils::match($pattern, $key) ^ $reverse) {
             P3Utils::print_cols($row);
         } elsif ($dh) {
-            P3Utils::print_cols($row, $dh);
+            P3Utils::print_cols($row, oh => $dh);
         }
     }
 }

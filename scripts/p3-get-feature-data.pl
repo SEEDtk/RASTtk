@@ -60,7 +60,7 @@ while (! eof $ih) {
     my $resultList = P3Utils::get_data_batch($p3, feature => $filterList, $selectList, $couplets);
     # Print them.
     for my $result (@$resultList) {
-        P3Utils::print_cols($result);
+        P3Utils::print_cols($result, opt => $opt);
     }
 }
 

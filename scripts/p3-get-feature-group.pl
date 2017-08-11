@@ -37,7 +37,11 @@ my $group_path = "$home/Feature Groups/$group";
 my $raw_group = $ws->get({ objects => [$group_path] });
 my($meta, $data_txt) = @{$raw_group->[0]};
 my $data = decode_json($data_txt);
-my @members = @{$data->{id_list}->{feature_id}};
+my $list = $data->{id_list}->{feature_id};
+my @members;
+if ($list) {
+    @members = @$list;
+}
 
 my $api = P3DataAPI->new;
 while (@members)

@@ -49,7 +49,7 @@ if (! $opt->nohead) {
     # Add a header for the gap output.
     push @$outHeaders, 'gap';
     # Print the header line.
-    P3Utils::print_cols($outHeaders, \*STDOUT);
+    P3Utils::print_cols($outHeaders);
 }
 # Now we pull in the feature pairs.
 while (! eof $ih) {
@@ -88,5 +88,5 @@ while (! eof $ih) {
     }
     # Append the gap to the output row.
     push @fields, $gap;
-    P3Utils::print_cols(\@fields, \*STDOUT);
+    P3Utils::print_cols(\@fields);
 }

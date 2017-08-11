@@ -99,6 +99,6 @@ while (! eof $ih) {
             $dna = SeedUtils::rev_comp($dna);
         }
         push @$line, $dna;
-        P3Utils::print_cols($line);
+        P3Utils::print_cols($line, opt => $opt);
     }
 }
