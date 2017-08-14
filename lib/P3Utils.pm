@@ -26,6 +26,7 @@ package P3Utils;
     use LWP::UserAgent;
     use HTTP::Request;
     use SeedUtils;
+    use Digest::MD5;
 
 =head1 PATRIC Script Utilities
 
@@ -74,6 +75,27 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             contig => 'sequence_id',
                             drug => 'antibiotic_name' };
 
+=head3 DERIVED
+
+Mapping from objects to derived fields. For each derived field name we have a list reference consisting of the function name followed by a list of the
+constituent fields.
+
+=cut
+
+use constant DERIVED => {
+            genome =>   {   taxonomy => ['concatSemi', 'taxon_lineage_names'],
+                        },
+            feature =>  {   function => ['altName', 'product'],
+                        },
+            family =>   {
+                        },
+            genome_drug => {
+                        },
+            contig =>   {   md5 => ['md5', 'sequence'],
+                        },
+            drug =>     {
+                        },
+};
 =head2  Methods
 
 =head3 data_options
@@ -672,14 +694,15 @@ sub get_data {
     if (! $cols) {
         @selected = IDCOL->{$object};
     } else {
-        @selected = @$cols;
+        my $computed = _select_list($object, $cols);
+        @selected = @$computed;
     }
     my @mods = (['select', @selected], @$filter);
     # Finally, we loop through the couplets, making calls. If there are no couplets, we make one call with
     # no additional filtering.
     if (! $fieldName) {
         my @entries = $p3->query($realName, @mods);
-        _process_entries(\@retVal, \@entries, [], $cols);
+        _process_entries($object, \@retVal, \@entries, [], $cols);
     } else {
         # Here we need to loop through the couplets one at a time.
         for my $couplet (@$couplets) {
@@ -689,7 +712,7 @@ sub get_data {
             # Make the query.
             my @entries = $p3->query($realName, $keyField, @mods);
             # Process the results.
-            _process_entries(\@retVal, \@entries, $row, $cols);
+            _process_entries($object, \@retVal, \@entries, $row, $cols);
         }
     }
     # Return the result rows.
@@ -753,7 +776,8 @@ sub get_data_batch {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my @mods = (['select', @keyList, @$cols], @$filter);
+    my $computed = _select_list($object, $cols);
+    my @mods = (['select', @keyList, @$computed], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
     my @keys = grep { $_ ne '' } map { $_->[0] } @$couplets;
     # Create a filter for the keys.
@@ -773,7 +797,7 @@ sub get_data_batch {
         my ($key, $row) = @$couplet;
         my $entryList = $entries{$key};
         if ($entryList) {
-            _process_entries(\@retVal, $entryList, $row, $cols);
+            _process_entries($object, \@retVal, $entryList, $row, $cols);
         }
     }
     # Return the result rows.
@@ -834,7 +858,8 @@ sub get_data_keyed {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my @mods = (['select', @keyList, @$cols], @$filter);
+    my $computed = _select_list($object, $cols);
+    my @mods = (['select', @keyList, @$computed], @$filter);
     # Create a filter for the keys.
     # Loop through the keys, a group at a time.
     my $n = @$keys;
@@ -846,7 +871,7 @@ sub get_data_keyed {
         my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
         # Next we run the query and push the output into the return list.
         my @results = $p3->query($realName, $keyClause, @mods);
-        _process_entries(\@retVal, \@results, [], $cols);
+        _process_entries($object, \@retVal, \@results, [], $cols);
     }
     # Return the result rows.
     return \@retVal;
@@ -1272,21 +1297,34 @@ sub list_object_fields {
     } else {
         my $json = $response->content;
         my $schema = SeedUtils::read_encoded_object(\$json);
-        @retVal = map { $_->{name} } @{$schema->{schema}{fields}};
+        for my $field (@{$schema->{schema}{fields}}) {
+            my $string = $field->{name};
+            if ($field->{multiValued}) {
+                $string .= ' (multi)';
+            }
+            push @retVal, $string;
+        }
+        # Get the derived fields.
+        my $derivedH = DERIVED->{$object};
+        push @retVal, map { "$_ (derived)" } keys %$derivedH;
     }
     # Return the list.
-    return \@retVal;
+    return [sort @retVal];
 }
 
 =head2 Internal Methods
 
 =head3 _process_entries
 
-    P3Utils::_process_entries(\@retList, \@entries, \@row, \@cols);
+    P3Utils::_process_entries($object, \@retList, \@entries, \@row, \@cols);
 
 Process the specified results from a PATRIC query and store them in the output list.
 
 =over 4
+
+=item object
+
+Name of the object queried.
 
 =item retList
 
@@ -1309,25 +1347,37 @@ Reference to a list of the names of the columns to be put in the output row, or 
 =cut
 
 sub _process_entries {
-    my ($retList, $entries, $row, $cols) = @_;
+    my ($object, $retList, $entries, $row, $cols) = @_;
     # Are we counting?
     if (! $cols) {
         # Yes. Pop on the count.
         push @$retList, [@$row, scalar(@$entries)];
     } else {
-        # No. Generate the data.
+        # No. Generate the data. First we need the derived-field hash.
+        my $derivedH = DERIVED->{$object};
+        # Loop through the entries.
         for my $entry (@$entries) {
-            my @outCols = map { $entry->{$_} } @$cols;
-            # Process the columns. If any are undefined, we change them
-            # to empty strings. If all are undefined, we throw away the
-            # record.
+            # Reject the record unless it has real data.
             my $reject = 1;
-            for (my $i = 0; $i < @outCols; $i++) {
-                if (! defined $outCols[$i]) {
-                    $outCols[$i] = '';
-                } else {
-                    $reject = 0;
+            # The output columns will be put in here.
+            my @outCols;
+            # Loop through the columns to create.
+            for my $col (@$cols) {
+                # Get the rule for this column.
+                my $algorithm = $derivedH->{$col} // ['altName', $col];
+                my ($function, @fields) = @$algorithm;
+                my @values = map { $entry->{$_} } @fields;
+                # Verify the values.
+                for (my $i = 0; $i < @values; $i++) {
+                    if (! defined $values[$i]) {
+                        $values[$i] = '';
+                    } else {
+                        $reject = 0;
+                    }
                 }
+                # Now we compute the output value.
+                my $outCol = _apply($function, @values);
+                push @outCols, $outCol;
             }
             # Output the record if it is NOT rejected.
             if (! $reject) {
@@ -1335,6 +1385,101 @@ sub _process_entries {
             }
         }
     }
+}
+
+=head3 _apply
+
+    my $result = _apply($function, @values);
+
+Apply a computational function to values to produce a computed field value.
+
+=over 4
+
+=item function
+
+Name of the function.
+
+=over 8
+
+=item altName
+
+Pass the input value back unmodified.
+
+=item concatSemi
+
+Concatenate the sub-values using a semi-colon/space separator.
+
+=item md5
+
+Compute an MD5 for a DNA or protein sequence.
+
+=back
+
+=item values
+
+List of the input values.
+
+=item RETURN
+
+Returns the computed result.
+
+=back
+
+=cut
+
+sub _apply {
+    my ($function, @values) = @_;
+    my $retVal;
+    if ($function eq 'altName') {
+        $retVal = $values[0];
+    } elsif ($function eq 'concatSemi') {
+        $retVal = join('; ', @{$values[0]});
+    } elsif ($function eq 'md5') {
+        $retVal = Digest::MD5::md5_hex(uc $values[0]);
+    }
+    return $retVal;
+}
+
+=head3 _select_list
+
+    my $fieldList = _select_list($object, $cols);
+
+Compute the list of fields required to retrieve the specified columns. This includes the specified normal fields plus any derived fields.
+
+=over 4
+
+=item object
+
+Name of the object being retrieved.
+
+=item cols
+
+Reference to a list of field names.
+
+=item RETURN
+
+Returns a reference to a list of field names to retrieve.
+
+=back
+
+=cut
+
+sub _select_list {
+    my ($object, $cols) = @_;
+    # The field names will be accumulated in here.
+    my %retVal;
+    # Get the derived-field hash.
+    my $derivedH = DERIVED->{$object};
+    # Loop through the field names.
+    for my $col (@$cols) {
+        my $algorithm = $derivedH->{$col} // ['altName', $col];
+        my ($function, @parms) = @$algorithm;
+        for my $parm (@parms) {
+            $retVal{$parm} = 1;
+        }
+    }
+    # Return the fields needed.
+    return [sort keys %retVal];
 }
 
 1;

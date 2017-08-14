@@ -77,6 +77,12 @@ is(scalar @$couplets, 7, 'couplet length test');
 my $lastRow = pop @$couplets;
 is($lastRow->[0], '1345703.9', 'last key test');
 is($lastRow->[1][2], '4733482', 'last field test');
+# Test list-fields.
+my $fieldList = P3Utils::list_object_fields('genome');
+my ($tax1) = grep { $_ =~ /taxon_lineage_ids/ } @$fieldList;
+my ($tax2) = grep { $_ =~ /taxonomy/ } @$fieldList;
+is($tax1, 'taxon_lineage_ids (multi)', 'multivalue field test');
+is($tax2, 'taxonomy (derived)', 'derived field test');
 # Test keyless headers.
 close $ih;
 $ih = P3Utils::ih($opt);
@@ -109,10 +115,15 @@ is($errorCount, 0, 'get_col test');
 my $value = '   This is (very) dirty   ';
 my $clean = P3Utils::clean_value($value);
 is($clean,'This is very dirty', 'clean value test');
-# Test get_data for all objects.
+# Test derived fields.
 my $p3 = P3DataAPI->new();
-my $results = P3Utils::get_data($p3, drug => [['eq', 'antibiotic_name', 'penicillin']], ['cas_id', 'molecular_formula']);
-is(scalar @$results, 1, 'get_data length test');
+my ($genomeID, undef, undef, $taxonomy) = @{EXPECTED->{'385964.3'}};
+my $results = P3Utils::get_data($p3, genome => [['eq', 'genome_id', $genomeID]], ['taxonomy']);
+is(scalar @$results, 1, 'get_data length test 1');
+is($results->[0][0], $taxonomy, 'derived field value test');
+# Test get_data for all objects.
+$results = P3Utils::get_data($p3, drug => [['eq', 'antibiotic_name', 'penicillin']], ['cas_id', 'molecular_formula']);
+is(scalar @$results, 1, 'get_data length test 2');
 my $result = $results->[0];
 is($result->[0], '61-33-6', 'get_data field 1 test');
 is($result->[1], 'C16H18N2O4S', 'get_data field 2 test');
