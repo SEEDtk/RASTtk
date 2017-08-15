@@ -27,7 +27,13 @@ my $genome;
 my $html = "";
 my $tmp = "";
 
-while (<>) {
+my $ih;
+if (@ARGV) {
+    open($ih, "<$ARGV[0]") || die "Could not open input file: $!";
+} else {
+    $ih = \*STDIN;
+}
+while (<$ih>) {
     if ($_ =~ '////') {
         $hdg=1;
     } elsif ($_ =~ '//$') {

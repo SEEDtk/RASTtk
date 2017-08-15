@@ -18,7 +18,7 @@ use File::Copy::Recursive;
 
 This tool takes as input two genome sets.  These will often be
 
-    gs1    genomes for a specifis species (e.g., Streptococcus pyogenes)
+    gs1    genomes for a specific species (e.g., Streptococcus pyogenes)
     gs2    genomes from the same genus, but different species
 
 The tool picks random subsets of gs1 and gs2, computes signature families for
@@ -90,7 +90,7 @@ a created directory that will contain the output
 
 =item family
 
-Type of protein family-- local, global, or
+Type of protein family-- local, global, or figfam.
 
 =back
 

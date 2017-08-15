@@ -26,13 +26,16 @@ The additional command-line options are as follows.
 
 =item d DataDirectory
 
+=item q
+
+no STDOUT, output is in DataDirectory/labeled.
+
 =back
 
 =cut
 
-my ($opt, $helper) = P3Utils::script_opts('',["d=s","a directory created by p3-related-by-clusters", { required => 1 }]);
+my ($opt, $helper) = P3Utils::script_opts('',["d=s","a directory created by p3-related-by-clusters", { required => 1 }],["q", "no STDOUT"]);
 my $outD = $opt->d;
-
 ###########
 &SeedUtils::run("p3-aggregate-sss -d $outD");
 ###########
@@ -48,27 +51,27 @@ while (defined($sss = <AG>))
     $/ = "\n";
     if ($sss =~ /^(\S+\t\S+)\t(\d+)\n(\S.*\S)\n\/\/\n\/\/\/\/\n/s)
     {
-	my($pair,$sc,$exemplars) = ($1,$2,$3);
+        my($pair,$sc,$exemplars) = ($1,$2,$3);
         my $i;
-	for ($i=0; ($i < @ignore) && (index($exemplars,$ignore[$i]) < 0); $i++) {}
-	if ($i == @ignore)
-	{
+        for ($i=0; ($i < @ignore) && (index($exemplars,$ignore[$i]) < 0); $i++) {}
+        if ($i == @ignore)
+        {
 #	    print STDERR &Dumper($sss); die "HERE";
-	    print PULL $pair,"\t",$sc,"\n";
+            print PULL $pair,"\t",$sc,"\n";
 
-	    my %seen;
-	    my @tmp = split(/\n\/\/\n/,$exemplars);
-	    foreach my $tmp1 (@tmp)
-	    {
-		my $fams = join("\t",(sort map { ($_ =~ /^fig\S+\t(\S+)/) ? $1 : () } split(/\n/,$tmp1)));
-		if (! $seen{$fams})
-		{
-		    $seen{$fams} = 1;
-		    print PULL $tmp1,"\n\/\/\n";
-		}
-	    }
-	    print PULL "////\n";
-	}
+            my %seen;
+            my @tmp = split(/\n\/\/\n/,$exemplars);
+            foreach my $tmp1 (@tmp)
+            {
+                my $fams = join("\t",(sort map { ($_ =~ /^fig\S+\t(\S+)/) ? $1 : () } split(/\n/,$tmp1)));
+                if (! $seen{$fams})
+                {
+                    $seen{$fams} = 1;
+                    print PULL $tmp1,"\n\/\/\n";
+                }
+            }
+            print PULL "////\n";
+        }
     }
     $/ = "\n////\n";
 }
@@ -90,20 +93,21 @@ while (defined($_ = <IN>))
     my $parsed = &parse($_,\%genome_names);
     if ($parsed)
     {
-	my $exemplars = $parsed->{exemplars};
-	print OUT $parsed->{pair}, "\t",$parsed->{sc}, "\n";
-	print OUT join("\n//\n",@$exemplars),"\n//\n////\n";
+        my $exemplars = $parsed->{exemplars};
+        print OUT $parsed->{pair}, "\t",$parsed->{sc}, "\n";
+        print OUT join("\n//\n",@$exemplars),"\n//\n////\n";
     }
     $/ = "\n////\n";
 }
 close(IN);
 close(OUT);
-
-open(IN, "<$outD/labeled") || die "Empty or missing $outD/labeled";
-while (defined($_ = <IN>)) {
-    print $_;
+if (! $opt->q) {
+    open(IN, "<$outD/labeled") || die "Empty or missing $outD/labeled";
+    while (defined($_ = <IN>)) {
+        print $_;
+    }
+    close(IN);
 }
-close(IN);
 
 #######################
 sub parse {
@@ -111,9 +115,9 @@ sub parse {
 
     if ($x =~ /^(\S+\t\S+)\t(\d+)\n(\S.*\S)\n\/\/\n\/\/\/\//s)
     {
-	my($pair,$sc,$exemplars) = ($1,$2,[split(/\n\/\/\n/,$3)]);
+        my($pair,$sc,$exemplars) = ($1,$2,[split(/\n\/\/\n/,$3)]);
         my @tmp_exemplars = map { ($_ =~ /fig\|(\d+\.\d+)/) ? ("$_\n###\t" . $genome_names->{$1}) : ($_ . "\nunknown")  } @$exemplars;
-	return { pair => $pair, exemplars => \@tmp_exemplars, sc => $sc };
+        return { pair => $pair, exemplars => \@tmp_exemplars, sc => $sc };
     }
     return undef;
 }
