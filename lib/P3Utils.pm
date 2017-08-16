@@ -780,24 +780,26 @@ sub get_data_batch {
     my @mods = (['select', @keyList, @$computed], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
     my @keys = grep { $_ ne '' } map { $_->[0] } @$couplets;
-    # Create a filter for the keys.
-    my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
-    # Next we run the query and create a hash mapping keys to return sets.
-    my @results = $p3->query($realName, $keyClause, @mods);
-    my %entries;
-    for my $result (@results) {
-        my $keyValue = $result->{$keyField};
-        push @{$entries{$keyValue}}, $result;
-    }
-    # Empty the results array to save memory.
-    undef @results;
-    # Now loop through the couplets, producing output.
-    # Loop through the couplets, producing output.
-    for my $couplet (@$couplets) {
-        my ($key, $row) = @$couplet;
-        my $entryList = $entries{$key};
-        if ($entryList) {
-            _process_entries($object, \@retVal, $entryList, $row, $cols);
+    # Only proceed if we have at least one key.
+    if (scalar @keys) {
+        # Create a filter for the keys.
+        my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
+        # Next we run the query and create a hash mapping keys to return sets.
+        my @results = $p3->query($realName, $keyClause, @mods);
+        my %entries;
+        for my $result (@results) {
+            my $keyValue = $result->{$keyField};
+            push @{$entries{$keyValue}}, $result;
+        }
+        # Empty the results array to save memory.
+        undef @results;
+        # Now loop through the couplets, producing output.
+        for my $couplet (@$couplets) {
+            my ($key, $row) = @$couplet;
+            my $entryList = $entries{$key};
+            if ($entryList) {
+                _process_entries($object, \@retVal, $entryList, $row, $cols);
+            }
         }
     }
     # Return the result rows.

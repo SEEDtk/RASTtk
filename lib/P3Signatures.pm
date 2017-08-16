@@ -193,7 +193,7 @@ sub PegInfo {
         push @couplets, [$fam, [$fam]];
     }
     if (@couplets) {
-        my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'plfam_id');
+        my $batch = P3Utils::get_data_batch($p3, feature => \@filterList, \@selectList, \@couplets, 'pgfam_id');
         push @retVal, @$batch;
     }
     # Return the results.
