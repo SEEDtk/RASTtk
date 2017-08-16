@@ -59,6 +59,7 @@ if ($mode eq 'contig') {
     $fastaLines = P3Utils::get_data($p3, 'contig', $filter, ['sequence_id', 'sequence_type', 'sequence']);
 } else {
     # Here we are getting all features for a genome.
+    push @$filter, ['eq', 'patric_id', '*'];
     my $sequenceField = ($mode eq 'protein' ? 'aa_sequence' : 'na_sequence');
     $fastaLines = P3Utils::get_data($p3, 'feature', $filter, ['patric_id', 'product', $sequenceField]);
 }
@@ -68,7 +69,9 @@ if (! @$fastaLines) {
 # $fastaLines is now a list of triples. Write out the triples as a FASTA file.
 for my $fastaLine (@$fastaLines) {
     my ($id, $comment, $seq) = @$fastaLine;
-    my @chunks = ($seq =~ /(.{1,60})/g);
-    print ">$id $comment\n";
-    print join("\n", @chunks, "");
+    if ($seq) {
+        my @chunks = ($seq =~ /(.{1,60})/g);
+        print ">$id $comment\n";
+        print join("\n", @chunks, "");
+    }
 }
