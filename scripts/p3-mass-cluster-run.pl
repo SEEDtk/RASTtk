@@ -34,6 +34,11 @@ The minimum portion of occurrences for a protein family to be considered signifi
 
 The maximum portion of occurrences for a protein family to be considered insignificant. The default is C<0.1>.
 
+=item resume
+
+If specified, genus-species combinations will be skipped if output files already exist.
+
+
 =back
 
 =cut
@@ -52,6 +57,7 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::ih_options(),
           ["min=f","min fraction of in-group to be signature family", { default => 0.8 }],
           ["max=f","max fraction of out-group to be signature family", { default => 0.1 }],
           ["iterations|n=i", "number of iterations to run", { default => 4 }],
+          ["missing", "process new species only"]
         );
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
@@ -60,6 +66,7 @@ my $size = $opt->size;
 my $min = $opt->min;
 my $max = $opt->max;
 my $defaultI = $opt->iterations;
+my $missing = $opt->missing;
 # Get the directories.
 my ($workDir, $outDir) = @ARGV;
 if (! $workDir) {
@@ -86,57 +93,60 @@ my $genomesH;
 while (! eof $ih) {
     # Read in the genus and species desired.
     my ($genus, $species) = P3Utils::get_cols($ih, [0,1]);
-    # Insure this is the genus we have in memory.
-    if ($genus ne $currentGenus) {
-        $genomesH = ReadGenomes($p3, $genus);
-        print scalar(keys %$genomesH) . " genomes found in $genus.\n";
-        $currentGenus = $genus;
-    }
-    # Create the in-group and out-group files for this species.
-    my ($inCount, $outCount) = (0, 0);
-    open(my $inH, ">$outDir/in.tbl") || die "Could not open in-group output file: $!";
-    print $inH "genome_id\n";
-    open(my $outH, ">$outDir/out.tbl") || die "Could not open out-group output file: $!";
-    print $outH "genome_id\n";
-    for my $genome (keys %$genomesH) {
-        if ($genomesH->{$genome} eq $species) {
-            print $inH "$genome\n";
-            $inCount++;
+    my $outFile = "$outDir/$genus.$species.clusters.html";
+    # Only proceed if this is a new species or we are NOT in missing-mode.
+    if (! $missing || ! -s $outFile) {
+        # Insure this is the genus we have in memory.
+        if ($genus ne $currentGenus) {
+            $genomesH = ReadGenomes($p3, $genus);
+            print scalar(keys %$genomesH) . " genomes found in $genus.\n";
+            $currentGenus = $genus;
+        }
+        # Create the in-group and out-group files for this species.
+        my ($inCount, $outCount) = (0, 0);
+        open(my $inH, ">$outDir/in.tbl") || die "Could not open in-group output file: $!";
+        print $inH "genome_id\n";
+        open(my $outH, ">$outDir/out.tbl") || die "Could not open out-group output file: $!";
+        print $outH "genome_id\n";
+        for my $genome (keys %$genomesH) {
+            if ($genomesH->{$genome} eq $species) {
+                print $inH "$genome\n";
+                $inCount++;
+            } else {
+                print $outH "$genome\n";
+                $outCount++;
+            }
+        }
+        close $inH; close $outH;
+        # Compute the number of iterations.
+        if (! $inCount) {
+            print "No genomes found for $species. Skipping.\n";
+        } elsif (! $outCount) {
+            print "Only $species found in $genus. Skipping.\n";
         } else {
-            print $outH "$genome\n";
-            $outCount++;
-        }
-    }
-    close $inH; close $outH;
-    # Compute the number of iterations.
-    if (! $inCount) {
-        print "No genomes found for $species. Skipping.\n";
-    } elsif (! $outCount) {
-        print "Only $species found in $genus. Skipping.\n";
-    } else {
-        my $iterations = ceil($inCount / $size);
-        if ($outCount > $inCount) {
-            $iterations = ceil($outCount / $size);
-        }
-        if ($defaultI < $iterations) {
-            $iterations = $defaultI;
-        }
-        print "$iterations iterations recommended.\n";
-        # Run the clustering.
-        my $rc = system('p3-related-by-clusters', '--gs1', "$outDir/in.tbl", '--gs2', "$outDir/out.tbl", '--sz1', $size, '--sz2', $size,
-                '--min', $min, '--max', $max, '--iterations', $iterations, '--output', "$workDir/$genus");
-        print "Clustering for $genus $species returned $rc.\n";
-        die "Error return from clustering." if $rc;
-        # Format the output.
-        $rc = system('p3-format-results', '-d', "$workDir/$genus", '-q');
-        print "Formatting for $genus $species returned $rc.\n";
-        die "Error return from formatting." if $rc;
-        my $outFile = "$outDir/$genus.$species.clusters.html";
-        open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
-        open(my $ch, "p3-aggregates-to-html $workDir/$genus/labeled |") || die "Could not open aggregation stream: $!";
-        while (! eof $ch) {
-            my $line = <$ch>;
-            print $oh $line;
+            my $iterations = ceil($inCount / $size);
+            if ($outCount > $inCount) {
+                $iterations = ceil($outCount / $size);
+            }
+            if ($defaultI < $iterations) {
+                $iterations = $defaultI;
+            }
+            print "$iterations iterations recommended.\n";
+            # Run the clustering.
+            my $rc = system('p3-related-by-clusters', '--gs1', "$outDir/in.tbl", '--gs2', "$outDir/out.tbl", '--sz1', $size, '--sz2', $size,
+                    '--min', $min, '--max', $max, '--iterations', $iterations, '--output', "$workDir/$genus");
+            print "Clustering for $genus $species returned $rc.\n";
+            die "Error return from clustering." if $rc;
+            # Format the output.
+            $rc = system('p3-format-results', '-d', "$workDir/$genus", '-q');
+            print "Formatting for $genus $species returned $rc.\n";
+            die "Error return from formatting." if $rc;
+            open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+            open(my $ch, "p3-aggregates-to-html $workDir/$genus/labeled |") || die "Could not open aggregation stream: $!";
+            while (! eof $ch) {
+                my $line = <$ch>;
+                print $oh $line;
+            }
         }
     }
 }
