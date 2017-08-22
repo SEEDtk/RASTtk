@@ -50,7 +50,7 @@ use POSIX qw(ceil);
 use File::Copy::Recursive;
 use SeedAware;
 
-
+$| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::ih_options(),
           ['size|n=i', 'sample size', { default => 20 }],
