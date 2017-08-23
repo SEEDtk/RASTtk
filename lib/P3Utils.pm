@@ -123,7 +123,7 @@ exact match. If the field is a string, the constraint will be a substring match.
 is interpreted as a wild card. Multiple equality constraints may be specified by coding the option multiple
 times.
 
-=item lt, le, gt, ge
+=item lt, le, gt, ge, ne
 
 Inequality constraints of the form I<field-name>C<,>I<value>. Multiple constrains of each type may be specified
 by coding the option multiple times.
@@ -151,6 +151,7 @@ sub data_options {
             ['le=s@', 'less-or-equal search constraint(s) in the form field_name,value'],
             ['gt=s@', 'greater-than search constraint(s) in the form field_name,value'],
             ['ge=s@', 'greater-or-equal search constraint(s) in the form field_name,value'],
+            ['ne=s@', 'not-equal search constraint(s) in the form field_name,value'],
             ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
             ['required|r=s@', 'field(s) required to have values'],
             delim_options());
@@ -495,7 +496,8 @@ sub form_filter {
                   'lt' => ($opt->lt // []),
                   'le' => ($opt->le // []),
                   'gt' => ($opt->gt // []),
-                  'ge' => ($opt->ge // []));
+                  'ge' => ($opt->ge // []),
+                  'ne' => ($opt->ne // []));
     # Loop through them.
     for my $op (keys %opHash) {
         for my $opSpec (@{$opHash{$op}}) {
