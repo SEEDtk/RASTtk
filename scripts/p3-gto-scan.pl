@@ -23,6 +23,10 @@ The command-line options are those in L<P3Utils/delim_options> plus the followin
 
 If specified, the features containing each role will be listed on the output.
 
+=item peg
+
+If specified, only protein-encoding features will be processed.
+
 =item verbose
 
 If specified, all roles will be displayed, rather than only the roles that differ between genomes.
@@ -41,6 +45,7 @@ use Stats;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('gto1 gto2 ... gtoN', P3Utils::delim_options(),
         ['features|f', 'display feature IDs'],
+        ['peg|p', 'only process protein-encoding features'],
         ['verbose|v', 'display all roles']);
 # Create the statistics object.
 my $stats = Stats->new();
@@ -87,36 +92,40 @@ for my $gtoFile (@gtoFiles) {
     my $featCount = 0;
     my $featuresL = $gto->{features};
     for my $feature (@$featuresL) {
-        $featCount++;
-        $stats->Add(features => 1);
-        # Compute the function ID. The function ID will be a list of role IDs, which
-        # are computed using the role checksum function.
-        my $funID;
-        my $function = $feature->{function};
-        if (! $function) {
-            $stats->Add(functionMissing => 1);
+        if ($feature->{type} ne 'CDS' && $opt->peg) {
+            $stats->Add(nonPegSkipped => 1);
         } else {
-            $stats->Add(functionRead => 1);
-            if (exists $funHash{$function}) {
-                # Here we already know the function.
-                $funID = $funHash{$function};
-                $stats->Add(functionReused => 1);
+            $featCount++;
+            $stats->Add(features => 1);
+            # Compute the function ID. The function ID will be a list of role IDs, which
+            # are computed using the role checksum function.
+            my $funID;
+            my $function = $feature->{function};
+            if (! $function) {
+                $stats->Add(functionMissing => 1);
             } else {
-                # Here we must compute it.
-                $stats->Add(functionAnalyzed => 1);
-                my @roles = SeedUtils::roles_of_function($function);
-                $funID = [];
-                for my $role (@roles) {
-                    my $roleID = RoleParse::Checksum($role);
-                    $roles{$roleID} = $role;
-                    push @$funID, $roleID;
+                $stats->Add(functionRead => 1);
+                if (exists $funHash{$function}) {
+                    # Here we already know the function.
+                    $funID = $funHash{$function};
+                    $stats->Add(functionReused => 1);
+                } else {
+                    # Here we must compute it.
+                    $stats->Add(functionAnalyzed => 1);
+                    my @roles = SeedUtils::roles_of_function($function);
+                    $funID = [];
+                    for my $role (@roles) {
+                        my $roleID = RoleParse::Checksum($role);
+                        $roles{$roleID} = $role;
+                        push @$funID, $roleID;
+                    }
+                    $funHash{$function} = $funID;
                 }
-                $funHash{$function} = $funID;
-            }
-            for my $roleID (@$funID) {
-                $stats->Add(roleProcessed => 1);
-                Increment(\%roleCounts, $roleID, $i);
-                push @{$roleFeats{$roleID}}, $feature->{id};
+                for my $roleID (@$funID) {
+                    $stats->Add(roleProcessed => 1);
+                    Increment(\%roleCounts, $roleID, $i);
+                    push @{$roleFeats{$roleID}}, $feature->{id};
+                }
             }
         }
     }

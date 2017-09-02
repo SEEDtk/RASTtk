@@ -42,7 +42,7 @@ The size of a kmer.
 
 =item maxFound
 
-The maximum number of groups in which a kmer can be found before it is considered common. Common kmers are removed from
+The maximum number of times a kmer can be found before it is considered common. Common kmers are removed from
 the hash. A value of C<0> indicates no kmers will be considered common.
 
 =item kmerHash
@@ -76,7 +76,7 @@ The size of a kmer. The default is C<10>.
 
 =item maxFound
 
-The maximum number of groups in which a kmer can be found before it is considered common. Common kmers are removed from
+The maximum number of times a kmer can be found before it is considered common. Common kmers are removed from
 the hash. The default is C<10>.
 
 =item json
@@ -188,7 +188,7 @@ sub AddGroup {
 
     $kmerdb->Finalize();
 
-Clean up the kmer hash to remove common kmers, prepapring it for use.
+Clean up the kmer hash to remove common kmers, preparing it for use.
 
 =cut
 
@@ -216,6 +216,59 @@ sub Finalize {
     }
     # Denote this database is finalized.
     $self->{finalized} = 1;
+}
+
+=head3 xref
+
+    my $xrefHash = $kmerdb->xref();
+
+Compute the cross-reference hash for the Kmer database. This hash can be used to compute a similarity matrix between the groups. The hash is two-dimensional,
+each entry containing three numbers-- the kmers only in the left group (L), the kmers in both groups (B), and the kmers only in the right group (R). If the left group
+is the source and the right group is the target, then B/(R+B) is the I<completeness> of the source and L/(L+B) is the I<contamination>.
+
+The database need not be finalized. If it is not, then the maxFound parameter has no effect.
+
+=cut
+
+sub xref {
+    my ($self) = @_;
+    # Get the list of groups.
+    my @groups = keys %{$self->{groupHash}};
+    my $n = scalar @groups;
+    # This will be the return hash. We pre-initialize it.
+    my %retVal;
+    my @groupWork = @groups;
+    while (@groupWork) {
+        my $group = shift @groupWork;
+        $retVal{$group} = { map { $_ => [0,0,0] } @groupWork };
+    }
+    # Loop through the kmers.
+    my $kmerHash = $self->{kmerHash};
+    for my $kmer (keys %$kmerHash) {
+        # Get this kmer's hash. If we are finalized, we must convert it from a list.
+        my $groupHash = $kmerHash->{$kmer};
+        if (ref $groupHash eq 'ARRAY') {
+            $groupHash = map { $_ => 1 } @$groupHash;
+        }
+        # Loop through the groups. Note we have a nested loop.
+        for (my $i = 0; $i < $n; $i++) {
+            my $groupI = $groups[$i];
+            my $foundI = $groupHash->{$groupI};
+            for (my $j = $i + 1; $j < $n; $j++) {
+                my $groupJ = $groups[$j];
+                my $foundJ = $groupHash->{$groupJ};
+                my $target = $retVal{$groupI}{$groupJ};
+                if ($foundI && $foundJ) {
+                    $target->[1]++;
+                } elsif ($foundI) {
+                    $target->[0]++;
+                } elsif ($foundJ) {
+                    $target->[2]++;
+                }
+            }
+        }
+    }
+    return \%retVal;
 }
 
 =head3 ComputeDiscriminators
