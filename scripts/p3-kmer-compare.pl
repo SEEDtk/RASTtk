@@ -21,6 +21,14 @@ The command-line options are as follows.
 
 The size of a kmer. The default is C<15>.
 
+=item geneticCode
+
+If specified, a genetic code to use to translate the DNA sequences to proteins. In this case, the matching will be on protein kmers.
+
+=item verbose
+
+If specified, raw kmer counts will be included in the output matrix.
+
 =back
 
 =cut
@@ -32,10 +40,18 @@ use KmerDb;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('genome1 genome2 ... genomeN',
-        ['kmerSize|kmersize|kmer|k=i', 'kmer size', { default => 15 }]
+        ['kmerSize|kmersize|kmer|k=i', 'kmer size', { default => 15 }],
+        ['geneticCode|geneticcode|code|gc|x=i', 'genetic code for protein kmers (default is to use DNA kmers)'],
+        ['verbose|v', 'include raw kmer counts in output']
         );
 # Extract the options.
 my $kmerSize = $opt->kmersize;
+my $verbose = $opt->verbose;
+# Compute the genetic code (if any).
+my $geneticCode = $opt->geneticcode;
+if ($geneticCode) {
+    $geneticCode = SeedUtils::genetic_code($geneticCode);
+}
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Get the two genomes.
@@ -82,7 +98,7 @@ for my $genomeI (@genomes) {
     for my $genomeJ (@genomes) {
         # If the genomes are identical, use a dummy.
         if ($genomeI eq $genomeJ) {
-            push @row, '100.0/0.0';
+            push @row, 'x';
         } else {
             # There is only one entry for this genome pair. If it's not the one we expect,
             # we use its dual.
@@ -92,7 +108,11 @@ for my $genomeI (@genomes) {
             }
             my $complete = $list->[1] * 100 / ($list->[1] + $list->[2]);
             my $contam = $list->[0] * 100 / ($list->[0] + $list->[1]);
-            push @row, sprintf("%.1f/%1.f", $complete, $contam);
+            my $ratio = sprintf("%0.1f/%0.1f", $complete, $contam);
+            if ($verbose) {
+                $ratio .= "," . join("/", @$list);
+            }
+            push @row, $ratio;
         }
     }
     P3Utils::print_cols(\@row);
@@ -115,7 +135,7 @@ sub ProcessPatric {
     my $results = P3Utils::get_data($p3, contig => [['eq', 'genome_id', $genome]], ['genome_name', 'sequence']);
     # Process the sequence kmers.
     for my $result (@$results) {
-        $kmerDb->AddSequence($genome, $result->[1], $result->[0]);
+        AddSequence($kmerDb, $genome, $result->[1], $result->[0], $geneticCode);
     }
 }
 
@@ -132,10 +152,11 @@ sub ProcessFasta {
         if (! $chunk || $chunk =~ /^>/) {
             # Here we are at the end of a sequence.
             my $line = join("", @chunks);
-            $kmerDb->AddSequence($genome, $line, "$genome FASTA file");
+            AddSequence($kmerDb, $genome, $line, "$genome FASTA file", $geneticCode);
             $done = ! $chunk;
         } else {
             # Here we have part of a sequence.
+            chomp $chunk;
             push @chunks, $chunk;
         }
     }
@@ -149,6 +170,29 @@ sub ProcessGto {
     # Loop through the contigs.
     my $contigsL = $gto->{contigs};
     for my $contig (@$contigsL) {
-        $kmerDb->AddSequence($genome, $contig->{dna}, $name);
+        AddSequence($kmerDb, $genome, $contig->{dna}, $name, $geneticCode);
+    }
+}
+
+## Add a sequence to the kmer database (both strands).
+sub AddSequence {
+    my ($kmerDb, $genome, $sequence, $gName, $gCode) = @_;
+    # Add this sequence to the kmer database in both directions.
+    AddSequence1($kmerDb, $genome, $sequence, $gName, $gCode);
+    $sequence = SeedUtils::reverse_comp($sequence);
+    AddSequence1($kmerDb, $genome, $sequence, $gName, $gCode);
+}
+
+## Add a sequence to the kmer database (one strand).
+sub AddSequence1 {
+    my ($kmerDb, $genome, $sequence, $gName, $gCode) = @_;
+    if (! $gCode) {
+        # DNA kmers.
+        $kmerDb->AddSequence($genome, $sequence, $gName);
+    } else {
+        for my $frm (0, 1, 2) {
+            my $prot = SeedUtils::translate(\$sequence, $frm, $gCode);
+            $kmerDb->AddSequence($genome, $prot, $gName);
+        }
     }
 }
