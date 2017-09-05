@@ -19,7 +19,7 @@ The command-line options are as follows.
 
 =item kmerSize
 
-The size of a kmer. The default is C<15>.
+The size of a kmer. The default is C<12> for DNA and C<8> for protein.
 
 =item geneticCode
 
@@ -40,18 +40,20 @@ use KmerDb;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('genome1 genome2 ... genomeN',
-        ['kmerSize|kmersize|kmer|k=i', 'kmer size', { default => 15 }],
+        ['kmerSize|kmersize|kmer|k=i', 'kmer size'],
         ['geneticCode|geneticcode|code|gc|x=i', 'genetic code for protein kmers (default is to use DNA kmers)'],
         ['verbose|v', 'include raw kmer counts in output']
         );
-# Extract the options.
-my $kmerSize = $opt->kmersize;
-my $verbose = $opt->verbose;
 # Compute the genetic code (if any).
 my $geneticCode = $opt->geneticcode;
 if ($geneticCode) {
     $geneticCode = SeedUtils::genetic_code($geneticCode);
 }
+# Extract the options.
+my $verbose = $opt->verbose;
+# Compute the kmer size.
+my $defaultKmer = ($geneticCode ? 8 : 12);
+my $kmerSize = $opt->kmersize // $defaultKmer;
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Get the two genomes.
