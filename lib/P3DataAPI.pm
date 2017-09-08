@@ -33,7 +33,7 @@ no warnings 'once';
 eval { require FIG_Config; };
 
 our $default_url = $FIG_Config::p3_data_api_url
-  || "https://www.patricbrc.org/api";
+  || "https://p3.theseed.org/services/data_api";
 
 our %family_field_of_type = (plfam => "plfam_id",
                              pgfam => "pgfam_id",
@@ -1407,19 +1407,20 @@ sub get_pin
 
     my %cut_pin = map { $_->{patric_id} => $_ } @pin;
 
-    my $tmp = File::Temp->new();
-    my $tmp2 = File::Temp->new();
+    my $tmpdir = File::Temp->newdir();
+    my $tmp = "$tmpdir/pin";
+    my $tmp2 = "$tmpdir/qry";
 
-    print $tmp2 ">$fid\n$me->{aa_sequence}\n";
-    close($tmp2);
+    open(my $tmp_fh, ">", $tmp2) or die "Cannot write $tmp2: $!";
+    print $tmp_fh ">$fid\n$me->{aa_sequence}\n";
+    close($tmp_fh);
 
-    print $tmp ">$_->{patric_id}\n$_->{aa_sequence}\n" foreach @pin;
-    close($tmp);
-    my $rc = system("formatdb", "-p", "t", "-i", "$tmp");
+    open(my $tmp_fh, ">", $tmp) or die "Cannot write $tmp: $!";
+    print $tmp_fh ">$_->{patric_id}\n$_->{aa_sequence}\n" foreach @pin;
+    close($tmp_fh);
+    my $rc = system("formatdb", "-p", "t", "-i", $tmp);
     $rc == 0 or die "formatdb failed with $rc\n";
 
-    system("cp $tmp /tmp/db");
-    system("cp $tmp2 /tmp/q");
     my $evalue = "1e-5";
 
     open(my $blast, "-|", "blastall", "-p", "blastp", "-i", "$tmp2", "-d", "$tmp", "-m", 8, "-e", $evalue,
