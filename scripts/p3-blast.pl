@@ -89,7 +89,7 @@ Minimum permissible match length (used to filter the results). The default is no
 use constant BLAST_TOOL => { blastp => 'prot', blastn => 'dna', blastx => 'prot', tblastn => 'dna' };
 
 # Get the command-line parameters.
-my $opt = P3Utils::get_options('type blastdb',
+my $opt = P3Utils::script_opts('type blastdb',
         ['output' => hidden => { one_of => [ [ 'hsp' => 'produce HSP output'], ['sim' => 'produce similarity output'] ]}],
         ['maxE|e=f', 'maximum e-value', { default => 1e-10 }],
         ['maxHSP|b', 'if specified, the maximum number of returned results (before filtering)'],
@@ -98,7 +98,7 @@ my $opt = P3Utils::get_options('type blastdb',
         ['minLen|l=i', 'if specified, the minimum permissible match lengt (for filtering)'],
         );
 # Open the input file.
-my $ih = ServicesUtils::ih($opt);
+my $ih = P3Utils::IH($opt);
 # Get the positional parameters.
 my ($blastProg, $blastdb) = @ARGV;
 if (! $blastProg) {
