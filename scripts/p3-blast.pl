@@ -53,6 +53,10 @@ If specified, then the output is in the form of HSP data (see L<Hsp>). This is t
 
 If specified, then the output is in the form of similarity data (see L<Sim>). This parameter is mutually exclusive with C<hsp>.
 
+=item best
+
+If specified, then only the best match for each query sequence will be output.
+
 =item BLAST Parameters
 
 The following may be specified as BLAST parameters
@@ -98,6 +102,7 @@ my $opt = P3Utils::script_opts('type blastdb',
         ['minScr=f', 'if specified, the minimum permissible bit score'],
         ['percIdentity=f', 'if specified, the minimum permissible percent identity'],
         ['minLen|l=i', 'if specified, the minimum permissible match lengt (for filtering)'],
+        ['best', 'only output best match for each query sequence']
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
@@ -117,6 +122,8 @@ $blast{maxE} = $opt->maxe;
 $blast{maxHSP} = $opt->maxhsp // 0;
 $blast{minIden} = $opt->percidentity // 0;
 $blast{minLen} = $opt->minlen // 0;
+# Save the best-only option.
+my $best = $opt->best;
 # Print the output headers.
 if ($blast{outForm} eq 'hsp') {
     P3Utils::print_cols([qw(qid qdef qlen sid sdef slen score e-val pN p-val match-len identity pct-identity positive gaps dir q-start q-end q-sequence s-start s-end s-sequence)]);
@@ -143,9 +150,14 @@ if (! $blastdb) {
 }
 # Now run the BLAST.
 my $matches = BlastInterface::blast(\@query, $blastDatabase, $blastProg, \%blast);
+my $lastQuery = '';
 # Format the output.
 for my $match (@$matches) {
-    P3Utils::print_cols($match);
+    my $qid = $match->[0];
+    if (! $best || $qid ne $lastQuery) {
+        P3Utils::print_cols($match);
+        $lastQuery = $qid;
+    }
 }
 
 
