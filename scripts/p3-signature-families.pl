@@ -40,11 +40,11 @@ Any genomes present in the gs1 set will be automatically deleted from this list.
 
 =item min
 
-Minimum fraction of genomes in Gs1 that occur in a signature family
+Minimum fraction of genomes in Gs1 that occur in a signature family (default 0.8).
 
 =item max
 
-Maximum fraction of genomes in Gs2 that occur in a signature family
+Maximum fraction of genomes in Gs2 that occur in a signature family (default 0.2).
 
 =item verbose
 

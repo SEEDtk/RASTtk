@@ -19,7 +19,7 @@
 
 use strict;
 use warnings;
-use ServicesUtils;
+use P3Utils;
 use gjoseqlib;
 use BlastInterface;
 use Data::Dumper;
@@ -34,12 +34,12 @@ can also be a FASTA file, the input itself, or it can be a genome ID.
 
 =head2 Parameters
 
-See L<ServicesUtils> for more information about common command-line options.
-
 The positional parameters are the name of the blast program (C<blastn>, C<blastp>, C<blastx>, or C<tblastn>)
 followed by the file name of the blast database. If the blast database is not pre-built, it will be built in
 place. If the database is not found, it is presumed to be a genome ID. If the database name is omitted, the
 input will be blasted against itself.
+
+The options in L<P3Utils/ih_options> can be used to override the standard input.
 
 The additional command-line options are as follows.
 
@@ -89,14 +89,14 @@ Minimum permissible match length (used to filter the results). The default is no
 use constant BLAST_TOOL => { blastp => 'prot', blastn => 'dna', blastx => 'prot', tblastn => 'dna' };
 
 # Get the command-line parameters.
-my ($opt, $helper) = ServicesUtils::get_options('type blastdb',
+my $opt = P3Utils::get_options('type blastdb',
         ['output' => hidden => { one_of => [ [ 'hsp' => 'produce HSP output'], ['sim' => 'produce similarity output'] ]}],
         ['maxE|e=f', 'maximum e-value', { default => 1e-10 }],
         ['maxHSP|b', 'if specified, the maximum number of returned results (before filtering)'],
         ['minScr=f', 'if specified, the minimum permissible bit score'],
         ['percIdentity=f', 'if specified, the minimum permissible percent identity'],
         ['minLen|l=i', 'if specified, the minimum permissible match lengt (for filtering)'],
-        { input => 'whole' });
+        );
 # Open the input file.
 my $ih = ServicesUtils::ih($opt);
 # Get the positional parameters.
@@ -127,7 +127,6 @@ if (! $blastdb) {
     $blastDatabase = $blastdb;
 } else {
     # Not a file name, so we assume it is a genome.
-    #my $gHash = $helper->genome_fasta([$blastdb], $blastDbType);
     p3_genome_fasta($blastdb, $blastDbType);
     $blastDatabase = $blastdb;
     if (! $blastDatabase) {
