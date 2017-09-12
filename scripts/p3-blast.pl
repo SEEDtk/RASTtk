@@ -90,6 +90,7 @@ use constant BLAST_TOOL => { blastp => 'prot', blastn => 'dna', blastx => 'prot'
 
 # Get the command-line parameters.
 my $opt = P3Utils::script_opts('type blastdb',
+        P3Utils::ih_options(),
         ['output' => hidden => { one_of => [ [ 'hsp' => 'produce HSP output'], ['sim' => 'produce similarity output'] ]}],
         ['maxE|e=f', 'maximum e-value', { default => 1e-10 }],
         ['maxHSP|b', 'if specified, the maximum number of returned results (before filtering)'],
