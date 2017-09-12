@@ -88,6 +88,7 @@ Minimum permissible match length (used to filter the results). The default is no
 # map each blast tool name to the type of blast database required
 use constant BLAST_TOOL => { blastp => 'prot', blastn => 'dna', blastx => 'prot', tblastn => 'dna' };
 
+$| = 1;
 # Get the command-line parameters.
 my $opt = P3Utils::script_opts('type blastdb',
         P3Utils::ih_options(),
