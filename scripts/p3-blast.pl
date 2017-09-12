@@ -99,7 +99,7 @@ my $opt = P3Utils::script_opts('type blastdb',
         ['minLen|l=i', 'if specified, the minimum permissible match lengt (for filtering)'],
         );
 # Open the input file.
-my $ih = P3Utils::IH($opt);
+my $ih = P3Utils::ih($opt);
 # Get the positional parameters.
 my ($blastProg, $blastdb) = @ARGV;
 if (! $blastProg) {
