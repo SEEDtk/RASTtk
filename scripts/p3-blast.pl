@@ -117,6 +117,12 @@ $blast{maxE} = $opt->maxe;
 $blast{maxHSP} = $opt->maxhsp // 0;
 $blast{minIden} = $opt->percidentity // 0;
 $blast{minLen} = $opt->minlen // 0;
+# Print the output headers.
+if ($blast{outForm} eq 'hsp') {
+    P3Utils::print_cols([qw(qid qdef qlen sid sdef slen score e-val pN p-val match-len identity pct-identity positive gaps dir q-start q-end q-sequence s-start s-end s-sequence)]);
+} else {
+    P3Utils::print_cols([qw(qid sid pct-identity match-len mismatches gaps q-start q-end s-start s-end e-val score q-len s-len tool)]);
+}
 # Get the input triples. These are the query sequences.
 my @query = gjoseqlib::read_fasta($ih);
 # Now we need to determine the BLAST database.
@@ -139,7 +145,7 @@ if (! $blastdb) {
 my $matches = BlastInterface::blast(\@query, $blastDatabase, $blastProg, \%blast);
 # Format the output.
 for my $match (@$matches) {
-    print join("\t", @$match) . "\n";
+    P3Utils::print_cols($match);
 }
 
 
