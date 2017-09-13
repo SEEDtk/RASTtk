@@ -126,7 +126,7 @@ $blast{minLen} = $opt->minlen // 0;
 my $best = $opt->best;
 # Print the output headers.
 if ($blast{outForm} eq 'hsp') {
-    P3Utils::print_cols([qw(qid qdef qlen sid sdef slen score e-val pN p-val match-len identity pct-identity positive gaps dir q-start q-end q-sequence s-start s-end s-sequence)]);
+    P3Utils::print_cols([qw(qid qdef qlen sid sdef slen score e-val pN p-val match-len identity positive gaps dir q-start q-end q-sequence s-start s-end s-sequence)]);
 } else {
     P3Utils::print_cols([qw(qid sid pct-identity match-len mismatches gaps q-start q-end s-start s-end e-val score q-len s-len tool)]);
 }
