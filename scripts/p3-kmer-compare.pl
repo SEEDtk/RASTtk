@@ -61,6 +61,8 @@ my $kmerSize = $opt->kmersize // $defaultKmer;
 my $p3 = P3DataAPI->new();
 # Get the two genomes.
 my @genomes = @ARGV;
+# This will count the sequences processed.
+my $count = 0;
 # Create the kmer database. Each genome will be a group.
 my $kmerDb = KmerDb->new(kmerSize => $kmerSize, maxFound => 0);
 for my $genome (@genomes) {
@@ -147,6 +149,7 @@ sub ProcessPatric {
 ## Process a FASTA genome. The FASTA sequences will be put into the Kmer database. Note we ignore the labels.
 sub ProcessFasta {
     my ($kmerDb, $genome, $label, $gh) = @_;
+    my $count = 0;
     # We will accumulate the current sequence in here.
     my @chunks;
     # This will be TRUE if we read end-of-file.
@@ -186,6 +189,8 @@ sub AddSequence {
     AddSequence1($kmerDb, $genome, $sequence, $gName, $gCode);
     $sequence = SeedUtils::reverse_comp($sequence);
     AddSequence1($kmerDb, $genome, $sequence, $gName, $gCode);
+    $count++;
+    print STDERR "$count sequences processed.\n";
 }
 
 ## Add a sequence to the kmer database (one strand).
