@@ -577,23 +577,23 @@ sub retrieve_protein_features_in_genome_in_export_format {
     my ( $self, $genome_id, $fasta_fh ) = @_;
 
     $self->query_cb("genome_feature",
-		    sub {
-			my ($data) = @_;
-			for my $ent (@$data) {
-			    my $def = "  $ent->{product} [$ent->{genome_name} | $genome_id]";
-			    print_alignment_as_fasta($fasta_fh,
-						     [
-						      $ent->{patric_id},
-						      $def,
-						      $ent->{aa_sequence}
-						      ]
-						    );
-			}
+                    sub {
+                        my ($data) = @_;
+                        for my $ent (@$data) {
+                            my $def = "  $ent->{product} [$ent->{genome_name} | $genome_id]";
+                            print_alignment_as_fasta($fasta_fh,
+                                                     [
+                                                      $ent->{patric_id},
+                                                      $def,
+                                                      $ent->{aa_sequence}
+                                                      ]
+                                                    );
+                        }
                     },
-		    [ "eq",     "feature_type", "CDS" ],
-		    [ "eq",     "genome_id",    $genome_id ],
-		    [ "select", "patric_id,aa_sequence,genome_name,product" ],
-		   );
+                    [ "eq",     "feature_type", "CDS" ],
+                    [ "eq",     "genome_id",    $genome_id ],
+                    [ "select", "patric_id,aa_sequence,genome_name,product" ],
+                   );
 }
 
 #
@@ -1414,8 +1414,8 @@ sub get_pin
     open(my $tmp_fh, ">", $tmp2) or die "Cannot write $tmp2: $!";
     print $tmp_fh ">$fid\n$me->{aa_sequence}\n";
     close($tmp_fh);
-
-    open(my $tmp_fh, ">", $tmp) or die "Cannot write $tmp: $!";
+    undef $tmp_fh;
+    open($tmp_fh, ">", $tmp) or die "Cannot write $tmp: $!";
     print $tmp_fh ">$_->{patric_id}\n$_->{aa_sequence}\n" foreach @pin;
     close($tmp_fh);
     my $rc = system("formatdb", "-p", "t", "-i", $tmp);
@@ -1634,37 +1634,37 @@ sub genetic_code_bulk
 
     for my $g (@gids)
     {
-	my($tax) = $g =~ /^(\d+)/;
-	$tax_of{$g} = $tax;
-	$to_find{$tax} = 1;
+        my($tax) = $g =~ /^(\d+)/;
+        $tax_of{$g} = $tax;
+        $to_find{$tax} = 1;
     }
     my @to_find = keys %to_find;
     undef %to_find;
     my %code_for;
     while (@to_find)
     {
-	my @b = splice(@to_find, 0, 100);
-	my $q = join(",", @b);
+        my @b = splice(@to_find, 0, 100);
+        my $q = join(",", @b);
 
-	print "q=$q\n";
-	my @code = $self->query("taxonomy",
-				[ "in",   "taxon_id",  "($q)" ],
-				[ "select", "taxon_id,genetic_code" ]
-			       );
-	for my $ent (@code)
-	{
-	    $code_for{$ent->{taxon_id}} = $ent->{genetic_code};
-	}
+        print "q=$q\n";
+        my @code = $self->query("taxonomy",
+                                [ "in",   "taxon_id",  "($q)" ],
+                                [ "select", "taxon_id,genetic_code" ]
+                               );
+        for my $ent (@code)
+        {
+            $code_for{$ent->{taxon_id}} = $ent->{genetic_code};
+        }
     }
 
     my $ret = {};
     for my $g (@gids)
     {
-	$ret->{$g} = $code_for{$tax_of{$g}} // 11;
+        $ret->{$g} = $code_for{$tax_of{$g}} // 11;
     }
     return $ret;
 }
-    
+
 
 
 sub function_of
