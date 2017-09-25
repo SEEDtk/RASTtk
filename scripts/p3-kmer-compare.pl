@@ -98,6 +98,7 @@ for my $genome (@genomes) {
 # Compute the cross-reference matrix.
 print STDERR "Creating cross-reference matrix, projecting column genomes into row genomes.\n";
 my $xref = $kmerDb->xref();
+print STDERR "Printing cross-reference matrix.\n";
 # Print out the matrix.
 P3Utils::print_cols(['genome', 'name', @genomes]);
 for my $genomeI (@genomes) {
