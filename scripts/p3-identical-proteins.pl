@@ -1,7 +1,9 @@
+### OBSOLETE ### Use p3-get-features-by-sequence
+
 =head1  Retrieve the proteins in PATRIC identical to the one provided.
 
     p3-identical-proteins [options] < target-protein-sequence
-        
+
     Retrieve the proteins in PATRIC identical to the one provided.
 =cut
 
@@ -17,9 +19,9 @@ use Digest::MD5;
 use gjoseqlib;
 
 my($opt, $usage) = describe_options("%c %o [input-file]",
-				    ["input|i=s", "FASTA input file of target protein sequence"],
-				    ["output|o=s", "Output file"],
-				    ["help|h", "Show this help message"]);
+                                    ["input|i=s", "FASTA input file of target protein sequence"],
+                                    ["output|o=s", "Output file"],
+                                    ["help|h", "Show this help message"]);
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) if @ARGV > 1;
 
@@ -70,9 +72,9 @@ my $md5 = Digest::MD5::md5_hex($seq);
 my $api = P3DataAPI->new();
 
 my @res = $api->query("genome_feature",
-		      ["select", "patric_id,aa_sequence_md5,genome_id"],
-		      ["eq", "annotation", "PATRIC"],
-		      ["eq", "aa_sequence_md5", $md5]);
+                      ["select", "patric_id,aa_sequence_md5,genome_id"],
+                      ["eq", "annotation", "PATRIC"],
+                      ["eq", "aa_sequence_md5", $md5]);
 
 print $out_fh join("genome.patric_id", "genome.genome_id"), "\n";
 for my $ent (@res)

@@ -1,7 +1,9 @@
+### OBSOLETE ### Use p3-get-features-by-sequence
+
 =head1  Retrieve the DNA features in PATRIC identical to the one provided.
 
     p3-identical-dna [options] < target-dna-sequence
-    
+
     Retrieve the DNA features in PATRIC identical to the one provided.
 =cut
 
@@ -14,9 +16,9 @@ use Digest::MD5;
 use gjoseqlib;
 
 my($opt, $usage) = describe_options("%c %o [input-file]",
-				    ["input|i=s", "FASTA input file of target DNA sequence"],
-				    ["output|o=s", "Output file"],
-				    ["help|h", "Show this help message"]);
+                                    ["input|i=s", "FASTA input file of target DNA sequence"],
+                                    ["output|o=s", "Output file"],
+                                    ["help|h", "Show this help message"]);
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) if @ARGV > 1;
 
@@ -88,9 +90,9 @@ else
 my $api = P3DataAPI->new();
 
 my @res = $api->query("genome_feature",
-		      ["select", "patric_id,genome_id,na_sequence"],
-		      ["eq", "annotation", "PATRIC"],
-		      $q);
+                      ["select", "patric_id,genome_id,na_sequence"],
+                      ["eq", "annotation", "PATRIC"],
+                      $q);
 
 print join("\t", "genome.patric_id", "genome.genome_id"), "\n";
 for my $ent (@res)
@@ -99,6 +101,6 @@ for my $ent (@res)
 
     if ($dna eq $seq)
     {
-	print $out_fh join("\t", $id, $genome), "\n";
+        print $out_fh join("\t", $id, $genome), "\n";
     }
 }
