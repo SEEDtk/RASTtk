@@ -1,8 +1,30 @@
-=head1 Return the sequences for feature ids
+=head1 Create A FASTA File of Feature Sequences
 
-    p3-get-feature-sequence < feature-ids [options] 
+    p3-get-feature-sequence [options] < feature-ids
 
-    Return sequences for patric feature ids. 
+This script takes as input a table of feature IDs and outputs a FASTA file of the feature sequences. The FASTA comment will be the
+feature annotation (product).
+
+=head2 Parameters
+
+There are no positional parameters.
+
+The standard input can be overridden using the options in L<P3Utils/ih_options>.
+
+The command-line options are those in L<P3Utils/col_options> (to choose the input column) plus the following.
+
+=over 4
+
+=item protein
+
+Output amino acid sequences (the default).
+
+=item dna
+
+Output DNA sequences (mutually exclusive with C<protein>).
+
+=back
+
 =cut
 
 
@@ -12,87 +34,31 @@ use Data::Dumper;
 use P3DataAPI;
 use gjoseqlib;
 
-my $opt = P3Utils::script_opts('[fids]',
-			       P3Utils::ih_options(),
-			       ["output|o=s", "name of the output file (if not the standard output)"],
-			       P3Utils::col_options(),
-			       ["dna" => "Return DNA for protein features (default is to return amino acid data for protein features)"],
-			      );
-
-my $api = P3DataAPI->new;
-
-my $ih;
-my ($outHeaders, $keyCol);
-
-if (@ARGV)
-{
-    my $inp = join("\n", @ARGV) . "\n";
-    open($ih, "<", \$inp);
-    $keyCol = -1;
-}
-else
-{
-    $ih = P3Utils::ih($opt);
-    # Process the headers and compute the key column index.
-    ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-}
-
-my %is_protein = (peg => 1, cds => 1);
-
-my @batch;
-my $batch_size = 100;
-my $last_stype;
-
-my $oh;
-
-if ($opt->output)
-{
-    open($oh, ">", $opt->output) or die "Cannot write " . $opt->output . ": $!\n";
-}
-else
-{
-    $oh = \*STDOUT;
-}
-
-while (<$ih>)
-{
-    chomp;
-    my @cols = split(/\t/);
-    my $fid = $cols[$keyCol];
-    if (! $fid) {next};
-    my($ftype) = $fid =~ /fig\|\d+\.\d+\.(\S+)\.\d+$/;
-    my $stype = "na_sequence";
-    $stype = "aa_sequence" if $is_protein{lc($ftype)} && !$opt->dna;
-    if (@batch >= $batch_size || ($last_stype && $last_stype ne $stype))
-    {
-	process_batch($last_stype, \@batch);
-	@batch = ();
+my $opt = P3Utils::script_opts('', P3Utils::ih_options(), P3Utils::col_options(),
+        ['mode' => hidden => { one_of => [['protein', 'feature protein FASTA'],
+                                          ['dna', 'feature DNA FASTA']],
+                                          default => 'protein' }],
+                              );
+# Get access to PATRIC.
+my $p3 = P3DataAPI->new();
+# Open the input file.
+my $ih = P3Utils::ih($opt);
+# Read the incoming headers.
+my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
+# Compute the field list.
+my $selectList = ['patric_id', 'product', ($opt->mode eq 'dna' ? 'na_sequence' : 'aa_sequence')];
+# Loop through the input.
+while (! eof $ih) {
+    my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
+    # Get the output rows for these input couplets.
+    my $keys = [map { $_->[0] } @$couplets];
+    my $resultList = P3Utils::get_data_keyed($p3, feature => [], $selectList, $keys, 'patric_id');
+    # Print them.
+    for my $result (@$resultList) {
+        my ($id, $comment, $seq) = @$result;
+        if ($seq) {
+            $seq = uc $seq;
+            print ">$id $comment\n$seq\n";
+        }
     }
-    push(@batch, $fid);
-    $last_stype = $stype;
 }
-if (@batch)
-{
-    process_batch($last_stype, \@batch);
-}
-
-sub process_batch
-{
-    my($stype, $list) = @_;
-
-    my $q = "(" . join(",", @$list) . ")";
-
-    my $cb = sub {
-	my($data) = @_;
-	for my $ent (@$data)
-	{
-	    print_alignment_as_fasta($oh, [$ent->{patric_id}, $ent->{product}, $ent->{$stype}]);
-	}
-    };
-
-    $api->query_cb("genome_feature", $cb,
-		   ["in", "patric_id", $q],
-		   ["select", "patric_id,$stype,product"]);
-    
-}
-    
