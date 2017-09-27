@@ -16,23 +16,25 @@
 # http://www.theseed.org/LICENSE.TXT.
 #
 
+### OBSOLETE ###
+
 use Data::Dumper;
 use strict;
 use warnings;
 use P3Utils;
- 
+
 =head1 Compute Abstract Clusters
 
      p3_abstract clusters <  cluster.signatures > abstract.clusters
 
      processes a file containing cluster.signatures of the form
 
-     	  famId1 peg1 func1
+               famId1 peg1 func1
           famId2 peg2 func2
-	  .
-	  .
-	  .
-	  //
+          .
+          .
+          .
+          //
 
 =head2 Parameters
 
@@ -54,11 +56,11 @@ while (defined(my $line = <$ih>))
     my %fams;
     foreach my $tuple (split("\n",$line))
     {
-	if ($tuple =~ /^(\S+)\t(\S+)\t(.*)$/)
-	{
-	    my($fam,$peg,$func) = ($1,$2,$3);
-	    $fams{$fam} = 1;
-	}
+        if ($tuple =~ /^(\S+)\t(\S+)\t(.*)$/)
+        {
+            my($fam,$peg,$func) = ($1,$2,$3);
+            $fams{$fam} = 1;
+        }
     }
     push(@clusters,[sort keys(%fams)]);
 }
@@ -74,14 +76,14 @@ while (@clusters > 0)
 
     foreach my $x (@clusters)
     {
-	if (! &instance($x,$seed))
-	{
-	    push @left, $x;
-	}
-	else
-	{
-	    $count++;
-	}
+        if (! &instance($x,$seed))
+        {
+            push @left, $x;
+        }
+        else
+        {
+            $count++;
+        }
     }
     push(@abstract_clusters,$seed);
     push(@counts,$count);

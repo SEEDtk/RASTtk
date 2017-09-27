@@ -4,6 +4,8 @@ use warnings;
 use P3Utils;
 use P3Signatures;
 
+### OBSOLETE ###
+
 =head1 Compute Cluster Signatures
 
      p3-signature-clusters

@@ -1,6 +1,9 @@
+### OBSOLETE ### - use p3-gto
+
+
 =head1 Create a gto file of a Patric genome
 
-    p3-extract-gto genome-id [options] 
+    p3-extract-gto genome-id [options]
 
     Create a gto file from a patric genome.
 =cut
@@ -14,8 +17,8 @@ use GenomeTypeObject;
 use Getopt::Long::Descriptive;
 
 my($opt, $usage) = describe_options("%c %o genome-id [ > genome.gto ]",
-				    ["output|o=s", "Write to this output file instead of stdout"],
-				    ["help|h", "Show this help message"]);
+                                    ["output|o=s", "Write to this output file instead of stdout"],
+                                    ["help|h", "Show this help message"]);
 
 print($usage->text), exit  if $opt->help;
 die($usage->text) if (@ARGV != 1);
@@ -29,9 +32,9 @@ my $d = P3DataAPI->new();
 
 my $gto = GenomeTypeObject->new();
 
-my @res = $d->query("genome", ["eq", "genome_id", $gid], 
-		    ["select", "genome_id", "genome_name", "taxon_id", "taxon_lineage_names"],
-		   );
+my @res = $d->query("genome", ["eq", "genome_id", $gid],
+                    ["select", "genome_id", "genome_name", "taxon_id", "taxon_lineage_names"],
+                   );
 
 @res == 1 or die "Cannot find genome $gid\n";
 
@@ -64,25 +67,25 @@ $gto->set_metadata({
 });
 
 my(@fields) = qw(feature_type
-		 patric_id
-		 segments
-		 aa_sequence
-		 accession
-		 location
-		 strand
-		 product
-		 uniprotkb_accession
-		 gi
-		 gene
-		 refseq_locus_tag
-		 );
-		 
+                 patric_id
+                 segments
+                 aa_sequence
+                 accession
+                 location
+                 strand
+                 product
+                 uniprotkb_accession
+                 gi
+                 gene
+                 refseq_locus_tag
+                 );
+
 @res = $d->query("genome_feature",
-		 ["select", @fields],
-		 ["ne", "feature_type", "source"],
-		 ["eq", "annotation", "PATRIC"],
-		 ["eq", "genome_id", $gid],
-		);
+                 ["select", @fields],
+                 ["ne", "feature_type", "source"],
+                 ["eq", "annotation", "PATRIC"],
+                 ["eq", "genome_id", $gid],
+                );
 
 for my $ent (@res)
 {
@@ -91,20 +94,20 @@ for my $ent (@res)
     my @loc;
     for my $lent (@{$ent->{segments}})
     {
-	if (my($l, $r) = ($lent =~ /^(\d+)\.\.(\d+)/))
-	{
-	    my $len = $r - $l + 1;
-	    my $start = $l;
-	    if ($ent->{strand} eq '-')
-	    {
-		$start = $r;
-	    }
-	    push(@loc, [$ent->{accession}, $start, $ent->{strand}, $len]);
-	}
-	else
-	{
-	    die "Could not parse location '$lent'\n";
-	}
+        if (my($l, $r) = ($lent =~ /^(\d+)\.\.(\d+)/))
+        {
+            my $len = $r - $l + 1;
+            my $start = $l;
+            if ($ent->{strand} eq '-')
+            {
+                $start = $r;
+            }
+            push(@loc, [$ent->{accession}, $start, $ent->{strand}, $len]);
+        }
+        else
+        {
+            die "Could not parse location '$lent'\n";
+        }
     }
     my $type = $ent->{feature_type};
 
@@ -113,50 +116,50 @@ for my $ent (@res)
     my $alias_pairs = [];
     if (my $v = $ent->{gi})
     {
-	push(@$aliases, "gi|$v");
-	push(@$alias_pairs, [gi => $v]);
+        push(@$aliases, "gi|$v");
+        push(@$alias_pairs, [gi => $v]);
     }
     if (my $v = $ent->{gene})
     {
-	push(@$aliases, $v);
-	push(@$alias_pairs, [gene => $v]);
+        push(@$aliases, $v);
+        push(@$alias_pairs, [gene => $v]);
     }
     if (my $v = $ent->{refseq_locus_tag})
     {
-	push(@$aliases, $v);
-	push(@$alias_pairs, [locus_tag => $v]);
+        push(@$aliases, $v);
+        push(@$alias_pairs, [locus_tag => $v]);
     }
-    
-    
+
+
     my $feat = {
-	id => $ent->{patric_id},
-	location => [@loc],
-	type => $type,
-	function => $ent->{product},
-	($ent->{aa_sequence} eq '' ? () : (protein_translation => $ent->{aa_sequence} )),
-	aliases => $aliases,
-	alias_pairs => $alias_pairs,
-	annotations => [],
-	family_assignments => [],
-	similarity_associations => [],
-	proposed_functions => [],
+        id => $ent->{patric_id},
+        location => [@loc],
+        type => $type,
+        function => $ent->{product},
+        ($ent->{aa_sequence} eq '' ? () : (protein_translation => $ent->{aa_sequence} )),
+        aliases => $aliases,
+        alias_pairs => $alias_pairs,
+        annotations => [],
+        family_assignments => [],
+        similarity_associations => [],
+        proposed_functions => [],
     };
     push(@{$gto->{features}}, $feat);
-	    
+
 }
 
 @res = $d->query("genome_sequence",
-		 ["select", "genome_id", "accession", "sequence"],
-		 ["eq", "genome_id", $gid],
-		);
+                 ["select", "genome_id", "accession", "sequence"],
+                 ["eq", "genome_id", $gid],
+                );
 
 for my $ent (@res)
 {
     push(@{$gto->contigs},
      {
-	 dna => $ent->{sequence},
-	 genetic_code => $genetic_code,
-	 id => $ent->{accession},
+         dna => $ent->{sequence},
+         genetic_code => $genetic_code,
+         id => $ent->{accession},
      });
 }
 

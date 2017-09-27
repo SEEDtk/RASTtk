@@ -4,6 +4,9 @@ use warnings;
 use P3Utils;
 use SeedUtils;
 
+
+### OBSOLETE ###
+
 =head1 Aggregate Clusters Produced from Distinct Samples
 
      p3-aggregate-sss -d DataDirectory > aggregated.clusters
@@ -40,7 +43,7 @@ while (defined($_ = <RF>))
 {
     if ($_ =~ /^(\S+\t\S+)\t(\d+)$/)
     {
-	$pairs{$1} += $2;
+        $pairs{$1} += $2;
     }
 }
 close(RF);
@@ -63,7 +66,7 @@ while (defined($cluster = <CLUST>))
     my $best_pair = &best($cluster,\%pairs);
     if ($best_pair)
     {
-	$sss{$best_pair}->{$cluster} = 1;
+        $sss{$best_pair}->{$cluster} = 1;
     }
 }
 close(CLUST);
@@ -73,7 +76,7 @@ foreach my $pair (sort { $pairs{$b} <=> $pairs{$a} } keys(%sss))
     print SSS join("\t",($pair,$pairs{$pair})),"\n";
     foreach my $cluster (sort { length($b) <=> length($a) } keys(%{$sss{$pair}}))
     {
-	print SSS $cluster;
+        print SSS $cluster;
     }
     print SSS "////\n";
 }
@@ -88,16 +91,16 @@ sub best {
     my $best_pair;
     for (my $i=0; ($i < $#fams); $i++)
     {
-	for (my $j = $i+1; ($j < @fams); $j++)
-	{
-	    if ($fams[$i] ne $fams[$j])
-	    {
-		my $p = join("\t",($fams[$i],$fams[$j]));
-		if (($_ = $pairs->{$p}) && ($_ > $sofar)) { $sofar = $_; $best_pair = $p  }
-		$p = join("\t",($fams[$i],$fams[$j]));
-		if (($_ = $pairs->{$p}) && ($_ > $sofar)) { $sofar = $_; $best_pair = $p  }
-	    }
-	}
+        for (my $j = $i+1; ($j < @fams); $j++)
+        {
+            if ($fams[$i] ne $fams[$j])
+            {
+                my $p = join("\t",($fams[$i],$fams[$j]));
+                if (($_ = $pairs->{$p}) && ($_ > $sofar)) { $sofar = $_; $best_pair = $p  }
+                $p = join("\t",($fams[$i],$fams[$j]));
+                if (($_ = $pairs->{$p}) && ($_ > $sofar)) { $sofar = $_; $best_pair = $p  }
+            }
+        }
     }
     return $best_pair;
 }

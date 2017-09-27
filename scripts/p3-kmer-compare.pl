@@ -3,11 +3,15 @@
     p3-kmer-compare.pl [options] genome1 genome2 ... genomeN
 
 This script compares genomes based on DNA kmers. It outputs the number of kmers the two genomes have in common, the number appearing
-only in the first genome, and the number appearing only in the second. It then produces a pair of percentages for each combination-- completeness and
-contamination-- displayed in a matrix. The percentages project the row genome onto the column genome. A completeness of 100% means every kmer in the
-column genome is found in the row genome. A contamination of 100% means every kmer in the column genome is NOT found in the row genome. So, if the
-genomes are identical, the percentages will be C<100.0/0.0>. If the column genome is a subset of the row genome, the completeness will be 100% but
-the contamination will be nonzero.
+only in the first genome, and the number appearing only in the second.
+
+In verbose mode, it produces a pair of percentages for each combination-- completeness and contamination-- displayed in a matrix. The percentages
+project the row genome onto the column genome. A completeness of 100% means every kmer in the column genome is found in the row genome. A
+contamination of 100% means every kmer in the column genome is NOT found in the row genome. So, if the genomes are identical, the percentages
+will be C<100.0/0.0>. If the column genome is a subset of the row genome, the completeness will be 100% but the contamination will be nonzero.
+
+NOTE that for best performance, the longest genome should be specified first in the list. This reduces the number of times memory needs to be
+reorganized.
 
 =head2 Parameters
 
@@ -30,7 +34,7 @@ If specified, a genetic code to use to translate the DNA sequences to proteins. 
 
 =item verbose
 
-If specified, raw kmer counts will be included in the output matrix.
+If specified, completeness and contamination percentages will be included in the output matrix.
 
 =back
 
@@ -45,7 +49,7 @@ use KmerDb;
 my $opt = P3Utils::script_opts('genome1 genome2 ... genomeN',
         ['kmerSize|kmersize|kmer|k=i', 'kmer size'],
         ['geneticCode|geneticcode|code|gc|x=i', 'genetic code for protein kmers (default is to use DNA kmers)'],
-        ['verbose|v', 'include raw kmer counts in output']
+        ['verbose|v', 'include percentages in output']
         );
 # Compute the genetic code (if any).
 my $geneticCode = $opt->geneticcode;
@@ -96,7 +100,10 @@ for my $genome (@genomes) {
     }
 }
 # Compute the cross-reference matrix.
-print STDERR "Creating cross-reference matrix, projecting column genomes into row genomes.\n";
+print STDERR "Creating cross-reference matrix, format is col/both/row.\n";
+if ($verbose) {
+    print STDERR "Percentages shown for projecting column genomes into row genomes.\n";
+}
 my $xref = $kmerDb->xref();
 print STDERR "Printing cross-reference matrix.\n";
 # Print out the matrix.
@@ -114,11 +121,11 @@ for my $genomeI (@genomes) {
             if (! $list) {
                 $list = [reverse @{$xref->{$genomeJ}{$genomeI}}];
             }
-            my $complete = $list->[1] * 100 / ($list->[1] + $list->[2]);
-            my $contam = $list->[0] * 100 / ($list->[0] + $list->[1]);
-            my $ratio = sprintf("%0.1f/%0.1f", $complete, $contam);
+            my $ratio = join("/", @$list);
             if ($verbose) {
-                $ratio .= "," . join("/", @$list);
+                my $complete = $list->[1] * 100 / ($list->[1] + $list->[2]);
+                my $contam = $list->[0] * 100 / ($list->[0] + $list->[1]);
+                $ratio .= ", " . sprintf("%0.1f/%0.1f", $complete, $contam);
             }
             push @row, $ratio;
         }

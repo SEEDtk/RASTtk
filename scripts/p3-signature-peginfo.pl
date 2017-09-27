@@ -1,3 +1,5 @@
+### OBSOLETE ###
+
 =head1 Return Signature Feature Data From Families in PATRIC
 
     p3-signature-peginfo
