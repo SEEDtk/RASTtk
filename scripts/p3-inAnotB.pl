@@ -1,5 +1,7 @@
 use strict;
 
+### OBSOLETE ### use p3-merge
+
 =head1 Find Lines in File1 NOT Present in File2
 
 p3-inAnotB

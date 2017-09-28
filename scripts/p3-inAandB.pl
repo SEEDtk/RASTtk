@@ -1,5 +1,6 @@
 use strict;
 
+### OBSOLETE ### use p3-merge
 
 =head1 Find Lines in File1 Also Present in File2
 

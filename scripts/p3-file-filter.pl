@@ -4,7 +4,8 @@
 
 Filter the standard input using the contents of a file. The output will contain only those rows in the input file whose key value
 matches a value from the specified column of the specified filter file. To have the output contain only those rows in the input
-file that do NOT match, use the C<--reverse> option,
+file that do NOT match, use the C<--reverse> option. This is similar to L<p3-merge.pl>, except that script operates on whole
+lines instead of a single key field.
 
 =head2 Parameters
 

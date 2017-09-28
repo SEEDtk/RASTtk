@@ -1,5 +1,7 @@
 use strict;
 
+### OBSOLETE ### use p3-merge
+
 =head1 Merge Two Files
 
 p3-inAorB
