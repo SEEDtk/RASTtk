@@ -1,18 +1,18 @@
 =head1 Merge Two Files-- Union, Intersection, or Difference
 
-    p3-merge.pl [options] file1 file2
+    p3-merge.pl [options] file1 file2 ... fileN
 
-This script reads two files and outputs a new one containing whole lines from those files. The output file can be the union (all lines from both files),
-intersection (all lines present in both files), or difference (all lines in the first but not the second). Both files must have the same header line.
-This is similar to L<p3-file-filter.pl>, except that script uses a single key field instead of whole lines.
+This script reads one or more files and outputs a new one containing whole lines from those files. The output file can be the union (all lines from all files),
+intersection (all lines present in all files), or difference (all lines in the first but not the others). All files must have the same header line.
+This script has a function similar to L<p3-file-filter.pl>, except that script uses a single key field instead of whole lines and is limited to only two files.
 
-Duplicate lines will be removed. That is, a line that occurs in both files or occurs once in either file will only appear once in the output.
+Duplicate lines will be removed. That is, a line that occurs in multiple files or occurs more than once in any file will only appear once in the output.
 
-Either file can be replaced by the standard input.
+Any one file can be replaced by the standard input.
 
 =head2 Parameters
 
-The positional parameters are the names of the two files. A minus sign (C<->) can be used to represent the standard input.
+The positional parameters are the names of the files. A minus sign (C<->) can be used to represent the standard input.
 
 The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
@@ -45,7 +45,7 @@ use P3Utils;
 use Digest::MD5;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('file1 file2', P3Utils::ih_options(),
+my $opt = P3Utils::script_opts('file1 file2 ... fileN', P3Utils::ih_options(),
         ['nohead', 'input files do not have headers'],
         ['mode' => hidden => { one_of => [['and', 'output lines in both files'],
                                           ['or', 'output lines in either file'],
@@ -53,25 +53,21 @@ my $opt = P3Utils::script_opts('file1 file2', P3Utils::ih_options(),
                                default => 'or' }]
         );
 # Get the input file names.
-my ($file1, $file2) = @ARGV;
+my @files = @ARGV;
 # Validate the file names.
-if (! $file2 || ! $file1) {
-    die "Two file names must be specified.";
-} elsif ($file2 eq $file1) {
-    die "The two files must be different.";
-} elsif ($file1 ne '-' && ! -f $file1) {
-    die "File $file1 is not found or invalid.";
-} elsif ($file2 ne '-' && ! -f $file2) {
-    die "File $file2 is not found or invalid.";
+if (! @files) {
+    die "At least one file name must be specified.";
+} elsif ((grep { $_ eq '-' } @files) > 1) {
+    die "The standard input (-) can only be specified once.";
 }
 # Compute the mode and the header option.
 my $mode = $opt->mode;
 my $nohead = $opt->nohead;
 # This will hold the header line.
 my $header;
-# Now we open the two files. The handles will be put in this list.
+# Now we open the files. The handles will be put in this list.
 my @fh;
-for my $file ($file1, $file2) {
+for my $file (@files) {
     my $fh;
     if ($file eq '-') {
         $fh = P3Utils::ih($opt);
@@ -87,7 +83,7 @@ for my $file ($file1, $file2) {
             $header = $headLine;
             print "$header\n";
         } elsif ($headLine ne $header) {
-            die "Files have incompatible headers.";
+            die "File $file has an incompatible header.";
         }
     }
     push @fh, $fh;
@@ -96,19 +92,33 @@ for my $file ($file1, $file2) {
 # This hash tracks records we've seen.
 my %seen;
 if ($mode eq 'or') {
-    # Here we're taking the union of the files. We read both files in order
+    # Here we're taking the union of the files. We read all files in order
     # and print the records we've not seen.
     for my $fh (@fh) {
         print_unseen($fh, \%seen);
     }
 } elsif ($mode eq 'diff') {
-    # Here we're taking the difference. We read the second file and print the unseen ones in the first.
-    print_none($fh[1], \%seen);
-    print_unseen($fh[0], \%seen);
+    # Here we're taking the difference. We read the second and subsequent files and print the unseen ones in the first.
+    my $fh = shift @fh;
+    for my $fh2 (@fh) {
+        print_none($fh2, \%seen);
+    }
+    print_unseen($fh, \%seen);
 } elsif ($mode eq 'and') {
-    # Here we're taking the intersection. We read the second file and print the seen ones in the first.
-    print_none($fh[1], \%seen);
-    print_new_seen($fh[0], \%seen);
+    # Here we're taking the intersection. We look for records in all the files but the first one, then filter the first one.
+    my $fh1 = shift @fh;
+    # Get the second file.
+    my $fh2 = shift @fh;
+    # Save the records in the second file.
+    print_none($fh2, \%seen);
+    # Filter the seen hash by the records in the other files.
+    for my $fh (@fh) {
+        my %new;
+        print_none($fh, \%new);
+        %seen = map { $_ => 1 } grep { $seen{$_} } keys %new;
+    }
+    # Print the records in the first file found in all the others.
+    print_new_seen($fh1, \%seen);
 }
 
 
