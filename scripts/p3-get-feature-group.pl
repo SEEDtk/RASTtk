@@ -6,6 +6,7 @@ Retrieve a feature group from a patric workspace. Use the C<--title> option to s
 A value of C<none> will omit the header; the default is the group name followed by C<genome_id>.
 
 =cut
+
 use strict;
 use Getopt::Long::Descriptive;
 use P3WorkspaceClient;

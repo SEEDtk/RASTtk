@@ -13,8 +13,6 @@ The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> (to specify the key column).
 
-=back
-
 =cut
 
 use strict;

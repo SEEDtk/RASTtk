@@ -5,6 +5,7 @@
     Retrieve the proteins in PATRIC similar to the one provided, based on PATRIC families
 
 =cut
+
 #
 # Retrieve the proteins in PATRIC similar to the one provided, based on
 # PATRIC families.

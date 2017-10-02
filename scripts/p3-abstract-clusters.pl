@@ -36,12 +36,6 @@ use P3Utils;
           .
           //
 
-=head2 Parameters
-
-=over 4
-
-=back
-
 =cut
 
 my $opt = P3Utils::script_opts('', P3Utils::ih_options());
