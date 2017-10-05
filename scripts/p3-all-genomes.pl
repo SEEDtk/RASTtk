@@ -28,6 +28,7 @@ Only include private genomes. If this option is specified and you are not logged
 exclusive with public.
 
 =back
+
 You can peruse
 
      https://github.com/PATRIC3/patric_solr/blob/master/genome/conf/schema.xml
