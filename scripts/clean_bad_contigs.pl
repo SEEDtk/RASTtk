@@ -67,6 +67,7 @@ If specified, then a good role is one that is expected, rather than one with an 
 
 =cut
 
+$| = 1;
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('packageDir pkg1 pkg2 ... pkgN',
         ['all', 'process all packages'],
