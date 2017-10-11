@@ -23,6 +23,7 @@ use FIG_Config;
 use ScriptUtils;
 use Stats;
 use GenomeTypeObject;
+use RoleParse;
 
 =head1 Clean Bad Contigs From a Genome Package
 
@@ -69,7 +70,7 @@ If specified, then a good role is one that is expected, rather than one with an 
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('packageDir pkg1 pkg2 ... pkgN',
         ['all', 'process all packages'],
-        ['roles=s', 'role definition file', { default => "FIG_Config::global/roles.in.subsystems" }],
+        ['roles=s', 'role definition file', { default => "$FIG_Config::global/roles.in.subsystems" }],
         ['missing', 'skip packages already processed'],
         ['suffix=s', 'output file suffix', { default => '1' }],
         ['coarse', 'use coarse criterion for good roles'],
@@ -134,10 +135,10 @@ for my $pkg (@pkgs) {
         my %goodRoles;
         my $count = 0;
         while (! eof $ih) {
-            my $line = <$rh>;
+            my $line = <$ih>;
             chomp $line;
             my ($role, $expect, $found) = split /\t/, $line;
-            if (($fine && $expect == $found) || ($expect >= $found)) {
+            if ($fine ? ($expect == $found) : ($expect >= $found)) {
                 $goodRoles{$role} = 1;
                 $stats->Add(goodRole => 1);
                 $count++;
