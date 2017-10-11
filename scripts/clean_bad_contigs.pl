@@ -101,6 +101,7 @@ if (! $packageDir) {
     print "Computing package list.\n";
     opendir(my $dh, $packageDir) || die "Could not open $packageDir: $!";
     @pkgs = grep { $_ =~ /\d+\.\d+/ } readdir $dh;
+    closedir $dh;
 }
 print scalar(@pkgs) . " packages to be processed.\n";
 # Read the role map.
