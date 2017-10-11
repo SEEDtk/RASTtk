@@ -170,7 +170,7 @@ for my $pkg (@pkgs) {
                 my $outDir = "$newDir/EvalByCheckm";
                 my $cmd = "checkm lineage_wf --tmpdir $FIG_Config::temp -x fa --file $newDir/evaluate.log $newDir $outDir";
                 SeedUtils::run($cmd);
-                File::Copy::Recursive::fmove("$pDir/evaluate.log", "$pDir/EvalByCheckm/evaluate.log");
+                File::Copy::Recursive::fmove("$newDir/evaluate.log", "$newDir/EvalByCheckm/evaluate.log");
                 print "Running SciKit.\n";
                 $outDir = "$newDir/EvalBySciKit";
                 $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::global/FunctionPredictors $FIG_Config::global/roles.in.subsystems $FIG_Config::global/roles.to.use";
