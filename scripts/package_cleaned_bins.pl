@@ -160,7 +160,11 @@ for my $pkg (@pkgs) {
                 print $oh "Source Package\t$pkg\n";
                 print $oh "Contigs\t$contigs\n";
                 print $oh "Base pairs\t$bases\n";
-                close $oh;
+                close $oh; undef $oh;
+                # Record this in the cleaning log.
+                open($oh, '>>', "$pDir/clean.log") || die "Could not open clean.log for $pkg: $!";
+                print $oh "$inFileName produced $newID in $outputDir.\n";
+                close $oh; undef $oh;
                 # Evaluate the new package.
                 print "Running CheckM.\n";
                 my $outDir = "$newDir/EvalByCheckm";
