@@ -170,15 +170,15 @@ for my $pkg (@pkgs) {
                     $good = 1;
                     $stats->Add(roleGood => 1);
                 }
-                if ($good) {
-                    $stats->Add(goodFeature => 1);
-                    my $locs = $feature->{location};
-                    for my $loc (@$locs) {
-                        $goodContigs{$loc->[0]}++;
-                    }
-                } else {
-                    $stats->Add(notGoodFeature => 1);
+            }
+            if ($good) {
+                $stats->Add(featureGood => 1);
+                my $locs = $feature->{location};
+                for my $loc (@$locs) {
+                    $goodContigs{$loc->[0]}++;
                 }
+            } else {
+                $stats->Add(featureNotGood => 1);
             }
         }
         # Now we have a list of good contigs. We need some counts.
