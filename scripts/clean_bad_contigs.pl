@@ -175,6 +175,8 @@ for my $pkg (@pkgs) {
                     for my $loc (@$locs) {
                         $goodContigs{$loc->[0]}++;
                     }
+                } else {
+                    $stats->Add(notGoodFeature => 1);
                 }
             }
         }
@@ -200,7 +202,7 @@ for my $pkg (@pkgs) {
                 $contigSkipped++;
                 $dnaSkipped += $len;
                 $stats->Add(contigsRejected => 1);
-                $stats->Add(dnaRejected => 1);
+                $stats->Add(dnaRejected => $len);
             }
         }
         close $oh;
