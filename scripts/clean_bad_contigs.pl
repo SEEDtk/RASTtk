@@ -135,6 +135,7 @@ for my $pkg (@pkgs) {
         # Read the role expectation list to compute the good roles.
         open(my $ih, "$packageDir/$pkg/EvalBySciKit/evaluate.out") || die "Could not load role expectation file for $pkg: $!";
         my %goodRoles;
+        my %badRoles;
         my $count = 0;
         while (! eof $ih) {
             my $line = <$ih>;
@@ -145,6 +146,7 @@ for my $pkg (@pkgs) {
                 $stats->Add(goodRole => 1);
                 $count++;
             } else {
+                $badRoles{$role} = 1;
                 $stats->Add(badRole => 1);
             }
         }
@@ -164,6 +166,8 @@ for my $pkg (@pkgs) {
                 my $roleID = $roleMap{$checksum};
                 if (! $roleID) {
                     $stats->Add(roleNotMapped => 1);
+                } elsif ($badRoles{$roleID}) {
+                    $stats->Add(roleBad => 1);
                 } elsif (! $goodRoles{$roleID}) {
                     $stats->Add(roleNotGood => 1);
                 } else {
