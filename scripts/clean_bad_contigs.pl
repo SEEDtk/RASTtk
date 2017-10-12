@@ -59,9 +59,27 @@ Only process packages that don't already have an output file.
 
 The suffix to place on the name portion of the output file. The default is C<1>, indicating C<bin1.fa>.
 
-=item coarse
+=item safeLen
 
-If specified, then a good role is one that is expected, rather than one with an exact match.
+If specified, then a contig length. Contigs of this length or greater will not be removed from the bin. A value of C<0> causes the
+length check to be ignored.
+
+=item minLen
+
+If specified, then a contig length. Contigs shorter than this length will be removed from the bin in the C<relaxed> algorithm if they
+have no good roles.
+
+=back
+
+In addition, at most one of the following options may be specified, indicating the algorithm for keeping contigs.
+
+=item relaxed
+
+If specified, then a contig is kept if it has at least one good role or no bad roles.
+
+=item fine
+
+If specified, then a contig is kept only if it has at least one good role.
 
 =back
 
@@ -74,19 +92,25 @@ my $opt = ScriptUtils::Opts('packageDir pkg1 pkg2 ... pkgN',
         ['roles=s', 'role definition file', { default => "$FIG_Config::global/roles.in.subsystems" }],
         ['missing', 'skip packages already processed'],
         ['suffix=s', 'output file suffix', { default => '1' }],
-        ['coarse', 'use coarse criterion for good roles'],
+        ['minLen=i', 'minimum contig length for a contig to be kept in relaxed mode', { default => 500 }],
+        ['safeLen=i', 'minimum contig length for contig to be safe from discarding', { default => 0 }],
+        ['method' => hidden => { one_of => [
+            ['fine', 'keep only contigs with good roles'],
+            ['relaxed', 'keep contigs with good roles or with no bad roles (minLen applies to the latter)'],
+            ], default => 'fine'}]
         );
 # Create the statistics object.
 my $stats = Stats->new();
-# Get the good-role criterion.
-my $fine;
-if ($opt->coarse) {
-    print "Coarse mode selected.\n";
-    $fine = 0;
-} else {
-    print "Fine mode selected.\n";
-    $fine = 1;
+# Determine the algorithm.
+my $method = $opt->method;
+print ucfirst($method) . " mode selected.\n";
+# Check for a safe length.
+my $safeLen = $opt->safelen;
+if ($safeLen) {
+    print "Safe length is $safeLen.\n";
 }
+# Get the minimum length.
+my $minLen = $opt->minlen;
 # Get the suffix.
 my $suffix = $opt->suffix;
 my $outFileName = "bin$suffix.fa";
@@ -136,31 +160,33 @@ for my $pkg (@pkgs) {
         open(my $ih, "$packageDir/$pkg/EvalBySciKit/evaluate.out") || die "Could not load role expectation file for $pkg: $!";
         my %goodRoles;
         my %badRoles;
-        my $count = 0;
+        my ($count, $bCount) = (0, 0);
         while (! eof $ih) {
             my $line = <$ih>;
             chomp $line;
             my ($role, $expect, $found) = split /\t/, $line;
-            if ($fine ? ($expect == $found) : ($expect >= $found)) {
+            if ($expect == $found) {
                 $goodRoles{$role} = 1;
                 $stats->Add(goodRole => 1);
                 $count++;
             } else {
                 $badRoles{$role} = 1;
                 $stats->Add(badRole => 1);
+                $bCount++;
             }
         }
         close $ih;
-        print "$count good roles found.\n";
+        print "$count good and $bCount bad roles found.\n";
         # Read the GTO and compute the good contigs.
         my %goodContigs;
+        my %badContigs;
         my $gto = GenomeTypeObject->create_from_file("$packageDir/$pkg/bin.gto");
         my $featuresL = $gto->{features};
         for my $feature (@$featuresL) {
             $stats->Add(featureProcessed => 1);
             my $function = $feature->{function};
             my @roles = SeedUtils::roles_of_function($function);
-            my $good;
+            my ($good, $bad);
             for my $role (@roles) {
                 my $checksum = RoleParse::Checksum($role);
                 my $roleID = $roleMap{$checksum};
@@ -168,6 +194,7 @@ for my $pkg (@pkgs) {
                     $stats->Add(roleNotMapped => 1);
                 } elsif ($badRoles{$roleID}) {
                     $stats->Add(roleBad => 1);
+                    $bad = 1;
                 } elsif (! $goodRoles{$roleID}) {
                     $stats->Add(roleNotGood => 1);
                 } else {
@@ -177,15 +204,20 @@ for my $pkg (@pkgs) {
             }
             if ($good) {
                 $stats->Add(featureGood => 1);
-                my $locs = $feature->{location};
-                for my $loc (@$locs) {
-                    $goodContigs{$loc->[0]}++;
+                RecordContigs($feature, \%goodContigs);
+                if ($bad) {
+                    $stats->Add(featureGoodAndBad => 1);
                 }
-            } else {
+            }
+            if ($bad) {
+                $stats->Add(featureBad => 1);
+                RecordContigs($feature, \%badContigs);
+            }
+            if (! $bad && ! $good) {
                 $stats->Add(featureNotGood => 1);
             }
         }
-        # Now we have a list of good contigs. We need some counts.
+        # Now we have a list of good and bad contigs. We need some counts.
         my ($contigKept, $contigSkipped, $dnaKept, $dnaSkipped) = (0, 0, 0, 0);
         # Open the output file.
         print "Writing $outFile.\n";
@@ -197,11 +229,25 @@ for my $pkg (@pkgs) {
             my $dna = $contig->{dna};
             my $len = length $dna;
             $stats->Add(contigsProcessed => 1);
+            my $contigOK;
             if ($goodContigs{$contigID}) {
+                $stats->Add(contigsGood => 1);
+                $contigOK = 1;
+            } elsif ($method eq 'relaxed' && ! $badContigs{$contigID}) {
+                if ($len >= $minLen) {
+                    $stats->Add(contigsNotBad => 1);
+                    $contigOK = 1;
+                } else {
+                    $stats->Add(contigsShort => 1);
+                }
+            } elsif ($safeLen && $len >= $safeLen) {
+                $stats->Add(contigsSafe => 1);
+                $contigOK = 1;
+            }
+            if ($contigOK) {
                 $contigKept++;
                 $dnaKept += $len;
                 print $oh ">$contigID\n$dna\n";
-                $stats->Add(contigsKept => 1);
                 $stats->Add(dnaKept => $len);
             } else {
                 $contigSkipped++;
@@ -216,3 +262,12 @@ for my $pkg (@pkgs) {
     }
 }
 print "All done.\n" . $stats->Show();
+
+# Record the contigs of a feature into the specified hash.
+sub RecordContigs {
+    my ($feature, $hash) = @_;
+    my $locs = $feature->{location};
+    for my $loc (@$locs) {
+        $hash->{$loc->[0]}++;
+    }
+}
