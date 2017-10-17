@@ -24,6 +24,8 @@ use ScriptUtils;
 use Stats;
 use GenomeTypeObject;
 use RoleParse;
+use TetraMap;
+use TetraProfile;
 
 =head1 Clean Bad Contigs From a Genome Package
 
@@ -69,6 +71,11 @@ length check to be ignored.
 If specified, then a contig length. Contigs shorter than this length will be removed from the bin in the C<relaxed> algorithm if they
 have no good roles.
 
+=item tetra
+
+A tetramer profile distance. Contigs which do not have bad roles but are within this distance of the contigs being kept will be
+added back in. A value of C<0> will skip the add-back-in step. 
+
 =back
 
 In addition, at most one of the following options may be specified, indicating the algorithm for keeping contigs.
@@ -97,13 +104,19 @@ my $opt = ScriptUtils::Opts('packageDir pkg1 pkg2 ... pkgN',
         ['method' => hidden => { one_of => [
             ['fine', 'keep only contigs with good roles'],
             ['relaxed', 'keep contigs with good roles or with no bad roles (minLen applies to the latter)'],
-            ], default => 'fine'}]
+            ], default => 'fine'}],
+        ['tetra=f', 'maximum tetramer distance (0 to disable)', { default => 0.25 }],
         );
 # Create the statistics object.
 my $stats = Stats->new();
 # Determine the algorithm.
 my $method = $opt->method;
 print ucfirst($method) . " mode selected.\n";
+# Determine the tetramer distance.
+my $tetraDist = $opt->tetra;
+if ($tetraDist) {
+    print "Tetramer distance is $tetraDist.\n";
+}
 # Check for a safe length.
 my $safeLen = $opt->safelen;
 if ($safeLen) {
@@ -217,11 +230,11 @@ for my $pkg (@pkgs) {
                 $stats->Add(featureNotGood => 1);
             }
         }
-        # Now we have a list of good and bad contigs. We need some counts.
-        my ($contigKept, $contigSkipped, $dnaKept, $dnaSkipped) = (0, 0, 0, 0);
-        # Open the output file.
-        print "Writing $outFile.\n";
-        open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+        # This will be our final list of good contigs.
+        my %good;
+        # This will be the tetramer profile for the good contigs.
+        my $mapper = TetraMap->new();
+        my $profile = TetraProfile->new($mapper, nolocals => 1, chunkSize => 0);
         # Get the contig list.
         my $contigsL = $gto->{contigs};
         for my $contig (@$contigsL) {
@@ -245,6 +258,44 @@ for my $pkg (@pkgs) {
                 $contigOK = 1;
             }
             if ($contigOK) {
+                # Save the contig and submit it to the profiler.
+                $good{$contigID} = 1;
+                $profile->ProcessContig($dna);
+            }
+        }
+        # Now we have a list of good and bad contigs. We need some counts.
+        my ($contigKept, $contigSkipped, $dnaKept, $dnaSkipped) = (0, 0, 0, 0);
+        print "Initial set of good contigs contains " . scalar(keys %good) . "\n";
+        # Open the output FASTA file.
+        print "Writing $outFile.\n";
+        open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+        # Get the tetramer profile.
+        my $global = $profile->global;
+        # Get the contig list. Here we make our final determination.
+        for my $contig (@$contigsL) {
+            my $contigID = $contig->{id};
+            my $dna = $contig->{dna};
+            my $len = length $dna;
+            $stats->Add(contigsChecked => 1);
+            my $contigOK;
+            if ($good{$contigID}) {
+                $stats->Add(contigGoodOut => 1);
+                $contigOK = 1;
+            } elsif ($tetraDist == 0) {
+                $stats->Add(contigRejected => 1);
+            } else {
+                # Compute the contig's tetramer distance.
+                my $vec = $mapper->ProcessString($dna);
+                TetraMap::Norm($vec);
+                my $dist = 1 - TetraMap::dot($global, $vec);
+                if ($dist <= $tetraDist) {
+                    $stats->Add(contigTetraOut => 1);
+                    $contigOK = 1;
+                } else {
+                    $stats->Add(contigRejected => 1);
+                }
+            }
+            if ($contigOK) {
                 $contigKept++;
                 $dnaKept += $len;
                 print $oh ">$contigID\n$dna\n";
@@ -252,7 +303,6 @@ for my $pkg (@pkgs) {
             } else {
                 $contigSkipped++;
                 $dnaSkipped += $len;
-                $stats->Add(contigsRejected => 1);
                 $stats->Add(dnaRejected => $len);
             }
         }
@@ -261,6 +311,7 @@ for my $pkg (@pkgs) {
         print "$contigSkipped contigs rejected with $dnaSkipped bases.\n";
     }
 }
+# Now we write out the good contigs. Open the output file.
 print "All done.\n" . $stats->Show();
 
 # Record the contigs of a feature into the specified hash.

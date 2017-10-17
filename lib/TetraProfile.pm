@@ -47,11 +47,15 @@ The chunk size to use for large sequences.
 
 Reference to a list of the chunk profile vectors. The vectors are normalized.
 
+=item keepLocals
+
+If TRUE, local vectors will be kept; otherwise they will be discarded.
+
 =back
 
 =head2 Special Methods
 
-    my $profile = TetraProfile->new($map, $chunkSize);
+    my $profile = TetraProfile->new($map, %options);
 
 Create a new, empty tetramer profile.
 
@@ -61,23 +65,38 @@ Create a new, empty tetramer profile.
 
 The L<TetraMap> object used to compute the tetramer vectors.
 
+=item options
+
+A hash of options, including 0 or more of the following.
+
+=over 8
+
+=item nolocals
+
+If TRUE, no local vectors will be kept. In this case, the L</stats> method is meaningless.
+
 =item chunkSize
 
-The number of base pairs to use in each sampling chunk. The default is C<1000>.
+The number of base pairs to use in each sampling chunk. The default is C<1000>. A value of C<0> disables chunking.
+
+=back
 
 =back
 
 =cut
 
 sub new {
-    my ($class, $map, $chunkSize) = @_;
-    $chunkSize //= 1000;
+    my ($class, $map, %options) = @_;
+    # Process the options.
+    my $chunkSize = $options{chunkSize} // 1000;
+    my $keepLocals = ! $options{nolocals};
     # Create the object.
     my $retVal = {
         'map' => $map,
         chunkSize => $chunkSize,
         global => $map->empty(),
-        locals => []
+        locals => [],
+        keepLocals => $keepLocals,
     };
     # Bless and return it.
     bless $retVal, $class;
@@ -184,8 +203,11 @@ sub ProcessContig {
     my $global = $self->{global};
     my $localL = $self->{locals};
     my $lenL = $self->{lens};
+    my $keep = $self->{keepLocals};
     # Get the contig length.
     my $len = length $contig;
+    # Change a chunk size of 0 to the contig length to prevent chunking.
+    $chunkSize ||= $len;
     # Loop through the chunks, computing profile vectors. We have to do a fancy loop because
     # we don't want any chunks that are less than 100 base pairs.
     my ($offset, $next) = (0, $chunkSize);
@@ -199,8 +221,10 @@ sub ProcessContig {
         # Each local vector is merged into the global before it is normalized.
         TetraMap::Add($global, $local);
         # Normalize and save the local vector.
-        TetraMap::Norm($local);
-        push @$localL, $local;
+        if ($keep) {
+            TetraMap::Norm($local);
+            push @$localL, $local;
+        }
         # Position at the next chunk.
         $offset = $next;
         $next += $chunkSize;
