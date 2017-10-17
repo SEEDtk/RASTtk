@@ -249,8 +249,10 @@ sub Norm {
     my ($vec) = @_;
     my $n = scalar @$vec;
     my $length = len($vec);
-    for (my $i = 0; $i < $n; $i++) {
-        $vec->[$i] /= $length;
+    if ($length > 0) {
+        for (my $i = 0; $i < $n; $i++) {
+            $vec->[$i] /= $length;
+        }
     }
 }
 

@@ -186,15 +186,23 @@ sub ProcessContig {
     my $lenL = $self->{lens};
     # Get the contig length.
     my $len = length $contig;
-    # Loop through the chunks, computing profile vectors.
-    for (my $offset = 0; $offset < $len; $offset += $chunkSize) {
-        my $chunk = substr($contig, $offset, $chunkSize);
+    # Loop through the chunks, computing profile vectors. We have to do a fancy loop because
+    # we don't want any chunks that are less than 100 base pairs.
+    my ($offset, $next) = (0, $chunkSize);
+    while ($offset < $len) {
+        # Insure we don't have a too-short fragment at the end. 
+        if ($len - $next < 100) {
+            $next = $len;
+        }
+        my $chunk = substr($contig, $offset, $next - $offset);
         my $local = $map->ProcessString($chunk);
         # Each local vector is merged into the global before it is normalized.
         TetraMap::Add($global, $local);
         # Normalize and save the local vector.
         TetraMap::Norm($local);
         push @$localL, $local;
+        # Position at the next chunk.
+        $offset = $next;
     }
 }
 
