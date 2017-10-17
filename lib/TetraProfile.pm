@@ -203,6 +203,7 @@ sub ProcessContig {
         push @$localL, $local;
         # Position at the next chunk.
         $offset = $next;
+        $next += $chunkSize;
     }
 }
 
