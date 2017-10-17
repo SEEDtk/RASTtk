@@ -73,7 +73,7 @@ If specified, all bins will be processed, regardless of whether or not they have
 
 $| = 1;
 # Get the command-line parameters.
-my $opt = ScriptUtils::Opts('packageDir package', ScriptUtils::ih_options(),
+my $opt = ScriptUtils::Opts('packageDir outputDir', ScriptUtils::ih_options(),
         ["user|u=s", "user name for RAST access"],
         ["password|p=s", "password for RAST access"],
         ["sleep=i", "sleep interval for status polling", { default => 60 }],
