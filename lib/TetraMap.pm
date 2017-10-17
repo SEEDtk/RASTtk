@@ -140,6 +140,10 @@ A tetramer vector encompassing a sequence's tetramer profile.
 
 A tetramer vector object encompassing another sequence's tetramer profile. It must have the same type (vector magnitude) as the other vector.
 
+=item RETURN
+
+Returns the distance between the two vectors in N-space.
+
 =back
 
 =cut
@@ -150,12 +154,80 @@ sub dist {
     die "Incompatible tetramer vectors." if ($n != scalar @$vec2);
     my $retVal = 0;
     for (my $i = 0; $i < $n; $i++) {
-        my $gap = $vec1->[$i] = $vec2->[$i];
+        my $gap = $vec1->[$i] - $vec2->[$i];
         $retVal += $gap*$gap;
     }
     $retVal = sqrt($retVal);
     return $retVal;
 }
+
+=head3 dot
+
+    my $dot = TetraMap::dot($vec1, $vec2);
+
+Return the dot product between two tetramer vectors.
+
+=over 4
+
+=item vec1
+
+A tetramer vector encompassing a sequence's tetramer profile.
+
+=item vec2
+
+A tetramer vector object encompassing another sequence's tetramer profile. It must have the same type (vector magnitude) as the other vector.
+
+=item RETURN
+
+Returns the distance between the two vectors in N-space.
+
+=back
+
+=cut
+
+sub dot {
+    my ($vec1, $vec2) = @_;
+    my $n = scalar @$vec1;
+    die "Incompatible tetramer vectors." if ($n != scalar @$vec2);
+    my $retVal = 0;
+    for (my $i = 0; $i < $n; $i++) {
+        $retVal += $vec1->[$i] * $vec2->[$i];
+    }
+    return $retVal;
+}
+
+
+=head3 len
+
+    my $len = TetraMap::len($vec);
+
+Return the length of a tetramer vector. This is the value used to normalize it.
+
+=over 4
+
+=item vec
+
+The vector whose length is desired.
+
+=item RETURN
+
+Returns the vector length.
+
+=back
+
+=cut
+
+sub len {
+    my ($vec) = @_;
+    my $n = scalar @$vec;
+    my $retVal = 0;
+    for my $coord (@$vec) {
+        $retVal += $coord * $coord;
+    }
+    $retVal = sqrt($retVal);
+    return $retVal;
+}
+
 
 =head3 Norm
 
@@ -176,13 +248,38 @@ A tetramer vector. The vector will be normalized to unit length.
 sub Norm {
     my ($vec) = @_;
     my $n = scalar @$vec;
-    my $length = 0;
-    for my $coord (@$vec) {
-        $length += $coord * $coord;
-    }
-    $length = sqrt($length);
+    my $length = len($vec);
     for (my $i = 0; $i < $n; $i++) {
         $vec->[$i] /= $length;
+    }
+}
+
+=head3 Add
+
+   TetraMap::Add($vec1, $vec2);
+
+Add a second vector to the first vector.
+
+=over 4
+
+=item vec1
+
+Vector to be updated.
+
+=item vec2
+
+Vector to add into the first vector.
+
+=back
+
+=cut
+
+sub Add {
+    my ($vec1, $vec2) = @_;
+    my $n = scalar @$vec1;
+    die "Incompatible tetramer vectors." if ($n != scalar @$vec2);
+    for (my $i = 0; $i < $n; $i++) {
+        $vec1->[$i] += $vec2->[$i];
     }
 }
 
