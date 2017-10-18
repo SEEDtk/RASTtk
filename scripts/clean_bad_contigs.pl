@@ -80,6 +80,8 @@ added back in. A value of C<0> will skip the add-back-in step.
 
 In addition, at most one of the following options may be specified, indicating the algorithm for keeping contigs.
 
+=over 4
+
 =item relaxed
 
 If specified, then a contig is kept if it has at least one good role or no bad roles.
