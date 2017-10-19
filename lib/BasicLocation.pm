@@ -848,7 +848,7 @@ Proposed new ending point.
 
 =head3 Widen
 
-    my  = $loc->Widen($distance, $max);
+    $loc->Widen($distance, $max);
 
 Add the specified distance to each end of the location, taking care not to
 extend past either end of the contig. The contig length must be provided
