@@ -1959,7 +1959,7 @@ sub translate {
         }
     }
 
-    if (($start) && ($ln >= 3) && (substr($$dna,$offset,3) =~ /^[GT]TG$/)) {
+    if (($start) && ($ln >= 3) && (substr($$dna,$offset,3) =~ /^[GT]TG$/i)) {
         substr($prot,0,1) = 'M';
     }
     return $prot;
