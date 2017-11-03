@@ -12,9 +12,11 @@ use TraceObject;
                            [--max=MaxGs2Frac]
         > family.signatures
 
-     This script produces a file in which the last field in each line
-     is a family signature. The first field will be the number of hits against Gs1,
-     and the second will be the number of hits against Gs2.
+This script compares two genome groups-- group 1 contains genomes that are interesting for some reason,
+group 2 contains genomes that are not. The output contains protein families that are common in the interesting
+set but not in the other set. The output file will be tab-delimited, with four columns-- the number of
+family occurrences in set 1, the number of family occurrences in set 2, the family ID, and the family's
+assigned function.
 
 =head2 Parameters
 
