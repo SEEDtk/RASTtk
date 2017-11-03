@@ -6,6 +6,7 @@
     p3-extract-gto genome-id [options]
 
     Create a gto file from a patric genome.
+
 =cut
 
 use strict;

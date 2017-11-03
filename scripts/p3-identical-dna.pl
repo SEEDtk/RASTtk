@@ -5,6 +5,7 @@
     p3-identical-dna [options] < target-dna-sequence
 
     Retrieve the DNA features in PATRIC identical to the one provided.
+
 =cut
 
 use Data::Dumper;

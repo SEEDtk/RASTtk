@@ -16,8 +16,14 @@ There are no positional parameters.
 
 Standard input is not used.
 
-=cut
+=head3 Example
 
+This command is used in the tutorial "p3_signature_clusters.html ";
+
+    p3-format-results -d Strep | p3-aggregates-to-html &gt;clusters.html
+
+=cut
+    
 my $patric = "https://www.patricbrc.org/";
 my $hdg=1;
 my $f1;

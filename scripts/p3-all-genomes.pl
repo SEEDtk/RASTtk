@@ -41,6 +41,22 @@ few, so do not panic.  You can use something like
 
 to get some commonly sought fields.
 
+=head3 Example
+
+This command is used in several tutorials, see p3_CLI.html for example;
+
+    p3-all-genomes --eq genome_name,Streptomyces --attr genome_id --attr genome_name
+
+This example retrieves the id and genome name for all genomes having Streptomyces in their name.
+
+    genome.genome_id    genome.genome_name
+    284037.4    Streptomyces sporocinereus strain OsiSh-2
+    67257.17    Streptomyces albus subsp. albus strain NRRL F-4371
+    68042.5 Streptomyces hygroscopicus subsp. hygroscopicus strain NBRC 16556
+    68042.6 Streptomyces hygroscopicus subsp. hygroscopicus strain NBRC 13472
+    1395572.3   Streptomyces albulus PD-1
+    ...
+
 =cut
 
 use strict;

@@ -51,6 +51,13 @@ If the sequence ID is already present in the input file, the name of the column 
 
 =back
 
+=head3 Example
+
+This command is shown in the tutorial p3_clustering.html;
+
+p3-find-couples --location=location --sequence=sequence_id --col=patric_id role &lt;feature.roles.tbl | p3-generate-clusters 1 2 &gt;clusters.tbl
+
+
 =cut
 
 use strict;

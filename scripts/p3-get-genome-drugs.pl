@@ -27,6 +27,8 @@ Filter for drugs to which the genome is resistant.
 
 Filter for drugs to which the genome is susceptible.
 
+=back
+
 =cut
 
 use strict;

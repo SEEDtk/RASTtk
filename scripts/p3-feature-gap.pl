@@ -25,6 +25,13 @@ Name or index of the column containing the ID of the second feature. The default
 
 =back
 
+=head3 Example
+
+p3-echo -t f1.patric_id -t f2.patric_id "fig|1302.21.peg.966" "fig|1302.21.peg.1019" | p3-feature-gap
+
+f1.patric_id    f2.patric_id    gap
+fig|1302.21.peg.966 fig|1302.21.peg.1019    55253
+
 =cut
 
     use strict;

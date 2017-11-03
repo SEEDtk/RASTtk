@@ -17,6 +17,7 @@ Run tests on the P3 Script Library L<P3Utils>.
 The positional parameter should be the name of a working directory to use for testing.
 
 =cut
+
  use constant ROWS => [
         ['id', 'name', 'length'],
         ['385964.3', 'Yersinia pestis subsp. pestis strain 231(708)', '4568800'],
