@@ -72,7 +72,7 @@ while (<$ih>) {
             $html .= "<A HREF=\"".$crlink."\" target=\_blank style=\"font-size: 100%; font-weight: 300; color: blue;\">&#9400;</A></td>\n";
             my $color = "color:blue";
             if ($fam eq $f1 || $fam eq $f2) {$color="color:red";}
-            my $famlink = $patric."view/FeatureList/?eq(plfam_id,$fam)#view_tab=features";
+            my $famlink = $patric."view/FeatureList/?eq(pgfam_id,$fam)#view_tab=features";
             $html .=  "<td><A HREF=\"".$famlink."\" target=\_blank style=\"$color\">".$fam."</A></td>\n";
             $html .=  "<td>$func</td>\n";
             $html .=  "</tr>\n";

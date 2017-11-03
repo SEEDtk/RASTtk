@@ -12,13 +12,20 @@ display pairs of these categories that tend to occur phyiscally close together o
 if the category column contained roles, this program would output role couples. If the category column contained
 global protein families, this program would output protein family couples.
 
+A blank value in the category column will cause the input line to be ignored.
+
 The output will be three columns-- the two category IDs and the number of times the couple occurred.
+
+If both the location and the sequence ID are present in the input file, then this command will not query the
+database. In that case, it can be run independent of access to PATRIC, even on genomes not necessarily in the
+PATRIC system. The feature IDs, however, must include the genome ID as a substring (which means the IDs should
+be of a format similar to the short-form PATRIC feature IDs). 
 
 =head2 Parameters
 
 The positional parameter is the index (1-based) or name of the column containing the category information.
 
-The standard input can be overriddn using the options in L<P3Utils/ih_options>.
+The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are those given in L<P3Utils/col_options> (to specify the column containing
 feature IDs) plus the following.
@@ -36,6 +43,7 @@ The maximum number of base pairs allowed between two features in the same cluste
 =item location
 
 If the feature location is already present in the input file, the name of the column containing the feature location.
+The feature location should be in the form I<start>C<..>I<end>.
 
 =item sequence
 
@@ -119,33 +127,36 @@ while (! eof $ih) {
     for my $couplet (@$couplets) {
         my ($fid, $line) = @$couplet;
         my $category = $line->[$catCol];
-        my ($start, $end, $sequence);
-        my $fidData = $rows{$fid};
-        # Here we get the start and end.
-        if (defined $locCol) {
-            my $loc = $line->[$locCol];
-            if ($loc =~ /(\d+)\.\.(\d+)/) {
-                ($start, $end) = ($1, $2);
+        # Only proceed if there is a category value.
+        if ($category) {
+            my ($start, $end, $sequence);
+            my $fidData = $rows{$fid};
+            # Here we get the start and end.
+            if (defined $locCol) {
+                my $loc = $line->[$locCol];
+                if ($loc =~ /(\d+)\.\.(\d+)/) {
+                    ($start, $end) = ($1, $2);
+                } else {
+                    die "Invalid location string \'$loc\'.";
+                }
+            } elsif (! $fidData) {
+                die "$fid not found in PATRIC.";
             } else {
-                die "Invalid location string \'$loc\'.";
+                ($start, $end) = ($fidData->{start}, $fidData->{end});
             }
-        } elsif (! $fidData) {
-            die "$fid not found in PATRIC.";
-        } else {
-            ($start, $end) = ($fidData->{start}, $fidData->{end});
+            # Here we get the sequence ID.
+            if (defined $seqCol) {
+                $sequence = $line->[$seqCol];
+            } elsif (! $fidData) {
+                die "$fid not found in PATRIC.";
+            } else {
+                $sequence = $fidData->{sequence_id};
+            }
+            # Compute the genome ID.
+            my ($genomeID) = ($fid =~ /(\d+\.\d+)/);
+            # Put the feature in the hash.
+            push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
         }
-        # Here we get the sequence ID.
-        if (defined $seqCol) {
-            $sequence = $line->[$seqCol];
-        } elsif (! $fidData) {
-            die "$fid not found in PATRIC.";
-        } else {
-            $sequence = $fidData->{sequence_id};
-        }
-        # Compute the genome ID.
-        my ($genomeID) = ($fid =~ /(\d+\.\d+)/);
-        # Put the feature in the hash.
-        push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
     }
 }
 # Now we have category and position data for each feature sorted by sequence.
