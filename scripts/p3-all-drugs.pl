@@ -19,6 +19,14 @@ List the names of the available fields.
 
 =back
 
+=head3 Example
+
+This command is used in the tutorial p3_CLI.html;
+
+    p3-all-drugs | p3-get-drug-genomes --attr genome_id --attr genome_name --resistant
+
+It lists all drugs in the database and feeds the id's to the p3-get-drug-genomes script to get resistance data relating to specific drugs from a list.
+
 =cut
 
 use strict;

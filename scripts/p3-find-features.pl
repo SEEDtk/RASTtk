@@ -50,6 +50,20 @@ Rather than processing the input, list the valid key names.
 
 =back
 
+=head3 Example
+
+    This command is shown in the tutorial p3_common_tasks.html
+
+    p3-echo coaA | p3-find-features --attr patric_id,product --eq genome_id,210007.7 gene
+
+    p3-echo coaA | p3-find-features --attr patric_id,product gene
+    id  feature.patric_id   feature.product
+    coaA    fig|996634.5.peg.916    Pantothenate kinase (EC 2.7.1.33)
+    coaA    fig|944560.4.peg.377    Pantothenate kinase (EC 2.7.1.33)
+    coaA    fig|992133.3.peg.4201   Pantothenate kinase (EC 2.7.1.33)
+    coaA    fig|992141.3.peg.4166   Pantothenate kinase (EC 2.7.1.33)
+    ...
+
 =cut
 
 use strict;

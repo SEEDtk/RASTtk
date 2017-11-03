@@ -24,6 +24,19 @@ Instead of only keeping input records that match a filter record, only keep reco
 
 =back
 
+=head3 Example
+
+This command is shown in the tutorial p3-common-tasks.html;
+
+p3-file-filter --reverse --col=feature.role aRoles.tbl feature.role &lt;cRoles.tbl
+
+feature.role    count
+2,3-dihydroxybenzoate-AMP ligase (EC 2.7.7.58) of siderophore biosynthesis  33
+2-octaprenyl-3-methyl-6-methoxy-1,4-benzoquinol hydroxylase (EC 1.14.13.-)  1
+2-pyrone-4,6-dicarboxylic acid hydrolase (EC 3.1.1.57)  14
+23S ribosomal RNA rRNA prediction is too short  1
+...
+
 =cut
 
 use strict;

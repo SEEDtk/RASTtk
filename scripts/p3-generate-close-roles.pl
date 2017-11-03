@@ -76,6 +76,18 @@ The minimum number of occurrences for a pair to be considered significant. The d
 
 =back
 
+=head3 Example
+
+This command is shown in the tutorial p3_common_tasks.html
+
+p3-get-genome-features --eq feature_type,CDS --attr sequence_id --attr location --attr product &lt;genomes.tbl | p3-function-to-role | p3-generate-close-roles
+    role1   role2   count
+    Transposase, IS3/IS911 family   Mobile element protein  33
+    Mobile element protein  Mobile element protein  29
+    Lead, cadmium, zinc and mercury transporting ATPase (EC 3.6.3.3) (EC 3.6.3.5)   Copper-translocating P-type ATPase (EC 3.6.3.4) 25
+    Potassium efflux system KefA protein    Small-conductance mechanosensitive channel  13
+    ...
+
 =cut
 
 use strict;
