@@ -12,7 +12,7 @@ use P3WorkspaceClient;
 use Data::Dumper;
 
 my($opt, $usage) = describe_options("%c %o",
-				    ["help|h" => "Show this help message."]);
+                                    ["help|h" => "Show this help message."]);
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) if @ARGV != 0;
 

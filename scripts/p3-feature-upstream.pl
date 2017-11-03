@@ -27,7 +27,7 @@ Specifies the length to display upstream. The default is C<100>.
 
 =head3 Example
 
-This command is shown in the tutorial p3_common_tasks.html 
+This command is shown in the tutorial p3_common_tasks.html
 
 p3-echo -t genome_id 1313.7001 | p3-get-genome-features --eq feature_type,CDS --attr patric_id --attr product | p3-feature-upstream --col=feature.patric_id
 

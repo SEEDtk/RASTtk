@@ -13,6 +13,15 @@ use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
 use DBI;
 use HTTP::Request::Common;
+use IPC::Run;
+use SeedUtils;
+our $have_redis;
+eval {
+    require Redis::Client;
+    require Redis::Client::List;
+    $have_redis = 1;
+};
+
 our $have_async;
 eval {
     require Net::HTTPS::NB;
@@ -60,10 +69,13 @@ if ($^O eq 'MSWin32')
 use warnings 'once';
 
 use base 'Class::Accessor';
-__PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache family_db_dsn family_db_user debug) );
+__PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
+                             family_db_dsn family_db_user
+                             debug redis
+                            ));
 
 sub new {
-    my ( $class, $url, $token ) = @_;
+    my ( $class, $url, $token, $params ) = @_;
 
     if (!$token)
     {
@@ -85,7 +97,22 @@ sub new {
         reference_genome_cache => undef,
         family_db_dsn => "DBI:mysql:database=fams_2016_0819;host=fir.mcs.anl.gov",
         family_db_user => 'p3',
+        # redis_expiry_time => 86400,
+        redis_expiry_time => 600,
+        (ref($params) eq 'HASH' ? %$params : ()),
     };
+
+    if ($params->{redis_host} && $params->{redis_port})
+    {
+        if ($have_redis)
+        {
+            $self->{redis} = Redis::Client->new(host => $params->{redis_host}, port => $params->{redis_port});
+        }
+        else
+        {
+            warn "Redis requested but Redis::Client not available in this perl environment";
+        }
+    }
 
     return bless $self, $class;
 }
@@ -221,21 +248,109 @@ sub query
     return @result;
 }
 
+=head3 query_cb
+
+    $d->query($core, $callback, @query);
+
+Run a query against the PATRIC database. Automatic flow control is used to reduce the possibility of timeout or overrun
+errors.
+
+The callback provided is invoked for each chunk of data returned from the database.
+
+=over 4
+
+=item core
+
+The name of the PATRIC object to be queried.
+
+=item callback
+
+A code reference which will be invoked for each chunk of data returned from the database.
+
+The callback is invoked with two parameters: an array reference containing the data returned, and a
+hash reference containing the following metadata about the lookup:
+
+=over 4
+
+=item start
+
+The starting index in the overall result set of the first item returned.
+
+=item next
+
+The starting index for the next result set at the server.
+
+=item count
+
+The number of items in the entire result set.
+
+=item last_call
+
+A value which will be true if this invocation of the callback is the final one.
+
+=back
+
+The return value of the callback is used to determine if the query will continue to be executed.
+A true value will cause the next page of results to be requested; a false value will
+terminate the query, resulting in the query_cb call to return.
+
+=item query
+
+A list of query specifications, consisting of zero or more tuples. The first element of each tuple is a specification type,
+which must be one of the following.
+
+=over 8
+
+=item select
+
+Specifies a list of the names for the fields to be returned. There should only be one C<select> tuple. If none is present,
+all the fields will be returned.
+
+=item eq
+
+Specifies a field name and matching value. This forms a constraint on the query. If the field is a string field, the
+constraint will be satisfied if the value matches a substring of the field value. If the field is a numeric field, the
+constraint will be satisfied if the value exactly matches the field value. In the string case, an interior asterisk can
+be used as a wild card.
+
+=item in
+
+Specifies a field name and a string containing a comma-delimited list of matching values enclosed in parentheses. This forms
+a constraint on the query. It works much like C<eq>, except the constraint is satisfied if the field value matches any one of
+the specified values. This is the only way to introduce OR-like functionality into the query.
+
+=item sort
+
+Specifies a list of field names, each prefixed by a C<+> or C<->. The output will be sorted in the fashion indicated by
+the field names, ascending for C<+>, descending for C<->.
+
+=back
+
+Note that parentheses must be manually removed from field values and special characters in the database are frequently
+ignored during string matches.
+
+=back
+
+=cut
+
 sub query_cb {
     my ( $self, $core, $cb_add, @query ) = @_;
 
     my $qstr;
 
     my @q;
-    for my $ent (@query) {
-        my ( $k, @vals ) = @$ent;
-        if ( @vals == 1 && ref( $vals[0] ) ) {
+    for my $ent (@query)
+    {
+        my ($k, @vals) = @$ent;
+
+        if (@vals == 1 && ref( $vals[0]))
+        {
             @vals = @{ $vals[0] };
         }
-        my $qe = "$k(" . join( ",", @vals ) . ")";
-        push( @q, $qe );
+        my $qe = "$k(" . join(",", @vals) . ")";
+        push(@q, $qe);
     }
-    $qstr = join( "&", @q );
+    $qstr = join("&", @q);
 
     my $url   = $self->{url} . "/$core";
     my $ua    = $self->{ua};
@@ -244,45 +359,51 @@ sub query_cb {
     my $start = 0;
 
     my @result;
-    while ( !$done ) {
+    while (!$done)
+    {
         my $lim = "limit($chunk,$start)";
         my $q   = "$qstr&$lim";
-
-        #	print "Qry $url '$q'\n";
-        #	my $resp = $ua->post($url,
-        #			     Accept => "application/json",
-        #			     Content => $q);
         my $qurl = "$url?$q";
-
-        # print STDERR "'$url?$q'\n";
-
-        # 	my $req = HTTP::Request::Common::GET($qurl,
-        # 					     Accept => "application/json",
-        # 					     #			    $self->auth_header,
-        # 					    );
-        # 	print Dumper($req);
 
         my $resp = $ua->get($qurl,
                             Accept => "application/json",
                             $self->auth_header,
                            );
-        if ( !$resp->is_success ) {
+        if (!$resp->is_success)
+        {
             die "Failed: " . $resp->code . "\n" . $resp->content;
         }
 
-        my $data = decode_json( $resp->content );
-        $cb_add->($data);
+        my $data = eval { decode_json( $resp->content ); };
+        if ($@)
+        {
+            die "Error parsing response content:  $@";
+        }
 
         my $r = $resp->header('content-range');
 
-        #	print "r=$r\n";
-        if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
+        if ($r =~ m,items\s+(\d+)-(\d+)/(\d+),)
+        {
             my $this_start = $1;
             my $next       = $2;
             my $count      = $3;
 
-            last if ( $next >= $count );
+            my $last_call = $next >= $count;
+
+            my $continue = $cb_add->($data,
+                         {
+                             start => $this_start,
+                             next => $next,
+                             count => $count,
+                             last_call => ($last_call ? 1 : 0),
+                         });
+
+            last if (!$continue || $last_call);
             $start = $next;
+        }
+        else
+        {
+            die "Could not parse content-range header '$r'\n";
         }
     }
 }
@@ -473,6 +594,7 @@ sub retrieve_contigs_in_genomes {
                         ]
                     );
                 }
+                return 1;
             },
             [ "eq", "genome_id", $gid ]
         );
@@ -496,6 +618,7 @@ sub retrieve_contigs_in_genome_to_temp {
                                                       "$ent->{description} [ $ent->{genome_name} | $ent->{genome_id} ]",
                                                       $ent->{sequence}]);
                         }
+                        return 1;
                     },
                     [ "eq", "genome_id", $genome_id ]
                    );
@@ -519,6 +642,7 @@ sub compute_contig_md5s_in_genomes {
                     my $md5 = md5_hex( lc( $ent->{sequence} ) );
                     $out->{$gid}->{ $ent->{sequence_id} } = $md5;
                 }
+                return 1;
             },
             [ "eq", "genome_id", $gid ]
         );
@@ -560,6 +684,7 @@ sub retrieve_protein_features_in_genomes {
                         );
                     }
                 }
+                return 1;
             },
             [ "eq",     "feature_type", "CDS" ],
             [ "eq",     "genome_id",    $gid ],
@@ -589,6 +714,7 @@ sub retrieve_protein_features_in_genome_in_export_format {
                                                       ]
                                                     );
                         }
+                        return 1;
                     },
                     [ "eq",     "feature_type", "CDS" ],
                     [ "eq",     "genome_id",    $genome_id ],
@@ -623,6 +749,7 @@ sub retrieve_protein_features_in_genomes_to_temp {
                                             );
                     push(@$ret_list, [@$ent{qw(patric_id product plfam_id pgfam_id)}]) if $ret_list;
                 }
+                return 1;
             },
             [ "eq",     "feature_type", "CDS" ],
              [ "eq", "annotation", "PATRIC"],
@@ -664,6 +791,7 @@ sub retrieve_protein_features_with_role {
                     $misses{$fn}++;
                 }
             }
+            return 1;
         },
         [ "eq",     "feature_type", "CDS" ],
         [ "eq",     "annotation",   "PATRIC" ],
@@ -713,6 +841,7 @@ sub retrieve_features_of_type_with_role {
                     $misses{$fn}++;
                 }
             }
+            return 1;
         },
         [ "eq", "feature_type", $type ],
         [ "eq", "annotation",   "PATRIC" ],
@@ -756,6 +885,7 @@ sub retrieve_ssu_rnas {
                     push( @out, $ent );
                 }
             }
+            return 1;
         },
         [ "eq", "feature_type", "rrna" ],
         [ "eq", "annotation",   "PATRIC" ],
@@ -783,6 +913,7 @@ sub retrieve_genome_metadata {
         sub {
             my ($data) = @_;
             push( @out, @$data );
+            return 1;
         },
         $qry,
         [ "select", @$keys ]
@@ -804,6 +935,7 @@ sub retrieve_protein_features_in_genomes_with_role {
                     push( @out, [ $gid, $ent->{aa_sequence} ] );
                     # print "$ent->{patric_id} $ent->{product}\n";
                 }
+                return 1;
             },
             [ "eq", "feature_type", "CDS" ],
             [ "eq", "annotation",   "PATRIC" ],
@@ -844,6 +976,7 @@ sub retrieve_dna_features_in_genomes {
                         push( @{ $map{$md5} }, $ent->{feature_id} );
                     }
                 }
+                return 1;
             },
             [ "eq",     "genome_id", $gid ],
             [ "select", "feature_id,na_sequence" ],
@@ -1142,6 +1275,170 @@ sub compare_regions_for_peg
     return \@out;
 }
 
+=head3 compute_reference_pin
+
+    my @fids = $api->compute_reference_pin($focus_peg, $n_genomes, $distance_class)
+
+Compute a pin for the given C<$focus_peg> from the PATRIC reference database.
+
+=over 4
+
+=item focus_peg
+
+The feature ID to pin from.
+
+=item pin_size
+
+Number of features to return in the pin.
+
+=item distribution_mode
+
+A string denoting the distribution of returned genomes based on their
+computed similarity. Values are "top", "spread_unique", "spread_proportional".
+
+=back
+
+=cut
+
+sub compute_reference_pin
+{
+    my($self, $focus_peg, $n_genomes, $distribution_mode) = @_;
+
+    #
+    # Start by looking up family memberships and function of this feature.
+    # We may treat hypothetical proteins differently due to the potentially
+    # huge size of the global family they are contained in.
+    #
+
+    my @res = $self->query("genome_feature",
+                           ["eq", "patric_id", $focus_peg],
+                           ["select", "pgfam_id,plfam_id,product,genome_id"]);
+    if (@res == 0)
+    {
+        die "$focus_peg: feature not found";
+    }
+    print Dumper(\@res);
+    my $focus_genome = genome_of($focus_peg);
+
+    my @genomes = $self->compute_reference_genomes($focus_genome, $n_genomes, $distribution_mode);
+
+    my $pgfam = $self->family_of($focus_peg, 'pgfam');
+    print "pgfam=$pgfam genomes=@genomes\n";
+
+    #
+    # Given this set of reference genomes, query the database
+    # of
+}
+
+sub compute_reference_genomes
+{
+    my($self, $focus_genome, $n_genomes, $distribution_mode) = @_;
+
+    #
+    # Begin by finding the pheS gene in our focus genome.
+    #
+    my $pheS_annotation = 'Phenylalanyl-tRNA synthetase alpha chain (EC 6.1.1.20)';
+
+    my($phe_fa) = $self->find_protein_in_genome_by_product($focus_genome, $pheS_annotation);
+
+    if (!$phe_fa)
+    {
+        die "Couldn't find pheS in $focus_genome";
+    }
+
+    my $phe_url = "http://holly.mcs.anl.gov:6101";
+
+    #
+    # Look up the related genomes.
+    #
+
+    $n_genomes = 10 unless $n_genomes =~ /^\d+$/;
+
+    my $qry = "raw=1&min_hits=3&distribution_mode=$distribution_mode&max_results=$n_genomes";
+    my $key = "p3api:ref_genomes:$qry";
+    if ($self->redis)
+    {
+
+        my @res = $self->redis->lrange($key, 0, -1);
+        print "redis $key returned " . scalar(@res) . "\n";
+        return @res if @res;
+    }
+
+    my $url = "$phe_url/distance?$qry";
+
+    my $out;
+    my $ok = IPC::Run::run(["curl", "--data-binary", '@-', "-s", $url],
+                           "<", \$phe_fa,
+                           ">", \$out);
+    $ok or die "couldn't get raw distances\n";
+
+    my @res;
+    open(my $fh, '<', \$out);
+    while (<$fh>)
+    {
+        chomp;
+        last if $_ eq '//';
+        my($undef, $fid, $score) = split(/\t/);
+        my $genome = genome_of($fid);
+        push(@res, "$genome:$score");
+    }
+    if (@res && $self->redis)
+    {
+        $self->redis->del($key);
+        $self->redis->rpush($key, @res);
+        my $x = $self->redis->expire($key, $self->{redis_expiry_time});
+    }
+    return @res;
+}
+
+=head3 find_protein_in_genome_by_product
+
+    my $aa_seq = $d->find_protein_in_genome_by_product($genome_id, $product_name)
+
+Look for a protein with the given product in the given genome.
+
+=cut
+
+sub find_protein_in_genome_by_product
+{
+    my($self, $genome_id, $product_name) = @_;
+
+    my $key ="p3api:protein_product:$genome_id:$product_name";
+
+    if ($self->redis)
+    {
+        my @res = $self->redis->lrange($key, 0, -1);
+        print "redis $key returned " . scalar(@res) . "\n";
+        return @res if @res;
+    }
+
+    my $xprod = $product_name;
+    $xprod =~ s/[()]//g;
+
+    my @res = $self->query("genome_feature",
+                            ["eq", "product", qq("$xprod")],
+                            ["eq", "genome_id", $genome_id],
+                            ["select", "patric_id,aa_sequence,product"]);
+
+    if (@res == 0)
+    {
+        return;
+    }
+    my @prots;
+    for my $ent (@res)
+    {
+        next unless $ent->{product} eq $product_name;
+        push(@prots, ">$ent->{patric_id} $ent->{product}\n$ent->{aa_sequence}\n");
+    }
+    if (@prots && $self->redis)
+    {
+        $self->redis->del($key);
+        $self->redis->rpush($key, @prots);
+        $self->redis->expire($key, $self->{redis_expiry_time});
+    }
+    return @prots;
+}
+
 sub genome_name
 {
     my($self, $gid_list) = @_;
@@ -1413,8 +1710,8 @@ sub get_pin
 
     open(my $tmp_fh, ">", $tmp2) or die "Cannot write $tmp2: $!";
     print $tmp_fh ">$fid\n$me->{aa_sequence}\n";
-    close($tmp_fh);
-    undef $tmp_fh;
+    close($tmp_fh); undef $tmp_fh;
+
     open($tmp_fh, ">", $tmp) or die "Cannot write $tmp: $!";
     print $tmp_fh ">$_->{patric_id}\n$_->{aa_sequence}\n" foreach @pin;
     close($tmp_fh);

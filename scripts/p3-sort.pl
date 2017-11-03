@@ -44,7 +44,6 @@ use P3Utils;
 my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
         ['count|K', 'count instead of sorting'],
         ['nonblank|V', 'discard records with empty keys'],
-        ['unique|u', 'remove duplicate keys'],
         );
 # Verify the parameters. We need to separate the column names from the sort types.
 my @sortCols;
@@ -67,7 +66,6 @@ if (! @ARGV) {
 # Get the options.
 my $count = $opt->count;
 my $valued = $opt->nonblank;
-my $unique = $opt->unique;
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers and compute the key columns.
@@ -79,7 +77,7 @@ if ($count) {
 } else {
     P3Utils::print_cols($headers);
 }
-# We will use this hash to facilitate the sort. It is keyed on the tab-delimited sort columns.
+# We will use this hash to facilitate the sort. It is keyed on the first column.
 my %sorter;
 # Loop through the input.
 while (! eof $ih) {
@@ -97,11 +95,8 @@ while (! eof $ih) {
 for my $key (sort { tab_cmp($a, $b) } keys %sorter) {
     # Sort the items.
     my $subList = $sorter{$key};
-    if ($unique) {
-        # Print the first item.
-        print $subList->[0];
-    } elsif (! $count) {
-        # Print all the sorted items.
+    if (! $count) {
+        # Print the sorted items.
         print @$subList;
     } else {
         # Count the items for each key combination and print them.

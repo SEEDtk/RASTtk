@@ -25,7 +25,7 @@ List the available fields.
 
 This command is shown in the tutorial p3_CLI.html
 
-    p3-all-genomes --eq genus,Methylobacillus | p3-get-genome-features --attr patric_id --attr product 
+    p3-all-genomes --eq genus,Methylobacillus | p3-get-genome-features --attr patric_id --attr product
     genome.genome_id        feature.patric_id       feature.product
     265072.11       fig|265072.11.rna.17    tRNA-Arg-CCG
     265072.11       fig|265072.11.rna.18    tRNA-Lys-TTT

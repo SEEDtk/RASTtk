@@ -5,7 +5,6 @@
     p3-identical-proteins [options] < target-protein-sequence
 
     Retrieve the proteins in PATRIC identical to the one provided.
-
 =cut
 
 #

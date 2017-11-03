@@ -61,8 +61,7 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
                             contig => ['genome_id', 'accession', 'length', 'gc_content', 'sequence_type', 'topology'],
-                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'],
-                            taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank'] };
+                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'], };
 
 =head3 IDCOL
 
@@ -75,8 +74,7 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             family => 'family_id',
                             genome_drug => 'id',
                             contig => 'sequence_id',
-                            drug => 'antibiotic_name',
-                            taxonomy => 'taxon_id' };
+                            drug => 'antibiotic_name' };
 
 =head3 DERIVED
 
@@ -97,8 +95,6 @@ use constant DERIVED => {
             contig =>   {   md5 => ['md5', 'sequence'],
                         },
             drug =>     {
-                        },
-            taxonomy => {
                         },
 };
 =head2  Methods
