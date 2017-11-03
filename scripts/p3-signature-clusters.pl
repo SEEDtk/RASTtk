@@ -14,7 +14,7 @@ use P3Signatures;
 
 The standard input file normally contains I<[n/a, n/a, family_id, feature_id, contig, start, end, strand, function]>
 (the first two columns are ignored). Such a file is created from a family signatures file (output of
-L<p3-signature-familes.pl>) using the following command
+L<p3-signature-families.pl>) using the following command
 
     p3-signature-peginfo --gs1=FileOfGenomeIds < family.data > peg.data
 
