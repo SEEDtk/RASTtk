@@ -114,33 +114,35 @@ while (! eof $ih) {
     for my $couplet (@$couplets) {
         my ($fid, $line) = @$couplet;
         my $category = $line->[$catCol];
-        my ($start, $end, $sequence);
-        my $fidData = $rows{$fid};
-        # Here we get the start and end.
-        if (defined $locCol) {
-            my $loc = $line->[$locCol];
-            if ($loc =~ /(\d+)\.\.(\d+)/) {
-                ($start, $end) = ($1, $2);
+        if ($category) {
+            my ($start, $end, $sequence);
+            my $fidData = $rows{$fid};
+            # Here we get the start and end.
+            if (defined $locCol) {
+                my $loc = $line->[$locCol];
+                if ($loc =~ /(\d+)\.\.(\d+)/) {
+                    ($start, $end) = ($1, $2);
+                } else {
+                    die "Invalid location string \'$loc\'.";
+                }
+            } elsif (! $fidData) {
+                die "$fid not found in PATRIC.";
             } else {
-                die "Invalid location string \'$loc\'.";
+                ($start, $end) = ($fidData->{start}, $fidData->{end});
             }
-        } elsif (! $fidData) {
-            die "$fid not found in PATRIC.";
-        } else {
-            ($start, $end) = ($fidData->{start}, $fidData->{end});
+            # Here we get the sequence ID.
+            if (defined $seqCol) {
+                $sequence = $line->[$seqCol];
+            } elsif (! $fidData) {
+                die "$fid not found in PATRIC.";
+            } else {
+                $sequence = $fidData->{sequence_id};
+            }
+            # Compute the genome ID.
+            my ($genomeID) = ($fid =~ /(\d+\.\d+)/);
+            # Put the feature in the hash.
+            push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
         }
-        # Here we get the sequence ID.
-        if (defined $seqCol) {
-            $sequence = $line->[$seqCol];
-        } elsif (! $fidData) {
-            die "$fid not found in PATRIC.";
-        } else {
-            $sequence = $fidData->{sequence_id};
-        }
-        # Compute the genome ID.
-        my ($genomeID) = ($fid =~ /(\d+\.\d+)/);
-        # Put the feature in the hash.
-        push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
     }
 }
 # Now we have category and position data for each feature sorted by sequence.
