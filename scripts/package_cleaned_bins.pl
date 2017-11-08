@@ -78,7 +78,7 @@ my $opt = ScriptUtils::Opts('packageDir outputDir', ScriptUtils::ih_options(),
         ["password|p=s", "password for RAST access"],
         ["sleep=i", "sleep interval for status polling", { default => 60 }],
         ["suffix=s", "input file name suffix", { default => '1' }],
-        ["force", "process all bins, even ones already processed"]
+        ["force", "process all bins, even ones already processed or good"]
         );
 # Get the two directories.
 my ($packageDir, $outputDir) = @ARGV;
@@ -125,7 +125,7 @@ for my $pkg (@pkgs) {
     } else {
         # Get the old quality information.
         my ($good, $cmplt, $contam, $coarse, $fine) = package_quality($pDir);
-        if ($good) {
+        if ($good && ! $force) {
             print "$pkg is already good-- skipping.\n";
         } else {
             # Get the taxonomy ID and name from the old GTO.
