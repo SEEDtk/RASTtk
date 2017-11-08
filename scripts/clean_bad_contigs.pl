@@ -74,7 +74,7 @@ have no good roles.
 =item tetra
 
 A tetramer profile distance. Contigs which do not have bad roles but are within this distance of the contigs being kept will be
-added back in. A value of C<0> will skip the add-back-in step. 
+added back in. A value of C<0> will skip the add-back-in step (this is the default).
 
 =back
 
@@ -89,6 +89,10 @@ If specified, then a contig is kept if it has at least one good role or no bad r
 =item fine
 
 If specified, then a contig is kept only if it has at least one good role.
+
+=item defrag
+
+If specified, then a contig is kept if it has at least one good role or has more than one feature.
 
 =back
 
@@ -106,8 +110,9 @@ my $opt = ScriptUtils::Opts('packageDir pkg1 pkg2 ... pkgN',
         ['method' => hidden => { one_of => [
             ['fine', 'keep only contigs with good roles'],
             ['relaxed', 'keep contigs with good roles or with no bad roles (minLen applies to the latter)'],
+            ['defrag', 'keep contigs with good roles or multiple features'],
             ], default => 'fine'}],
-        ['tetra=f', 'maximum tetramer distance (0 to disable)', { default => 0.25 }],
+        ['tetra=f', 'maximum tetramer distance (0 to disable)', { default => 0 }],
         );
 # Create the statistics object.
 my $stats = Stats->new();
@@ -192,6 +197,8 @@ for my $pkg (@pkgs) {
         }
         close $ih;
         print "$count good and $bCount bad roles found.\n";
+        # This will count the features in a contig.
+        my %contigFeats;
         # Read the GTO and compute the good contigs.
         my %goodContigs;
         my %badContigs;
@@ -231,6 +238,8 @@ for my $pkg (@pkgs) {
             if (! $bad && ! $good) {
                 $stats->Add(featureNotGood => 1);
             }
+            # Record this feature in the contig feature counts.
+            RecordContigs($feature, \%contigFeats);
         }
         # This will be our final list of good contigs.
         my %good;
@@ -247,6 +256,9 @@ for my $pkg (@pkgs) {
             my $contigOK;
             if ($goodContigs{$contigID}) {
                 $stats->Add(contigsGood => 1);
+                $contigOK = 1;
+            } elsif ($method eq 'defrag' && $contigFeats{$contig} && $contigFeats{$contig} > 1) {
+                $stats->Add(contigsNotFrag => 1);
                 $contigOK = 1;
             } elsif ($method eq 'relaxed' && ! $badContigs{$contigID}) {
                 if ($len >= $minLen) {
