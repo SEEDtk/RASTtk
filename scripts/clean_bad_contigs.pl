@@ -257,7 +257,7 @@ for my $pkg (@pkgs) {
             if ($goodContigs{$contigID}) {
                 $stats->Add(contigsGood => 1);
                 $contigOK = 1;
-            } elsif ($method eq 'defrag' && $contigFeats{$contig} && $contigFeats{$contig} > 1) {
+            } elsif ($method eq 'defrag' && $contigFeats{$contigID} && $contigFeats{$contigID} > 1) {
                 $stats->Add(contigsNotFrag => 1);
                 $contigOK = 1;
             } elsif ($method eq 'relaxed' && ! $badContigs{$contigID}) {
