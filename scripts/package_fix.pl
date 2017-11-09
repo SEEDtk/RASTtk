@@ -45,8 +45,14 @@ if (! $targetDir) {
 }
 # Read the files and directories in the target dir.
 opendir(my $dh, $targetDir) || die "Could not open $targetDir: $!";
-my @packages = grep { $_ =~ /^\d+\.\d+$/ } readdir $dh;
-my %outFiles = map { $_ => 1 } grep { $_ =~ /\.txt$/ } readdir $dh;
+my (@packages, %outFiles);
+while (my $member = readdir $dh) {
+    if ($member =~ /^\d+\.\d+$/) {
+        push @packages, $member;
+    } elsif ($member =~ /\.txt$/) {
+        $outFiles{$member} = 1;
+    }
+}
 closedir $dh;
 print scalar(@packages) . " package directories found.\n";
 # Loop through the packages.
