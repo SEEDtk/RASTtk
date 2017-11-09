@@ -125,7 +125,7 @@ for my $pkg (@pkgs) {
     } else {
         # Get the old quality information.
         my ($good, $cmplt, $contam, $coarse, $fine) = package_quality($pDir);
-        if ($good && ! $force) {
+        if ($good) {
             print "$pkg is already good-- skipping.\n";
         } else {
             # Get the taxonomy ID and name from the old GTO.
