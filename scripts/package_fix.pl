@@ -63,7 +63,7 @@ for my $pkg (@packages) {
         # We have the files. Move them.
         File::Copy::Recursive::fmove("$targetDir/$pkg.scikit.eval.txt", "$targetDir/$pkg/EvalBySciKit/evaluate.out") || die "Could not move scikit.eval.txt: $!";
         File::Copy::Recursive::fmove("$targetDir/$pkg.scikit.txt", "$targetDir/$pkg/EvalBySciKit/evaluate.log") || die "Could not move scikit.txt: $!";
-        File::Copy::Recursive::fmove("$targetDir/$pkg.checkm.txt", "$targetDir/$pkg/EvalByCheckM/evaluate.log") || die "Could not move checkm.txt: $!";
+        File::Copy::Recursive::fmove("$targetDir/$pkg.checkm.txt", "$targetDir/$pkg/EvalByCheckm/evaluate.log") || die "Could not move checkm.txt: $!";
         print "Files moved.\n";
     }
 }
