@@ -140,6 +140,11 @@ constraints may be specified by coding the option multiple times.
 Specifies the name of a field that must have a value for the record to be included in the output. Multiple
 fields may be specified by coding the option multiple times.
 
+=item keyword
+
+Specifies a keyword or phrase (in quotes) that should be included in any field of the output. This performs a
+text search against entire records.
+
 =back
 
 =cut
@@ -154,6 +159,7 @@ sub data_options {
             ['ge=s@', 'greater-or-equal search constraint(s) in the form field_name,value'],
             ['ne=s@', 'not-equal search constraint(s) in the form field_name,value'],
             ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
+            ['keyword=s', 'if specified, a keyword or phrase that shoould be in at least one field of every record'],
             ['required|r=s@', 'field(s) required to have values'],
             delim_options());
 }
@@ -532,6 +538,12 @@ sub form_filter {
         die "Invalid field name \"$field\" for required-specification." if ($field =~ /\W+/);
         # Apply the constraint.
         push @retVal, ['eq', $field, '*'];
+    }
+    # Check for a keyword constraint.
+    my $keyword = $opt->keyword;
+    if ($keyword) {
+        # Apply the constraint.
+        push @retVal, ['keyword', $keyword];
     }
     # Return the filter clauses.
     return \@retVal;
