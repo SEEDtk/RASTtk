@@ -19,6 +19,10 @@ Additional command-line options are those given in L<P3Utils/data_options> and L
 
 List the available fields.
 
+=item selective
+
+If specified, the number of features per genome is expected to be small, so a faster algorithm can be used.
+
 =back
 
 =head3 Example
@@ -43,7 +47,7 @@ use P3Utils;
 # Get the command-line options.
 
 my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
-    ['fields|f', 'Show available fields']);
+    ['fields|f', 'Show available fields'], ['selective', 'Use batch query (only for small number of features per genome)']);
 
 my $fields = ($opt->fields ? 1 : 0);
 if ($fields) {
@@ -72,7 +76,13 @@ if (! $opt->nohead) {
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Get the output rows for these input couplets.
-    my $resultList = P3Utils::get_data($p3, feature => $filterList, $selectList, genome_id => $couplets);
+    my $resultList;
+    if ($opt->selective) {
+        $resultList = P3Utils::get_data_batch($p3, feature => $filterList, $selectList, $couplets, 'genome_id');
+    } else {
+        $resultList = P3Utils::get_data($p3, feature => $filterList, $selectList, genome_id => $couplets);
+    }
+
     # Print them.
     for my $result (@$resultList) {
         P3Utils::print_cols($result, opt => $opt);
