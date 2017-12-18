@@ -78,8 +78,6 @@ if ($opt->fields) {
     my ($selectList, $newHeaders) = P3Utils::select_clause(genome => $opt, 1);
     # Compute the filter.
     my $filterList = P3Utils::form_filter($opt);
-    # Add a safety check to remove null genomes.
-    push @$filterList, ['ne', 'genome_id', 0];
     # Check for public-only and private-only.
     if ($opt->public) {
         push @$filterList, ['eq', 'public', 1];

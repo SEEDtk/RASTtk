@@ -90,7 +90,7 @@ sub new {
     $url ||= $default_url;
     my $self = {
         url        => $url,
-        chunk_size => 50000,
+        chunk_size => 25000,
         ua         => LWP::UserAgent->new(),
         token      => $token,
         benchmark  => 0,

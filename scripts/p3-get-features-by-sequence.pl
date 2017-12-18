@@ -92,12 +92,12 @@ for my $couplet (@couplets) {
     if ($mode eq 'protein') {
         # Protein lookup is easy.
         my $md5 = Digest::MD5::md5_hex($seq);
-        $found = P3Utils::get_data($p3, feature => [['eq', 'aa_sequence_md5', $md5], ['eq', 'patric_id', '*']], ['patric_id']);
+        $found = P3Utils::get_data($p3, feature => [['eq', 'aa_sequence_md5', $md5]], ['patric_id']);
     } else {
         # DNA lookup requires a protein translation step and post-processing to verify the sequence.
         my @seqList = compute_md5s($seq);
         my $seqString = '(' . join(',', @seqList) . ')';
-        my $possibles = P3Utils::get_data($p3, feature => [['in', 'aa_sequence_md5', $seqString], ['eq', 'patric_id', '*']], ['patric_id', 'na_sequence']);
+        my $possibles = P3Utils::get_data($p3, feature => [['in', 'aa_sequence_md5', $seqString]], ['patric_id', 'na_sequence']);
         for my $possible (@$possibles) {
             if ($possible->[1] eq $seq) {
                 push @$found, $possible->[0];
