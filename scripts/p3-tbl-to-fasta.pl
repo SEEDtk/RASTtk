@@ -18,7 +18,12 @@ The following additional command-line options are supported.
 
 =item comment
 
-The index (1-based) or name of the column containing comment text. If omitted, no comment text is included in the output.
+The index (1-based) or name of the column containing comment text. If omitted, no comment text is included in the output. If multiple
+comment columns are specified (using multiple instancs of the option), they will be concatenated with a tab.
+
+=item nohead
+
+If specified, the standard input will be presumed to have no headers.
 
 =back
 
@@ -30,7 +35,8 @@ use P3Utils;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('idCol seqCol', P3Utils::ih_options(),
-        ['comment|k=s', 'index (1-based) or name of the comment column']
+        ['nohead', 'input has no headers'],
+        ['comment|k=s@', 'index (1-based) or name of the comment column']
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
@@ -45,20 +51,20 @@ if (! defined $idCol) {
 }
 $idCol = P3Utils::find_column($idCol, $outHeaders);
 $seqCol = P3Utils::find_column($seqCol, $outHeaders);
-my $commentCol;
+my @commentCols;
 if ($opt->comment) {
-    $commentCol = P3Utils::find_column($commentCol, $outHeaders);
+    my @cols = @{$opt->comment};
+    for my $commentCol (@cols) {
+        push @commentCols, P3Utils::find_column($commentCol, $outHeaders);
+    }
 }
-my @columns = ($idCol, $seqCol);
-if (defined $commentCol) {
-    push @columns, $commentCol;
-}
+my @columns = ($idCol, $seqCol, @commentCols);
 # Loop through the input, creating FASTA output.
 while (! eof $ih) {
     # Get the columns we need.
-    my ($id, $seq, $comment) = P3Utils::get_cols($ih, \@columns);
+    my ($id, $seq, @comments) = P3Utils::get_cols($ih, \@columns);
     # Insure the comment is a string.
-    $comment //= '';
+    my $comment = join("\t", @comments);
     # Output the sequence data.
     my @chunks = ($seq =~ /(.{1,60})/g);
     print ">$id $comment\n";
