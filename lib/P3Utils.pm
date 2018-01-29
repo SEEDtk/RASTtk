@@ -176,13 +176,11 @@ options. These options are as follows.
 =item col
 
 Index (1-based) of the column number to contain the key field. If a non-numeric value is specified, it is presumed
-to be the value of the header in the desired column. This option is only present if the B<$colFlag> parameter is
-TRUE. The default is C<0>, which indicates the last column.
+to be the value of the header in the desired column. The default is C<0>, which indicates the last column.
 
 =item batchSize
 
-Maximum number of lines to read in a batch. The default is C<100>. This option is only present if the B<$colFlag>
-parameter is TRUE.
+Maximum number of lines to read in a batch. The default is C<100>.
 
 =item nohead
 
