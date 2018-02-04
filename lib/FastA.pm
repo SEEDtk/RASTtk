@@ -108,6 +108,8 @@ sub new {
 
 =head2 Public Manipulation Methods
 
+=head3 next
+
     my $found = $fqhandle->next;
 
 Move forward to the next record, returning TRUE if one was found.
@@ -257,65 +259,5 @@ sub seqs {
     my ($self) = @_;
     return ($self->{left});
 }
-
-=head2 Internal Utilities
-
-=head3 _read_fastq
-
-    $fqhandle->_read_fastq($ih, $dir);
-
-Read the next record from the indicated FASTQ input stream and store its data in the specified object members.
-
-=over 4
-
-=item ih
-
-Open file handle for the FASTQ file.
-
-=item dir
-
-C<left> for a left record and C<right> for a right record.
-
-=back
-
-=cut
-
-sub _read_fastq {
-    my ($self, $ih, $dir) = @_;
-    # Compute the quality string member name.
-    my $qual = substr($dir, 0, 1) . 'qual';
-    # This will hold the sequence ID.
-    my $id;
-    # Read the ID line.
-    my $line = <$ih>;
-    if ($line =~ /^\@(\S+)/) {
-        $id = $1;
-    } else {
-        die "Invalid FASTQ input: $line";
-    }
-    # Read the data line.
-    my $data = <$ih>;
-    die "Missing data line for $id in FASTQ file." if ! defined $data;
-    chomp $data;
-    $self->{$dir} = $data;
-    # Read the quality header.
-    $line = <$ih>;
-    if (! $line || substr($line, 0, 1) ne '+') {
-        die "Invalid quality header for $id in FASTQ file.";
-    } else {
-        # Read the quality data.
-        $line = <$ih>;
-        die "Missing quality line for $id in FASTQ file." if ! defined $line;
-        chomp $line;
-        if (length($line) ne length($data)) {
-            die "Incorrect length for quality line belonging to $id in FASTQ file.";
-        } else {
-            $self->{$qual} = $line;
-        }
-    }
-    # Normalize the ID and store it.
-    $self->{id} = norm_id($id);
-}
-
 
 1;

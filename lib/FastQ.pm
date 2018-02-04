@@ -86,7 +86,7 @@ Name of the file containing the right-end reads, or an open file handle for it.
 
 =item interlaced
 
-Name of the file containing the interlaced reads.
+Name of the file containing the interlaced reads, or an open file handle for it.
 
 =back
 
@@ -102,7 +102,7 @@ sub new {
     };
     # Store the handle for the left file.
     my $lh;
-    if (ref $left eq 'GLOB') {
+    if (ref($left) =~ /^(?:GLOB|IO::)/) {
         $lh = $left;
     } else {
         open($lh, "<$left") || die "Could not open FASTQ file $left: $!";
@@ -112,7 +112,7 @@ sub new {
     # Store the handle for the right file if we are not interlaced.
     if ($right) {
         my $rh;
-        if (ref $right eq 'GLOB') {
+        if (ref($right) =~ /^(?:GLOB|IO::)/) {
             $rh = $right;
         } else {
             open($rh, "<$right") || die "Could not open FASTQ file $right: $!";
@@ -147,7 +147,7 @@ Returns the normalized sequence ID.
 sub norm_id {
     my ($id) = @_;
     my $retVal;
-    if ($id =~ /(.+)\/\d/) {
+    if ($id =~ /(.+)[\/\.][12]/) {
         $retVal = $1;
     } else {
         $retVal = $id;
@@ -200,6 +200,8 @@ sub OrganizeFiles {
 
 
 =head2 Public Manipulation Methods
+
+=head3 next
 
     my $found = $fqhandle->next;
 
@@ -274,6 +276,50 @@ sub Write {
     print $oh join("\n", "\@$id/1", $self->left, "+$id/1", $self->lqual,
                          "\@$id/2", $self->right, "+$id/2", $self->rqual,
                          "");
+}
+
+=head3 WriteL
+
+    $fqhandle->WriteL($oh);
+
+Write the left sequence of the current record to the specified file handle in FASTQ format.
+
+=over 4
+
+=item oh
+
+An open file handle onto which the current record's sequences should be written.
+
+=back
+
+=cut
+
+sub WriteL {
+    my ($self, $oh) = @_;
+    my $id = $self->id;
+    print $oh join("\n", "\@$id/1", $self->left, "+$id/1", $self->lqual, "");
+}
+
+=head3 WriteR
+
+    $fqhandle->WriteR($oh);
+
+Write the right sequence of the current record to the specified file handle in FASTQ format.
+
+=over 4
+
+=item oh
+
+An open file handle onto which the current record's sequences should be written.
+
+=back
+
+=cut
+
+sub WriteR {
+    my ($self, $oh) = @_;
+    my $id = $self->id;
+    print $oh join("\n", "\@$id/2", $self->right, "+$id/2", $self->rqual, "");
 }
 
 
