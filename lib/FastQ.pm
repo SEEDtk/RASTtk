@@ -218,14 +218,20 @@ sub next {
     # Check for end-of-file.
     if (! eof $lh) {
         # Read the left record.
-        $self->_read_fastq($lh, 'left');
+        my $leftID = $self->_read_fastq($lh, 'left');
         # Determine from where we will get the right record. If there is no right
         # file, it will be the left file (interlaced mode).
+        my $rightID = '';
         $rh //= $lh;
-        # Read the right record.
-        $self->_read_fastq($rh, 'right');
-        # Denote we have our data.
-        $retVal = 1;
+        if (! eof $rh) {
+            # Read the right record.
+            $rightID = $self->_read_fastq($rh, 'right');
+            $retVal = 1;
+        }
+        # Insure we have valid data.
+        if ($leftID ne $rightID) {
+            die "Unpaired data in FASTQ files.\n";
+        }
     }
     # Return the success indication.
     return $retVal;
@@ -408,7 +414,7 @@ sub seqs {
 
 =head3 _read_fastq
 
-    $fqhandle->_read_fastq($ih, $dir);
+    my $id = $fqhandle->_read_fastq($ih, $dir);
 
 Read the next record from the indicated FASTQ input stream and store its data in the specified object members.
 
@@ -421,6 +427,10 @@ Open file handle for the FASTQ file.
 =item dir
 
 C<left> for a left record and C<right> for a right record.
+
+=item RETURN
+
+Returns the ID for the read.
 
 =back
 
@@ -460,7 +470,11 @@ sub _read_fastq {
         }
     }
     # Normalize the ID and store it.
-    $self->{id} = norm_id($id);
+    my $retVal = norm_id($id);
+    $self->{id} = $retVal;
+    # Return the ID.
+    return $retVal;
+
 }
 
 

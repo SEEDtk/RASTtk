@@ -203,12 +203,15 @@ sub download_runs {
     my $stats = $self->{stats};
     # This will be set to TRUE if we need to abort.
     my $error = 0;
+    # This will be set to TRUE if we create a directory.
+    my $created = 0;
     # Insure we have an output directory.
     if (! $outDir) {
         die "No output directory specified for run download.";
     } elsif (! -d $outDir) {
         $self->_log("Creating run output directory $outDir.\n");
         File::Copy::Recursive::pathmk($outDir);
+        $created = 1;
     }
     # Find the FASTQ-DUMP command.
     my $cmdPath = SeedAware::executable_for('fastq-dump');
@@ -217,19 +220,63 @@ sub download_runs {
     open(my $rh, '>', "$outDir/${name}_2.fastq") || die "Could not open right FASTQ for $name: $!";
     # Loop through the runs.
     for my $run (@$runList) {
+        $self->_log("Processing $run.\n");
         # Create a FastQ object to read the run from NCBI.
-        open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical $run |") || die "Could not start fastq dunmp for $run: $!";
+        open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
-        my $fq = FastQ->new($ih);
-        while ($fq->next) {
-            $stats->Add(runRecords => 1);
-            $fq->WriteL($lh);
-            $fq->WriteR($rh);
+        my $line;
+        while (! eof $ih && ! $error) {
+            $line = <$ih>;
+            # Check for the left read.
+            if ($line =~ /^\@(\S+)\.1\s/) {
+                # Found it. Echo the data and the quality to the left file.
+                my $id = $1;
+                print $lh $line;
+                for my $idx (1,2,3) {
+                    $line = <$ih>;
+                    print $lh $line;
+                }
+                # Check for the right read.
+                $line = <$ih>;
+                if ($line && $line =~ /^\@(\S+)\.2\s/) {
+                    my $idR = $1;
+                    if ($idR ne $id) {
+                        # Mismatched reads.
+                        $error = 1;
+                        $self->_log("Bad run: right read does not match left read $id.\n");
+                    } else {
+                        # Echo to the right file.
+                        print $rh $line;
+                        for my $idx (1,2,3) {
+                            $line = <$ih>;
+                            print $rh $line;
+                        }
+                    }
+                } else {
+                    # No valid right read.
+                    $error = 1;
+                    $self->_log("Bad run: no right read following left read $id.\n");
+                }
+            } else {
+                # No valid left read.
+                $error = 1;
+                $self->_log("Bad run: left read not found when expected.\n");
+            }
+        }
+        # Flush the piped command stream.
+        while (! eof $ih) {
+            $line = <$ih>;
         }
         close $ih;
     }
     # Clean up the files.
     close $lh; close $rh;
+    if ($error && $created) {
+        # Here we must remove the created directory.
+        $self->_log("Cleaning up $outDir.\n");
+        File::Copy::Recursive::pathempty($outDir);
+        rmdir $outDir;
+    }
     # Return the success flag.
     my $retVal = ! $error;
     return $retVal;
