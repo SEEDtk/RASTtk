@@ -25,6 +25,7 @@ package SRAlib;
     use Stats;
     use File::Copy::Recursive;
     use FastQ;
+    use SeedAware;
 
 =head1 Library for Downloading SRA Entries
 
@@ -209,13 +210,15 @@ sub download_runs {
         $self->_log("Creating run output directory $outDir.\n");
         File::Copy::Recursive::pathmk($outDir);
     }
+    # Find the FASTQ-DUMP command.
+    my $cmdPath = SeedAware::executable_for('fastq-dump');
     # Create the FASTQ output files.
     open(my $lh, '>', "$outDir/${name}_1.fastq") || die "Could not open left FASTQ for $name: $!";
     open(my $rh, '>', "$outDir/${name}_2.fastq") || die "Could not open right FASTQ for $name: $!";
     # Loop through the runs.
     for my $run (@$runList) {
         # Create a FastQ object to read the run from NCBI.
-        open(my $ih, "RunTool fastq-dump --stdout $run |") || die "Could not start fastq dunmp for $run: $!";
+        open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
         my $fq = FastQ->new($ih);
         while ($fq->next) {
