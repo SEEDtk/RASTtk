@@ -118,7 +118,7 @@ Get the list of runs for a specified sample.
 
 =item id
 
-The SRS ID for the sample (e.g. C<SRS015383>).
+The SRS ID for the sample (e.g. C<SRS015383>) or an individual run (e.g. C<SRR2657613>).
 
 =item RETURN
 
@@ -135,31 +135,38 @@ sub get_runs {
     # This will be the return value.
     my $retVal;
     $stats->Add(runRequests => 1);
-    # Retrieve the web page for this sample.
-    $self->_log("Fetching runs for $id.\n");
-    my $url = "http://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?save=efetch&db=sra&rettype=runinfo&term=$id";
-    my $response = $self->{ua}->get($url);
-    if (! $response->is_success) {
-        $self->_log_error($response);
-        $stats->Add(runRequestErrors => 1);
+    # Is this a run ID?
+    $id = uc $id;
+    if ($id =~ /^SRR/) {
+        # Yes, return it as a list.
+        $retVal = [$id];
     } else {
-        # Here we have a valid web page to scrape.
-        my $content = $response->decoded_content;
-        $stats->Add(runRequestPages => 1);
-        $retVal = [];
-        my @lines = split /\n/, $content;
-        for my $line (@lines) {
-            if ($line =~ /^(SRR\d+),/) {
-                push @$retVal, $1;
-                $stats->Add(runFound => 1);
-            }
-        }
-        if (! scalar @$retVal) {
-            # Chances are this is an invalid SRS ID, so it's an error.
-            $self->_log("No runs found for $id.\n");
-            undef $retVal;
+        # Retrieve the web page for this sample.
+        $self->_log("Fetching runs for $id.\n");
+        my $url = "http://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?save=efetch&db=sra&rettype=runinfo&term=$id";
+        my $response = $self->{ua}->get($url);
+        if (! $response->is_success) {
+            $self->_log_error($response);
+            $stats->Add(runRequestErrors => 1);
         } else {
-            $self->_log(scalar(@$retVal) . " runs found for $id.\n");
+            # Here we have a valid web page to scrape.
+            my $content = $response->decoded_content;
+            $stats->Add(runRequestPages => 1);
+            $retVal = [];
+            my @lines = split /\n/, $content;
+            for my $line (@lines) {
+                if ($line =~ /^(SRR\d+),/) {
+                    push @$retVal, $1;
+                    $stats->Add(runFound => 1);
+                }
+            }
+            if (! scalar @$retVal) {
+                # Chances are this is an invalid SRS ID, so it's an error.
+                $self->_log("No runs found for $id.\n");
+                undef $retVal;
+            } else {
+                $self->_log(scalar(@$retVal) . " runs found for $id.\n");
+            }
         }
     }
     # Return the results.
