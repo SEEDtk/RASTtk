@@ -26,6 +26,7 @@ package SRAlib;
     use File::Copy::Recursive;
     use FastQ;
     use SeedAware;
+    use IO::Compress::Gzip;
 
 =head1 Library for Downloading SRA Entries
 
@@ -50,6 +51,10 @@ An open file handle for status messages. If C<undef>, then no status messages ar
 =item stats
 
 A L<Stats> object for run statistics.
+
+=item gzip
+
+If TRUE, then the output files should be in gzip format.
 
 =back
 
@@ -81,6 +86,10 @@ An open file handle for status message output. If omitted, no status messages ar
 
 A L<Stats> object to use for run statistics. If omitted, statistics are generated internally.
 
+=item gzip
+
+If TRUE, then the output files should be in gzip format.
+
 =back
 
 =back
@@ -94,11 +103,13 @@ sub new {
     # Get the other options.
     my $stats = $options{stats} // Stats->new();
     my $log = $options{logH};
+    my $gzip = $options{gzip} // 0;
     # Create the object.
     my $retVal = {
         ua => $ua,
         logH => $log,
         stats => $stats,
+        gzip => $gzip
     };
     # Bless and return it.
     bless $retVal, $class;
@@ -223,8 +234,15 @@ sub download_runs {
     # Find the FASTQ-DUMP command.
     my $cmdPath = SeedAware::executable_for('fastq-dump');
     # Create the FASTQ output files.
-    open(my $lh, '>', "$outDir/${name}_1.fastq") || die "Could not open left FASTQ for $name: $!";
-    open(my $rh, '>', "$outDir/${name}_2.fastq") || die "Could not open right FASTQ for $name: $!";
+    my ($lh, $rh);
+    my ($lfile, $rfile) = ("$outDir/${name}_1.fastq", "$outDir/${name}_2.fastq");
+    if ($self->{gzip}) {
+        $lh = new IO::Compress::Gzip("$lfile.gz");
+        $rh = new IO::Compress::Gzip("$rfile.gz");
+    } else {
+        open($lh, '>', $lfile) || die "Could not open left FASTQ for $name: $!";
+        open($rh, '>', $rfile) || die "Could not open right FASTQ for $name: $!";
+    }
     # Loop through the runs.
     for my $run (@$runList) {
         $self->_log("Processing $run.\n");
