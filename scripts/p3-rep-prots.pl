@@ -3,7 +3,7 @@
     p3-rep-prots.pl [options] outDir
 
 This script processes a list of genome IDs to create a directory suitable for use by the L<RepresentativeGenomes> server.
-It will extract all the instances of the specified seed protein (usually Phenylanyl synthetase alpha chain) and only
+It will extract all the instances of the specified seed protein (Phenylanyl synthetase alpha chain) and only
 keep genomes with a single instance of reasonable length. The list of genome IDs and names will go in the output file
 C<complete.genomes> and a FASTA of the seed proteins in C<6.1.1.20.fasta>.
 
@@ -17,10 +17,6 @@ Additional command-line options are those given in L<P3Utils/col_options> plus t
 options.
 
 =over 4
-
-=item protein
-
-The description string of the desired protein role. The default is C<Phenylalanyl-tRNA synthetase alpha chain>.
 
 =item minlen
 
@@ -43,11 +39,11 @@ use P3DataAPI;
 use P3Utils;
 use Stats;
 use File::Copy::Recursive;
+use RoleParse;
 
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
-        ['protein=s', 'protein role description', { default => 'Phenylalanyl-tRNA synthetase alpha chain'}],
         ['minlen=i', 'minimum protein length', { default => 209 }],
         ['maxlen=i', 'maximum protein length', { default => 485 }],
         ['clear', 'clear the output directory if it exists']
@@ -66,9 +62,11 @@ if (! $outDir) {
 # Create the statistics object.
 my $stats = Stats->new();
 # Create a filter from the protein name.
-my @filter = (['eq', 'product', $opt->protein]);
+my @filter = (['eq', 'product', 'Phenylalanyl tRNA-synthetase alpha chain']);
+# Save the checksum for the seed role.
+my $roleCheck = "WCzieTC/aZ6262l19bwqgw";
 # Create a list of the columns we want.
-my @cols = qw(genome_name patric_id aa_sequence);
+my @cols = qw(genome_name patric_id aa_sequence product);
 # Get the length options.
 my $minlen = $opt->minlen;
 my $maxlen = $opt->maxlen;
@@ -97,10 +95,16 @@ while (! eof $ih) {
     # Collate them by genome ID, discarding the nulls.
     my %proteins;
     for my $prot (@$protList) {
-        my ($genome, $name, $fid, $sequence) = @$prot;
+        my ($genome, $name, $fid, $sequence, $product) = @$prot;
         if ($fid) {
-            push @{$proteins{$genome}}, [$name, $sequence];
-            $stats->Add(protFound => 1);
+            # We have a real feature, check the function.
+            my $check = RoleParse::Checksum($product // '');
+            if ($check ne $roleCheck) {
+                $stats->Add(funnyProt => 1);
+            } else {
+                push @{$proteins{$genome}}, [$name, $sequence];
+                $stats->Add(protFound => 1);
+            }
         }
     }
     # Process the genomes one at a time.
