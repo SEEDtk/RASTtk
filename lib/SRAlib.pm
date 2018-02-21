@@ -184,6 +184,55 @@ sub get_runs {
     return $retVal;
 }
 
+=head3 get_stats
+
+    my ($spots, $bases) = $sraLib->get_stats($srs_id);
+
+Extract the the number of spots and base pairs for a specified sample.
+
+=over 4
+
+=item id
+
+The SRS ID for the sample (e.g. C<SRS015383>).
+
+=item RETURN
+
+Returns a list containing the number of spots and the number of base pairs. Note that not all the spots may be usable, but this is a good
+rule of thumb.
+
+=back
+
+=cut
+
+sub get_stats {
+    my ($self, $id) = @_;
+    # This will be the return value.
+    my ($spots, $bases) = (0, 0);
+    # Normalize the ID to upper case.
+    $id = uc $id;
+    # Retrieve the web page for this sample.
+    $self->_log("Fetching run data for $id.\n");
+    my $url = "http://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?save=efetch&db=sra&rettype=runinfo&term=$id";
+    my $response = $self->{ua}->get($url);
+    if (! $response->is_success) {
+        $self->_log_error($response);
+    } else {
+        # Here we have a valid web page to scrape.
+        my $content = $response->decoded_content;
+        my @lines = split /\n/, $content;
+        for my $line (@lines) {
+            my ($run, undef, undef, $spot0, $base0) = split /,/, $line;
+            if ($run && $run =~ /^SRR/) {
+                $spots += $spot0;
+                $bases += $base0;
+            }
+        }
+    }
+    # Return the results.
+    return ($spots, $bases);
+}
+
 
 =head3 download_runs
 
