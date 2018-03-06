@@ -52,7 +52,7 @@ use P3Utils;
 my $opt = P3Utils::script_opts('filterFile filterCol1 filterCol2 ... filterColN', P3Utils::ih_options(),
         ['reverse|invert|v', 'only keep non-matching records'],
         ['nohead', 'file has no headers'],
-        ['col|c=s@', 'input file key columns', { default => 0 }]
+        ['col|c=s@', 'input file key columns', { default => [0] }]
         );
 # Get the filter parameters.
 my ($filterFile, @filterCol) = @ARGV;
