@@ -19,21 +19,21 @@
 
 use strict;
 use warnings;
-use P3DataAPI;
+use GPUtils;
 use SubsystemProjector;
 use File::Copy::Recursive;
 use ScriptUtils;
 
-=head1 Project Subsystems onto PATRIC Genomes
+=head1 Project Subsystems onto Genome Packages
 
-    p3-project-subystems.pl [ options ] outDir genome1 genome2 ... genomeN
+    package_subystems.pl [ options ] packageDir
 
-This script will examine PATRIC genomes and project subsystems onto them. The resulting GTOs will be output to the
-specified output directory.
+This script will examine the genomes in the specified genome package directory and project subsystems onto them. This involves replacing the
+C<bin.gto> files.
 
 =head2 Parameters
 
-The positional parameters are the name of the output directory followed by one or more PATRIC genome IDs.
+The positional parameter is the name of the output directory.
 
 The command-line options are the following:
 
@@ -54,34 +54,30 @@ Name of a tab-delimited file containing in each record (0) a subsystem name, (1)
 
 $| = 1;
 # Get the command-line parameters.
-my $opt = ScriptUtils::Opts('outDir genome1 genome2 ... genomeN',
+my $opt = ScriptUtils::Opts('packageDir',
         ['roleFile|r=s', 'name of file containing subsystems for roles', { required => 1 }],
         ['variantFile|v=s', 'name of file containing variant maps', { required => 1}]
         );
 # Get the positional parameters.
-my ($outDir, @genomes) = @ARGV;
+my ($packageDir) = @ARGV;
 # Verify the parameters.
-if (! $outDir) {
-    die "No output directory specified.";
-} elsif (! -d $outDir) {
-    print "Creating $outDir.\n";
-    File::Copy::Recursive::pathmk($outDir) || die "Could not create output directory $outDir: $!";
+if (! $packageDir) {
+    die "No package directory specified.";
+} elsif (! -d $packageDir) {
+    die "Package directory $packageDir missing or invalid.";
 }
-if (! @genomes) {
-    die "No genomes specified.";
-}
-# Connect to PATRIC.
-print "Connecting to PATRIC.\n";
-my $p3 = P3DataAPI->new();
 # Create the subsystem projector.
 print "Initializing projector.\n";
 my $projector = SubsystemProjector->new($opt->rolefile, $opt->variantfile);
 # Get the statistics object.
 my $stats = $projector->stats;
+# Get all the packages.
+print "Reading package directory.\n";
+my $gHash = GPUtils::get_all($packageDir);
 # Loop through the genomes.
-for my $genome (@genomes) {
+for my $genome (sort keys %$gHash) {
     print "Reading $genome.\n";
-    my $gto = $p3->gto_of($genome);
+    my $gto = GPUtils::gto_of($gHash, $genome);
     if (! $gto) {
         print "ERROR: genome not found.\n";
         $stats->Add(badGenome => 1);
@@ -90,9 +86,16 @@ for my $genome (@genomes) {
         my $subsystemHash = $projector->ProjectForGto($gto, store => 1);
         my $count = scalar(keys %$subsystemHash);
         print "$count subsystems found.\n";
-        my $outFile = "$outDir/$genome.gto";
+        # Now we must replace the old GTO file. We write to a new file name, delete the old file, and rename the new one.
+        my $genomeDir = $gHash->{$genome};
+        my $oldFile = "$genomeDir/bin.gto";
+        my $outFile = "$genomeDir/bin.gto~";
         print "Writing output to $outFile.\n";
         $gto->destroy_to_file($outFile);
+        print "Overwriting old file.\n";
+        unlink $oldFile;
+        rename($outFile, $oldFile) || die "Could not rename $outFile: $!";
+        $stats->Add(packagesProcessed => 1);
     }
 }
 print "All done: " . $stats->Show();

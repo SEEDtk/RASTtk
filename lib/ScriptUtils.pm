@@ -245,6 +245,33 @@ sub read_col {
     return $retVal;
 }
 
+=head3 get_line
+
+    my @fields = ScriptUtils::get_line($ih);
+
+Return all the columns from the next input line.
+
+=over 4
+
+=item ih
+
+Open input file handle.
+
+=item RETURN
+
+Returns a list of all the column entries in the next input line.
+
+=back
+
+=cut
+
+sub get_line {
+    my ($ih) = @_;
+    my $line = <$ih>;
+    $line =~ s/\r?\n$//;
+    return split /\t/, $line;
+}
+
 =head3 get_couplets
 
     my @couplets = ScriptUtils::get_couplets($ih, $col, $batchSize);
