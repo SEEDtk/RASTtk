@@ -55,8 +55,8 @@ Name of a tab-delimited file containing in each record (0) a subsystem name, (1)
 $| = 1;
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('packageDir',
-        ['roleFile|r=s', 'name of file containing subsystems for roles', { required => 1 }],
-        ['variantFile|v=s', 'name of file containing variant maps', { required => 1}]
+        ['roleFile|r=s', 'name of file containing subsystems for roles', { default => "$FIG_Config::global/roleMap.tbl" }],
+        ['variantFile|v=s', 'name of file containing variant maps', { default => "$FIG_Config::global/variantMap.tbl" }]
         );
 # Get the positional parameters.
 my ($packageDir) = @ARGV;
@@ -86,16 +86,21 @@ for my $genome (sort keys %$gHash) {
         my $subsystemHash = $projector->ProjectForGto($gto, store => 1);
         my $count = scalar(keys %$subsystemHash);
         print "$count subsystems found.\n";
-        # Now we must replace the old GTO file. We write to a new file name, delete the old file, and rename the new one.
-        my $genomeDir = $gHash->{$genome};
-        my $oldFile = "$genomeDir/bin.gto";
-        my $outFile = "$genomeDir/bin.gto~";
-        print "Writing output to $outFile.\n";
-        $gto->destroy_to_file($outFile);
-        print "Overwriting old file.\n";
-        unlink $oldFile;
-        rename($outFile, $oldFile) || die "Could not rename $outFile: $!";
-        $stats->Add(packagesProcessed => 1);
+        $stats->Add(subsysFound => $count);
+        if (! $count) {
+            $stats->Add(packageNoSubsys => 1);
+        } else {
+            # Now we must replace the old GTO file. We write to a new file name, delete the old file, and rename the new one.
+            my $genomeDir = $gHash->{$genome};
+            my $oldFile = "$genomeDir/bin.gto";
+            my $outFile = "$genomeDir/bin.gto~";
+            print "Writing output to $outFile.\n";
+            $gto->destroy_to_file($outFile);
+            print "Overwriting old file.\n";
+            unlink $oldFile;
+            rename($outFile, $oldFile) || die "Could not rename $outFile: $!";
+            $stats->Add(packagesUpdated => 1);
+        }
     }
 }
 print "All done: " . $stats->Show();
