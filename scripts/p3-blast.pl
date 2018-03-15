@@ -151,9 +151,9 @@ if (! $blastdb) {
     $blastDatabase = $blastdb;
 } else {
     # Not a file name, so we assume it is a genome.
-    p3_genome_fasta($blastdb, $blastDbType);
+    my $ok = p3_genome_fasta($blastdb, $blastDbType);
     $blastDatabase = $blastdb;
-    if (! $blastDatabase) {
+    if (! $ok) {
         die "$blastdb is not a file or a genome ID."
     }
 }
@@ -180,13 +180,17 @@ sub p3_genome_fasta
 {
     my ($genome_id, $blastDbType) = @_;
     my $d = P3DataAPI->new();
-
+    my $retVal;
     my $gto = $d->gto_of($genome_id);
-    if ($blastDbType eq "dna") {
-        $gto->write_contigs_to_file("$genome_id");
-      } else {
+    if ($gto) {
+        if ($blastDbType eq "dna") {
+            $gto->write_contigs_to_file("$genome_id");
+        } else {
             $gto->write_protein_translations_to_file("$genome_id");
+        }
+        $retVal = 1;
     }
+    return $retVal;
 }
 
 
