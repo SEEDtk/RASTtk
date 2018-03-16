@@ -83,6 +83,9 @@ if ($opt->fields) {
         push @$filterList, ['eq', 'public', 1];
     } elsif ($opt->private) {
         push @$filterList, ['eq', 'public', 0];
+    } elsif (! @$filterList) {
+        # We must always have a filter, so add a dummy here.
+        push @$filterList, ['ne', 'genome_id', 0];
     }
     # Write the headers.
     P3Utils::print_cols($newHeaders);
