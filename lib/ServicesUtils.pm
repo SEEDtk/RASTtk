@@ -1,3 +1,4 @@
+# This is a SAS Component
 #
 # Copyright (c) 2003-2015 University of Chicago and Fellowship
 # for Interpretations of Genomes. All Rights Reserved.
