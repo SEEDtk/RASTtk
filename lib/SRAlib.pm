@@ -148,7 +148,7 @@ sub get_runs {
     $stats->Add(runRequests => 1);
     # Is this a run ID?
     $id = uc $id;
-    if ($id =~ /^SRR/) {
+    if ($id =~ /^[SDE]RR/) {
         # Yes, return it as a list.
         $retVal = [$id];
     } else {
