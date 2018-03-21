@@ -104,7 +104,7 @@ my $suffix = $opt->suffix;
 my $inFileName = "bin$suffix.fa";
 # Find the cleaned packages.
 opendir(my $dh, $packageDir) || die "Could not open $packageDir: $!";
-my @pkgs = grep { -s "$packageDir/$_/$inFileName" } readdir $dh;
+my @pkgs = sort grep { -s "$packageDir/$_/$inFileName" } readdir $dh;
 closedir $dh;
 print scalar(@pkgs) . " packages found with $inFileName files.\n";
 for my $pkg (@pkgs) {
