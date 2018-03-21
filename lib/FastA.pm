@@ -132,6 +132,7 @@ sub next {
             # Read the data lines until we hit the end.
             my $line = <$ih>;
             if (! defined $line) {
+                $self->{id} = $self->{next_id};
                 $done = 1;
             } elsif ($line =~ /^>(\S+)/) {
                 # Here we have a header for a new record.
