@@ -124,19 +124,24 @@ sub next {
     my $ih = $self->{ih};
     # This will hold the current sequence.
     my @seqs;
-    # Loop until we hit a new record or we hit the end of the file.
-    my $done;
-    while (! eof $ih && ! $done) {
-        # Read the data lines until we hit the end.
-        my $line = <$ih>;
-        if ($line =~ /^>(\S+)/) {
-            # Here we have a header for a new record.
-            ($self->{id}, $self->{next_id}) = ($self->{next_id}, $1);
-            $done = 1;
-        } else {
-            # Here we have sequence data.
-            $line =~ s/[\r\n]+$//;
-            push @seqs, $line;
+    # Only proceed if there is data left in the file.
+    if (! eof $ih) {
+        # Loop until we hit a new record or we hit the end of the file.
+        my $done;
+        while (! $done) {
+            # Read the data lines until we hit the end.
+            my $line = <$ih>;
+            if (! defined $line) {
+                $done = 1;
+            } elsif ($line =~ /^>(\S+)/) {
+                # Here we have a header for a new record.
+                ($self->{id}, $self->{next_id}) = ($self->{next_id}, $1);
+                $done = 1;
+            } else {
+                # Here we have sequence data.
+                $line =~ s/[\r\n]+$//;
+                push @seqs, $line;
+            }
         }
     }
     # Did we find anything?
