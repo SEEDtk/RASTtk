@@ -125,62 +125,58 @@ for my $pkg (@pkgs) {
     } else {
         # Get the old quality information.
         my ($good, $cmplt, $contam, $coarse, $fine) = package_quality($pDir);
-        if ($good) {
-            print "$pkg is already good-- skipping.\n";
+        # Get the taxonomy ID and name from the old GTO.
+        my ($taxonID, $name) = get_taxon($pDir);
+        print "Package is $taxonID: $name.\n";
+        $name = "$name (cleaned)";
+        # Read the contigs.
+        my $newFa = "$pDir/$inFileName";
+        my $triples = gjoseqlib::read_fasta($newFa);
+        my ($contigs, $bases) = (0,0);
+        for my $triple (@$triples) {
+            $contigs++;
+            $bases += length($triple->[2]);
+        }
+        # Create the GTO.
+        print STDERR "Submitting cleaned $pkg contigs to RAST.\n";
+        my %options = ('sleep' => $opt->sleep, user => $opt->user, password => $opt->password);
+        my $gto = RASTlib::Annotate($triples, $taxonID, $name, %options);
+        # Output the GTO.
+        my $newID = $gto->{id};
+        print STDERR "Creating new GenomePackage $newID.\n";
+        my $newDir = "$outputDir/$newID";
+        if (-d $newDir) {
+            die "Redundant genome ID returned $newID.";
         } else {
-            # Get the taxonomy ID and name from the old GTO.
-            my ($taxonID, $name) = get_taxon($pDir);
-            print "Package is $taxonID: $name.\n";
-            $name = "$name (cleaned)";
-            # Read the contigs.
-            my $newFa = "$pDir/$inFileName";
-            my $triples = gjoseqlib::read_fasta($newFa);
-            my ($contigs, $bases) = (0,0);
-            for my $triple (@$triples) {
-                $contigs++;
-                $bases += length($triple->[2]);
-            }
-            # Create the GTO.
-            print STDERR "Submitting cleaned $pkg contigs to RAST.\n";
-            my %options = ('sleep' => $opt->sleep, user => $opt->user, password => $opt->password);
-            my $gto = RASTlib::Annotate($triples, $taxonID, $name, %options);
-            # Output the GTO.
-            my $newID = $gto->{id};
-            print STDERR "Creating new GenomePackage $newID.\n";
-            my $newDir = "$outputDir/$newID";
-            if (-d $newDir) {
-                die "Redundant genome ID returned $newID.";
-            } else {
-                print "Creating $newID in $outputDir.\n";
-                File::Copy::Recursive::pathmk($newDir) || die "Could not create $newDir: $!";
-                File::Copy::Recursive::fmove($newFa, "$newDir/bin.fa") || die "Could not copy FASTA: $!";
-                SeedUtils::write_encoded_object($gto, "$newDir/bin.gto");
-                open(my $oh, '>', "$newDir/data.tbl") || die "Could not open new data.tbl: $!";
-                print $oh "Genome Name\t$name\n";
-                print $oh "Source Package\t$pkg\n";
-                print $oh "Contigs\t$contigs\n";
-                print $oh "Base pairs\t$bases\n";
-                close $oh; undef $oh;
-                # Record this in the cleaning log.
-                open($oh, '>>', "$pDir/clean.log") || die "Could not open clean.log for $pkg: $!";
-                print $oh "$inFileName produced $newID in $outputDir.\n";
-                close $oh; undef $oh;
-                # Evaluate the new package.
-                print "Running CheckM.\n";
-                my $outDir = "$newDir/EvalByCheckm";
-                my $cmd = "checkm lineage_wf --tmpdir $FIG_Config::temp -x fa --file $newDir/evaluate.log $newDir $outDir";
-                SeedUtils::run($cmd);
-                File::Copy::Recursive::fmove("$newDir/evaluate.log", "$newDir/EvalByCheckm/evaluate.log");
-                print "Running SciKit.\n";
-                $outDir = "$newDir/EvalBySciKit";
-                $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::global/FunctionPredictors $FIG_Config::global/roles.in.subsystems $FIG_Config::global/roles.to.use";
-                SeedUtils::run($cmd);
-                print "Old stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
-                ($good, $cmplt, $contam, $coarse, $fine) = package_quality($newDir);
-                print "New stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
-                if ($good) {
-                    print "PACKAGE IS NOW GOOD.\n";
-                }
+            print "Creating $newID in $outputDir.\n";
+            File::Copy::Recursive::pathmk($newDir) || die "Could not create $newDir: $!";
+            File::Copy::Recursive::fmove($newFa, "$newDir/bin.fa") || die "Could not copy FASTA: $!";
+            SeedUtils::write_encoded_object($gto, "$newDir/bin.gto");
+            open(my $oh, '>', "$newDir/data.tbl") || die "Could not open new data.tbl: $!";
+            print $oh "Genome Name\t$name\n";
+            print $oh "Source Package\t$pkg\n";
+            print $oh "Contigs\t$contigs\n";
+            print $oh "Base pairs\t$bases\n";
+            close $oh; undef $oh;
+            # Record this in the cleaning log.
+            open($oh, '>>', "$pDir/clean.log") || die "Could not open clean.log for $pkg: $!";
+            print $oh "$inFileName produced $newID in $outputDir.\n";
+            close $oh; undef $oh;
+            # Evaluate the new package.
+            print "Running CheckM.\n";
+            my $outDir = "$newDir/EvalByCheckm";
+            my $cmd = "checkm lineage_wf --tmpdir $FIG_Config::temp -x fa --file $newDir/evaluate.log $newDir $outDir";
+            SeedUtils::run($cmd);
+            File::Copy::Recursive::fmove("$newDir/evaluate.log", "$newDir/EvalByCheckm/evaluate.log");
+            print "Running SciKit.\n";
+            $outDir = "$newDir/EvalBySciKit";
+            $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::global/FunctionPredictors $FIG_Config::global/roles.in.subsystems $FIG_Config::global/roles.to.use";
+            SeedUtils::run($cmd);
+            print "Old stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
+            ($good, $cmplt, $contam, $coarse, $fine) = package_quality($newDir);
+            print "New stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
+            if ($good) {
+                print "PACKAGE IS NOW GOOD.\n";
             }
         }
     }
