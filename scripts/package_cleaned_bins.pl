@@ -105,9 +105,9 @@ my $suffix = $opt->suffix;
 my $inFileName = "bin$suffix.fa";
 # Find the cleaned packages.
 opendir(my $dh, $packageDir) || die "Could not open $packageDir: $!";
-my @pkgs = sort grep { -s "$packageDir/$_/$inFileName" } readdir $dh;
+my @pkgs = sort grep { -s "$packageDir/$_/bin.gto" } readdir $dh;
 closedir $dh;
-print scalar(@pkgs) . " packages found with $inFileName files.\n";
+print scalar(@pkgs) . " packages found in $packageDir.\n";
 for my $pkg (@pkgs) {
     my $pDir = "$packageDir/$pkg";
     # If we are NOT forcing, check to see if this is a redundant operation.
@@ -123,6 +123,8 @@ for my $pkg (@pkgs) {
     }
     if ($found) {
         print "$pkg already processed-- skipping.\n";
+    } elsif (! -s "$pDir/$inFileName") {
+        print "$pkg does not have an $inFileName-- skipping.\n";
     } else {
         # Get the old quality information.
         my ($good, $cmplt, $contam, $coarse, $fine) = package_quality($pDir);
