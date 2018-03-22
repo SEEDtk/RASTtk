@@ -173,9 +173,12 @@ for my $pkg (@pkgs) {
             $outDir = "$newDir/EvalBySciKit";
             $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::global/FunctionPredictors $FIG_Config::global/roles.in.subsystems $FIG_Config::global/roles.to.use";
             SeedUtils::run($cmd);
-            print "Old stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
+            print "Package $pkg transformed to $newID: $name\n";
+            my $qual = int(($cmplt + 1.06 * $fine - 10 * $contam) * 100) / 100;
+            print "Old stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent, $qual quality.\n";
             ($good, $cmplt, $contam, $coarse, $fine) = package_quality($newDir);
-            print "New stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent.\n";
+            $qual = int(($cmplt + 1.06 * $fine - 10 * $contam) * 100) / 100;
+            print "New stats are $cmplt complete, $contam contamination, $coarse coarse-consistent, $fine fine-consistent, $qual quality.\n";
             if ($good) {
                 print "PACKAGE IS NOW GOOD.\n";
             }
