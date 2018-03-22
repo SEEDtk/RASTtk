@@ -25,6 +25,7 @@ use File::Copy::Recursive;
 use RASTlib;
 use GenomeTypeObject;
 use gjoseqlib;
+use GPUtils;
 
 =head1 Create a New Genome Package From Cleaned FASTAs
 
@@ -222,6 +223,13 @@ sub package_quality {
             close $fh;
         }
     }
-    return (($checkMscore - 5 * $checkMcontam >= 50 && $checkMscore >= 80 && $scikitFScore >= 85), $checkMscore, $checkMcontam, $scikitCScore, $scikitFScore);
+    # Are we probably good?
+    my $good = ($checkMcontam <= 10 && $checkMscore >= 80 && $scikitFScore >= 85);
+    if ($good) {
+        # Yes, check the seed protein.
+        my $gto = GenomeTypeObject->create_from_file("$pDir/bin.gto");
+        $good = GPUtils::good_seed($gto);
+    }
+    return ($good, $checkMscore, $checkMcontam, $scikitCScore, $scikitFScore);
 }
 
