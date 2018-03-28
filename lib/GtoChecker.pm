@@ -29,12 +29,12 @@ package GtoChecker;
 =head1 Data Structures to Check GTOs for Completeness
 
 This object manages data structures to check GTOs for completeness and contamination. The algorithm is simple, and
-is based on files created by the scripts L<taxon_analysis.pl> and L<compute_taxon_map.pl> plus the global role-mapping
-file C<roles.in.subsystems>.
+is based on files created by the scripts L<taxon_analysis.pl>, L<group_marker_roles.pl>, and L<compute_taxon_map.pl>
+plus the global role-mapping file C<roles.in.subsystems>.
 
-For each taxonomic group, there is a list of roles that appear singly in 95% of the genomes in that taxonomic grouping.
-Completeness is measured by the percent of those roles that actually occur. Contamination is measured by the number
-of duplicates found.
+For each taxonomic group, there is a list of roles that appear singly in 95% of the genomes in that taxonomic grouping
+and an associated weight for each. Completeness is measured by the wieghted percent of those roles that actually occur.
+Contamination is measured by the weighted number of duplicates found.
 
 This object contains the following fields.
 
@@ -66,7 +66,12 @@ Handle of a log file for status messages, or C<undef> if no status messages shou
 
 =item roleLists
 
-A hash mapping each taxonomic group ID to a list of the identifying role IDs.
+A hash mapping each taxonomic group ID to a hash of the identifying role IDs and their weights. (In other words, the key of
+the sub-hash is role ID and the value is the role weight).
+
+=item taxSizes
+
+A hash mapping each taxonomic group ID to its total role weight.
 
 =back
 
@@ -119,8 +124,10 @@ sub new {
     my $roleFile = $options{rolesInSubsystems} // "$FIG_Config::global/roles.in.subsystems";
     # We will track the roles of interest in here. When we read roles.in.subsystems we will fill in the role names.
     my %nameMap;
-    # This will be our map of taxonomic group IDs to role lists.
+    # This will be our map of taxonomic group IDs to role hashes.
     my %roleLists;
+    # This will map group IDs to total weight.
+    my %taxSizes;
     # This will map group IDs to names.
     my %taxNames;
     # This will map taxon IDs to group IDs.
@@ -129,23 +136,36 @@ sub new {
     my %roleMap;
     # Create and bless the object.
     my $retVal = { taxonMap => \%taxonMap, taxNames => \%taxNames, roleMap => \%roleMap,
-            nameMap => \%nameMap, stats => $stats, roleLists => \%roleLists, logH => $logH };
+            nameMap => \%nameMap, taxSizes => \%taxSizes, stats => $stats,
+            roleLists => \%roleLists, logH => $logH };
     bless $retVal, $class;
     # Get the roles.tbl file.
-    $retVal->Log("Processing roles.tbl.\n");
-    open(my $rh, "<$checkDir/roles.tbl") || die "Could not open roles.tbl in $checkDir: $!";
+    $retVal->Log("Processing weighted.tbl.\n");
+    open(my $rh, "<$checkDir/weighted.tbl") || die "Could not open weighted.tbl in $checkDir: $!";
     # Skip the header.
     my $line = <$rh>;
     # Loop through the taxonomic groups.
     while (! eof $rh) {
-        my ($taxon, $name, $size, @roles) = ScriptUtils::get_line($rh);
+        my ($taxon, $size, $name) = ScriptUtils::get_line($rh);
         $taxNames{$taxon} = $name;
+        $taxSizes{$taxon} = $size;
         $stats->Add(taxGroupIn => 1);
-        # Note we track the roles in the name map as well as in the group's master list.
-        for my $role (@roles) {
-            $nameMap{$role} = $role;
+        # Now we loop through the roles.
+        my $done;
+        my %weights;
+        while (! eof $rh && ! $done) {
+            my ($role, $weight) = ScriptUtils::get_line($rh);
+            if ($role eq '//') {
+                $done = 1;
+            } else {
+                # We need to track the roles in the name map as well as the group's role hash.
+                # Later the name map is used to fill in the role names for the roles we need.
+                $nameMap{$role} = $role;
+                $weights{$role} = $weight;
+                $stats->Add(taxRoleIn => 1);
+            }
         }
-        $roleLists{$taxon} = \@roles;
+        $roleLists{$taxon} = \%weights;
     }
     close $rh; undef $rh;
     my $markerCount = scalar keys %nameMap;
@@ -302,10 +322,11 @@ sub Check {
         # Get the group name.
         $taxGroup = $self->{taxNames}{$groupID};
         # Fill the roleData hash from the role list.
-        my $roleList = $self->{roleLists}{$groupID};
-        %roleData = map { $_ => 0 } @$roleList;
+        my $roleHash = $self->{roleLists}{$groupID};
+        %roleData = map { $_ => 0 } keys %$roleHash;
         my $markers = scalar keys %roleData;
-        $self->Log("$markers markers for group $groupID: $self->{taxNames}{$groupID}.\n");
+        my $size = $self->{taxSizes}{$groupID};
+        $self->Log("$markers markers with total weight $size for group $groupID: $self->{taxNames}{$groupID}.\n");
         # Now we run through the features of the GTO, tallying the roles found.
         $self->Log("Processing features.\n");
         my $featList = $gto->{features};
@@ -335,13 +356,14 @@ sub Check {
         for my $roleID (keys %roleData) {
             my $count = $roleData{$roleID};
             if ($count >= 1) {
-                $found++;
-                $extra += $count - 1;
+                my $weight = $roleHash->{$roleID};
+                $found += $weight;
+                $extra += ($count - 1) * $weight;
             }
         }
         # Compute the percentages.
-        $complete = $found * 100 / $markers;
-        $contam = $extra * 100 / $markers;
+        $complete = $found * 100 / $size;
+        $contam = $extra * 100 / $size;
     }
     # Return the results.
     my $retVal = { complete => $complete, contam => $contam, roleData => \%roleData, taxon => $taxGroup };
