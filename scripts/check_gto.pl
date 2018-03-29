@@ -61,7 +61,8 @@ If specified, only GTOs without output files in the output directory will be pro
 =item packages
 
 If specified, each directory name will be presumed to by a genome package directory, and all the genome packages in it
-will be processed.
+will be processed. If a value is specified, it will be treated as a file name, and an evaluation comparison report will
+be written to it.
 
 =back
 
@@ -81,7 +82,7 @@ my $opt = ScriptUtils::Opts('outDir gto1 gto2 gto3 ... gtoN', ScriptUtils::ih_op
         ['roleFile|roles|R=s', 'role-mapping file', { default => "$FIG_Config::global/roles.in.subsystems" }],
         ['workDir=s', 'directory containing data files', { default => "$FIG_Config::global/CheckG" }],
         ['missing|m', 'only process new GTOs'],
-        ['packages', 'directory inputs contain genome packages'],
+        ['packages:s', 'directory inputs contain genome packages'],
         );
 # Get the statistics object.
 my $stats = Stats->new();
@@ -101,6 +102,14 @@ my $missing = $opt->missing;
 my $packages = $opt->packages;
 my $workDir = $opt->workdir;
 my $roleFile = $opt->rolefile;
+my ($packageFlag, $ph);
+if (defined $packages) {
+    $packageFlag = 1;
+    if ($packages) {
+        open($ph, ">$packages") || die "Could not open package report: $!\n";
+        print $ph "GenomeID\tconsist\tcomplete\tcm-complete\tmulti\tcm-multi\tcontam\tgood\n";
+    }
+}
 # If there are any packages, this hash saves the (complete, contam, taxon) triples found.
 my %packageQH;
 # Now we create a list of all the GTOs.
@@ -121,7 +130,7 @@ for my $gtoName (@gtos) {
                     if (-s "$gtoName/$dir/quality.tbl") {
                         open(my $qh, "<$gtoName/$dir/quality.tbl") || die "Could not open quality.tbl for $dir: $!";
                         my @fields = ScriptUtils::get_line($qh);
-                        $packageQH{$fileName} = [ @fields[13, 14, 15] ];
+                        $packageQH{$fileName} = [ @fields[12 .. 16] ];
                     }
                 }
             }
@@ -160,11 +169,12 @@ for my $gtoFile (@inputs) {
         my $resultH = $checker->Check($gto);
         my $complete = $resultH->{complete};
         if (! defined $complete) {
-            print "Genome is from an unsupported taxonomic grouping.\n";
+            print "$gtoFile is from an unsupported taxonomic grouping.\n";
             $stats->Add(gtoFail => 1);
         } else {
             $complete = nearest(0.01, $complete);
             my $contam = nearest(0.01, $resultH->{contam});
+            my $multi = nearest(0.01, $resultH->{multi});
             my $roleHash = $resultH->{roleData};
             my $group = $resultH->{taxon};
             print "Producing output for $genomeID in $outDir.\n";
@@ -176,18 +186,22 @@ for my $gtoFile (@inputs) {
             }
             close $rh;
             open(my $oh, ">$outDir/$genomeID.out") || die "Could not open $genomeID.out: $!";
-            print $oh "Completeness\tContamination\tGroup\n";
-            print $oh "$complete\t$contam\t$group\n";
+            print $oh "Completeness\tContamination\tMultiplicity\tGroup\n";
+            print $oh "$complete\t$contam\t$multi\t$group\n";
             my ($groupWord) = split /\s/, $group;
             $stats->Add("gto-$groupWord" => 1);
             # If there is a package quality tuple, put it into the trace message.
             my $tuple = $packageQH{$gtoFile};
             if ($tuple) {
-                $complete .= " ($tuple->[0])";
-                $contam   .= " ($tuple->[1])";
-                $group    .= " ($tuple->[2])";
+                if ($ph) {
+                    print $ph join("\t", $genomeID, $tuple->[0], $complete, $tuple->[1], $multi, $tuple->[2],
+                        $contam, $tuple->[4]) . "\n";
+                }
+                $complete .= " ($tuple->[1])";
+                $multi    .= " ($tuple->[2])";
+                $group    .= " ($tuple->[3])";
             }
-            print "Completeness $complete contamination $contam using $group.\n";
+            print "Completeness $complete, contamination $contam, and multiplicity $multi using $group.\n";
         }
     }
 }

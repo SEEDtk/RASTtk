@@ -285,7 +285,11 @@ The percent completeness.
 
 =item contam
 
-The percent contamination (above the part believed to be legitimate).
+The percent contamination.
+
+=item extra
+
+The percent of extra genomes. This is an attempt to mimic the checkM contamination value.
 
 =item roleData
 
@@ -304,7 +308,7 @@ Name of the taxonomic group used.
 sub Check {
     my ($self, $gto) = @_;
     # These will be the return values.
-    my ($complete, $contam);
+    my ($complete, $contam, $multi);
     my $taxGroup = 'root';
     # Get the statistics object.
     my $stats = $self->{stats};
@@ -352,7 +356,7 @@ sub Check {
             }
         }
         # Now we count the markers.
-        my ($found, $extra) = (0, 0);
+        my ($found, $extra, $total) = (0, 0, 0);
         for my $roleID (keys %roleData) {
             my $count = $roleData{$roleID};
             if ($count >= 1) {
@@ -363,10 +367,11 @@ sub Check {
         }
         # Compute the percentages.
         $complete = $found * 100 / $size;
-        $contam = $extra * 100 / $size;
+        $contam = ($extra > 0 ? $extra * 100 / ($found + $extra) : 0);
+        $multi = $extra * 100 / $size;
     }
     # Return the results.
-    my $retVal = { complete => $complete, contam => $contam, roleData => \%roleData, taxon => $taxGroup };
+    my $retVal = { complete => $complete, contam => $contam, multi => $multi, roleData => \%roleData, taxon => $taxGroup };
     return $retVal;
 }
 
