@@ -64,6 +64,10 @@ If specified, each directory name will be presumed to by a genome package direct
 will be processed. If a value is specified, it will be treated as a file name, and an evaluation comparison report will
 be written to it.
 
+=item eval
+
+If specified, the output files will be named C<evaluate.log> and C<evaluate.out> instead of being based on the genome ID.
+
 =back
 
 =head2 Output Files
@@ -83,6 +87,7 @@ my $opt = ScriptUtils::Opts('outDir gto1 gto2 gto3 ... gtoN', ScriptUtils::ih_op
         ['workDir=s', 'directory containing data files', { default => "$FIG_Config::global/CheckG" }],
         ['missing|m', 'only process new GTOs'],
         ['packages:s', 'directory inputs contain genome packages'],
+        ['eval', 'use evaluate output file naming (only valid for single input GTO)']
         );
 # Get the statistics object.
 my $stats = Stats->new();
@@ -110,8 +115,6 @@ if (defined $packages) {
         print $ph "GenomeID\tconsist\tcomplete\tcm-complete\tmulti\tcm-multi\tcontam\tgood\n";
     }
 }
-# If there are any packages, this hash saves the (complete, contam, taxon) triples found.
-my %packageQH;
 # Now we create a list of all the GTOs.
 print "Gathering input.\n";
 my @inputs;
@@ -127,11 +130,6 @@ for my $gtoName (@gtos) {
                 my $fileName = "$gtoName/$dir/bin.gto";
                 if (-s $fileName) {
                     push @files, $fileName;
-                    if (-s "$gtoName/$dir/quality.tbl") {
-                        open(my $qh, "<$gtoName/$dir/quality.tbl") || die "Could not open quality.tbl for $dir: $!";
-                        my @fields = ScriptUtils::get_line($qh);
-                        $packageQH{$fileName} = [ @fields[12 .. 16] ];
-                    }
                 }
             }
             print scalar(@files) . " packages found.\n";
@@ -147,6 +145,11 @@ for my $gtoName (@gtos) {
     }
 }
 my $total = scalar @inputs;
+# Check the output file naming convention/
+my $evalFlag = $opt->eval;
+if ($evalFlag && $total > 1) {
+    die "Cannot use EVAL option for multiple input GTOs.";
+}
 print "$total GTO files found.\n";
 print "Creating GTO Checker object.\n";
 my $checker = GtoChecker->new($workDir, stats => $stats, roleFile => $roleFile, logH => \*STDOUT);
@@ -160,8 +163,17 @@ for my $gtoFile (@inputs) {
     $stats->Add(gtoRead => 1);
     # Get the genome ID.
     my $genomeID = $gto->{id};
+    # Compute the output file names.
+    my ($outFile, $tblFile);
+    if ($evalFlag) {
+        $outFile = "evaluate.log";
+        $tblFile = "evaluate.out";
+    } else {
+        $outFile = "$genomeID.out";
+        $tblFile = "$genomeID.tbl";
+    }
     # If the output exists and MISSING is on, then skip.
-    if (-s "$outDir/$genomeID.out" && $missing) {
+    if (-s "$outDir/$outFile" && $missing) {
         print "Output already in $outDir-- skipping.\n";
         $stats->Add(gtoSkipped => 1);
     } else {
@@ -178,29 +190,18 @@ for my $gtoFile (@inputs) {
             my $roleHash = $resultH->{roleData};
             my $group = $resultH->{taxon};
             print "Producing output for $genomeID in $outDir.\n";
-            open(my $rh, ">$outDir/$genomeID.tbl") || die "Could not open $genomeID.tbl: $!";
+            open(my $rh, ">$outDir/$tblFile") || die "Could not open $tblFile: $!";
             print $rh "Role\tCount\tName\n";
             for my $role (sort keys %$roleHash) {
                 my $name = $checker->role_name($role);
                 print $rh "$role\t$roleHash->{$role}\t$name\n";
             }
             close $rh;
-            open(my $oh, ">$outDir/$genomeID.out") || die "Could not open $genomeID.out: $!";
+            open(my $oh, ">$outDir/$outFile") || die "Could not open $outFile: $!";
             print $oh "Completeness\tContamination\tMultiplicity\tGroup\n";
             print $oh "$complete\t$contam\t$multi\t$group\n";
             my ($groupWord) = split /\s/, $group;
             $stats->Add("gto-$groupWord" => 1);
-            # If there is a package quality tuple, put it into the trace message.
-            my $tuple = $packageQH{$gtoFile};
-            if ($tuple) {
-                if ($ph) {
-                    print $ph join("\t", $genomeID, $tuple->[0], $complete, $tuple->[1], $multi, $tuple->[2],
-                        $contam, $tuple->[4]) . "\n";
-                }
-                $complete .= " ($tuple->[1])";
-                $multi    .= " ($tuple->[2])";
-                $group    .= " ($tuple->[3])";
-            }
             print "Completeness $complete, contamination $contam, and multiplicity $multi using $group.\n";
         }
     }
