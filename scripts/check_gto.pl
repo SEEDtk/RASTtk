@@ -68,6 +68,10 @@ be written to it.
 
 If specified, the output files will be named C<evaluate.log> and C<evaluate.out> instead of being based on the genome ID.
 
+=item quiet
+
+Display fewer log messages.
+
 =back
 
 =head2 Output Files
@@ -87,7 +91,8 @@ my $opt = ScriptUtils::Opts('outDir gto1 gto2 gto3 ... gtoN', ScriptUtils::ih_op
         ['workDir=s', 'directory containing data files', { default => "$FIG_Config::global/CheckG" }],
         ['missing|m', 'only process new GTOs'],
         ['packages:s', 'directory inputs contain genome packages'],
-        ['eval', 'use evaluate output file naming (only valid for single input GTO)']
+        ['eval', 'use evaluate output file naming (only valid for single input GTO)'],
+        ['quiet', 'display fewer messages']
         );
 # Get the statistics object.
 my $stats = Stats->new();
@@ -107,6 +112,7 @@ my $missing = $opt->missing;
 my $packages = $opt->packages;
 my $workDir = $opt->workdir;
 my $roleFile = $opt->rolefile;
+my $quiet = $opt->quiet;
 my ($packageFlag, $ph);
 if (defined $packages) {
     $packageFlag = 1;
@@ -116,7 +122,7 @@ if (defined $packages) {
     }
 }
 # Now we create a list of all the GTOs.
-print "Gathering input.\n";
+print "Gathering input.\n" if ! $quiet;
 my @inputs;
 # Now we loop through the GTOs.
 for my $gtoName (@gtos) {
@@ -132,11 +138,11 @@ for my $gtoName (@gtos) {
                     push @files, $fileName;
                 }
             }
-            print scalar(@files) . " packages found.\n";
+            print scalar(@files) . " packages found.\n" if ! $quiet;
         } else {
             print "Collecting GTO files in $gtoName.\n";
             @files = map { "$gtoName/$_" } grep { $_ =~ /\.gto$/ } readdir $dh;
-            print scalar(@files) . " GTO files found.\n";
+            print scalar(@files) . " GTO files found.\n" if ! $quiet;
         }
         push @inputs, @files;
         closedir $dh;
@@ -150,14 +156,15 @@ my $evalFlag = $opt->eval;
 if ($evalFlag && $total > 1) {
     die "Cannot use EVAL option for multiple input GTOs.";
 }
-print "$total GTO files found.\n";
+print "$total GTO files found.\n" if ! $quiet;
 print "Creating GTO Checker object.\n";
-my $checker = GtoChecker->new($workDir, stats => $stats, roleFile => $roleFile, logH => \*STDOUT);
+my $log = ($quiet ? undef : \*STDOUT);
+my $checker = GtoChecker->new($workDir, stats => $stats, roleFile => $roleFile, logH => $log);
 # Loop through the GTO files.
 my $count = 0;
 for my $gtoFile (@inputs) {
     $count++;
-    print "Processing $gtoFile ($count of $total).\n";
+    print "Processing $gtoFile ($count of $total).\n" if ! $quiet;
     # Read this GTO.
     my $gto = GenomeTypeObject->create_from_file($gtoFile);
     $stats->Add(gtoRead => 1);
@@ -189,7 +196,7 @@ for my $gtoFile (@inputs) {
             my $multi = nearest(0.01, $resultH->{multi});
             my $roleHash = $resultH->{roleData};
             my $group = $resultH->{taxon};
-            print "Producing output for $genomeID in $outDir.\n";
+            print "Producing output for $genomeID in $outDir.\n" if ! $quiet;
             open(my $rh, ">$outDir/$tblFile") || die "Could not open $tblFile: $!";
             print $rh "Role\tCount\tName\n";
             for my $role (sort keys %$roleHash) {
@@ -206,4 +213,4 @@ for my $gtoFile (@inputs) {
         }
     }
 }
-print "All done.\n" . $stats->Show();
+print "All done.\n" . $stats->Show() if ! $quiet;
