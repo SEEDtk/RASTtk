@@ -359,9 +359,14 @@ sub good_seed {
     my $retVal = 0;
     my $flist = role_to_features($gto, 'Phenylalanyl-tRNA synthetase alpha chain');
     if (scalar @$flist == 1) {
+        my $domain = $gto->{domain};
+        my ($min, $max) = (209, 405);
+        if ($domain eq 'Archaea') {
+            ($min, $max) = (293, 652);
+        }
         my $aa = $flist->[0]{protein_translation};
         my $aaLen = length $aa;
-        if ($aaLen >= 209 && $aaLen <= 405) {
+        if ($aaLen >= $min && $aaLen <= $max) {
             $retVal = 1;
         }
     }
