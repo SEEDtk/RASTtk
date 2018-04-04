@@ -59,6 +59,8 @@ sub new {
 
 =head2 Query Methods
 
+=head3 compute
+
     my $ic50Value = $ic50->compute(\%growthMap);
 
 Estimate the IC50 for a specific drug given a set of dosage/growth mappings.
