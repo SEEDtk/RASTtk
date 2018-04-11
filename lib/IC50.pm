@@ -20,7 +20,7 @@ package IC50;
 
     use strict;
     use warnings;
-    use Statistics::LineFit;
+    use Math::Vector::Real;
 
 =head1 Utilities for IC50 Computation
 
@@ -50,7 +50,6 @@ A hash containing option values. Currently, there are none.
 sub new {
     my ($class, %options) = @_;
     my $retVal = {
-        fitter => Statistics::LineFit->new(),
     };
     bless $retVal, $class;
     return $retVal;
@@ -69,11 +68,11 @@ Estimate the IC50 for a specific drug given a set of dosage/growth mappings.
 
 =item growthMap
 
-Reference to a hash that maps a log-dosage values to growth reduction percentages.
+Reference to a hash that maps a log-dosage values to growth percentages.
 
 =item RETURN
 
-Returns the estimated log-dosage at which growth reduction will be 50%, or C<undef> if the data is insufficient.
+Returns the estimated log-dosage at which growth will be 50%, or C<undef> if the data is insufficient.
 
 =back
 
@@ -81,54 +80,114 @@ Returns the estimated log-dosage at which growth reduction will be 50%, or C<und
 
 sub compute {
     my ($self, $growthMap) = @_;
-    # Initialize the x-y values.
-    my $fitter = $self->{fitter};
     my @xy = map { [$_, $growthMap->{$_}] } keys %$growthMap;
-    $fitter->setData(\@xy);
-    # Compute the slope and intercept.
-    my ($b, $m) = $fitter->coefficients();
-    # Compute the IC50.
-    my $retVal;
-    $retVal = (50.0 - $b) / $m;
+    my $retVal = $self->computeFromPairs(\@xy);
     return $retVal;
 }
 
-=head3 computeMap
+=head3 computeFromPairs
 
-    my $ic50Map = $ic50->computeMap(\%growthMap2);
+    my $ic50Value = $ic50->compute(\@growthPairs);
 
-Compute the IC50 of a drug (drug 2) at each dosage level of another drug (drug 1).
+Compute the IC50 from a se
 
 =over 4
 
-=item growthMap2
+=item growthPairs
 
-Reference to a two-dimensional hash that maps a pair of log-dosages to a percent growth reduction. The first dimension is
-the log of the drug 1 dosage; the second is the log of the drug 2 dosage.
+Reference to a list of [log-dosage, growth-precentage] pairs.
 
 =item RETURN
 
-Returns a reference to a hash mapping each log-dosage for drug 1 to the IC50 of drug 2 at that dosage level for drug 1.
+Returns the estimated log-dosage at which growth will be 50%, or C<undef> if the data is insufficient.
 
 =back
 
 =cut
 
-sub compute2 {
-    my ($self, $growthMap2) = @_;
-    # This will be our return hash.
-    my %retVal;
-    # Loop through the drug 1 dosages.
-    for my $dose1 (keys %$growthMap2) {
-        my $growthMap = $growthMap2->{$dose1};
-        my $ic50 = $self->compute($growthMap);
-        # If we found a value, put it in the output hash.
-        if (defined $ic50) {
-            $retVal{$dose1} = $ic50;
+sub computeFromPairs {
+    my ($self, $growthPairs) = @_;
+    # Compute the quadratic fit.
+    my ($a, $b, $c) = $self->quadFit($growthPairs);
+    # This will be the return value.
+    my $retVal;
+    # Compute the IC50.
+    my $discrim = $b * $b - 4 * $a * ($c - 50);
+    if ($discrim >= 0.0) {
+        $discrim = sqrt($discrim);
+        my $scale = 2 * $a;
+        my ($x1, $x2) = (($discrim - $b) / $scale, -($discrim + $b) / $scale);
+        my $oldX = $growthPairs->[0][0];
+        for (my $i = 1; $i < @$growthPairs && ! defined $retVal; $i++) {
+            my $newX = $growthPairs->[$i][0];
+            if ($oldX <= $x1 && $x1 <= $newX) {
+                $retVal = $x1;
+            } elsif ($oldX <= $x2 && $x2 <= $newX) {
+                $retVal = $x2;
+            } else {
+                $oldX = $newX;
+            }
         }
     }
-    # Return the results.
-    return \%retVal;
+    return $retVal;
+}
+
+=head3 quadFit
+
+    my ($a, $b, $c) = $ic50->quadFit(\@growthPairs);
+
+Fit a quadratic curve to the growth data.
+
+=item growthPairs
+
+Reference to a list of [log-dosage, growth-precentage] pairs.
+
+=item RETURN
+
+Returns a three-element list containing the quadratic, linear, and constant terms of the best-fit curve. If no such
+curve exists, it will return C<undef> for all elements.
+
+=back
+
+=cut
+
+sub quadFit {
+    my ($self, $growthPairs) = @_;
+    # These will be the return variables.
+    my ($a, $b, $c);
+    # Compute the various summations.
+    my ($n, $Sx, $Sx2, $Sx3, $Sx4, $Sy, $Syx, $Syx2) = (0, 0, 0, 0, 0, 0);
+    for my $pair (@$growthPairs) {
+        my ($x, $y) = @$pair;
+        $n += 1.0;
+        $Sx += $x;
+        $Sx2 += $x*$x;
+        $Sx3 += $x*$x*$x;
+        $Sx4 += $x*$x*$x*$x;
+        $Sy += $y;
+        $Syx += $y*$x;
+        $Syx2 += $y*$x*$x;
+    }
+    # Create the equations.
+    my $eq1 = V($n, $Sx, $Sx2, $Sy);
+    my $eq2 = V($Sx, $Sx2, $Sx3, $Syx);
+    my $eq3 = V($Sx2, $Sx3, $Sx4, $Syx2);
+    # Solve the equations.
+    $eq1 /= $n;
+    $eq2 -= $eq1 * $eq2->[0];
+    $eq3 -= $eq1 * $eq3->[0];
+    if ($eq2->[1] != 0.0) {
+        $eq2 /= $eq2->[1];
+        $eq3 -= $eq2 * $eq3->[1];
+        if ($eq3->[2] != 0.0) {
+            $eq3 /= $eq3->[2];
+            $a = $eq3->[3];
+            $b = $eq2->[3] - $a * $eq2->[2];
+            $c = $eq1->[3] - $a * $eq1->[2] - $b * $eq1->[1];
+        }
+    }
+    # Return the result.
+    return ($a, $b, $c);
 }
 
 1;
