@@ -325,6 +325,7 @@ sub Check {
     } else {
         # Get the group name.
         $taxGroup = $self->{taxNames}{$groupID};
+        $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
         # Fill the roleData hash from the role list.
         my $roleHash = $self->{roleLists}{$groupID};
         %roleData = map { $_ => 0 } keys %$roleHash;
