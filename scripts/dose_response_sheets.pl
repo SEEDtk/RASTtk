@@ -63,9 +63,9 @@ input directory.
 =cut
 
 # list of report types
-use constant TYPES => [qw(CCLE CTRP GDSC SCLC NCI60)];
-use constant TYPEH => { CCLE => 1, CTRP => 2, GDSC => 3, SCLC => 4, NCI60 => 5, ALMANAC => 6, NCI60M => 7, ALMANACM => 8 };
-use constant IC50H => { GDSC => 11, NCI60 => 12 };
+use constant TYPES => [qw(CCLE CTRP GDSC SCLC NCI60 gCSI)];
+use constant TYPEH => { CCLE => 1, CTRP => 2, GDSC => 3, SCLC => 4, NCI60 => 5, ALMANAC => 6, gCSI => 7, NCI60M => 8, ALMANACM => 9 };
+use constant IC50H => { GDSC => 12, NCI60 => 13 };
 use constant IC50L => 10;
 
 $| = 1;
@@ -250,17 +250,6 @@ for my $drug (sort keys %growthMap) {
         $sheet->write_string(0, 0, "Offset");
         # The second row contains the computed IC50s.
         $sheet->write_string(1, 0, "IC50");
-        my $pairMap = $clMap->{$cl};
-        my @types = keys %$pairMap;
-        for my $type (@types) {
-            my $pairs = $pairMap->{$type};
-            my $ic50 = $ic50Thing->computeFromPairs($pairs);
-            if (defined $ic50) {
-                $sheet->write_number(1, TYPEH->{$type}, $ic50);
-                $ic50Sheet->write_number($ic50Row, TYPEH->{$type} + 1, $ic50);
-                $stats->Add(ic50Computed => 1);
-            }
-        }
         # Past the end, the first two rows contain IC50 numbers from the web.
         $sheet->write_string(1, IC50L, "IC50");
         for my $type (keys %{IC50H()}) {
@@ -273,6 +262,8 @@ for my $drug (sort keys %growthMap) {
         # Get the map of source types to tuple lists. We must sort the lists and compute the offsets
         # To get each one starting at 100.
         print "Computing offsets and sorting dosages.\n";
+        my $pairMap = $clMap->{$cl};
+        my @types = keys %$pairMap;
         for my $type (@types) {
             my $tuples = $pairMap->{$type};
             my @sorted = sort { $a->[0] <=> $b->[0] } @$tuples;
@@ -282,6 +273,18 @@ for my $drug (sort keys %growthMap) {
                 $tuple->[1] += $offset;
             }
             $pairMap->{$type} = \@sorted;
+        }
+        # Now compute and store the IC50s.
+        for my $type (@types) {
+            my $pairs = $pairMap->{$type};
+            my $ic50 = $ic50Thing->computeFromPairs($pairs);
+            if (defined $ic50) {
+                $sheet->write_number(1, TYPEH->{$type}, $ic50);
+                $ic50Sheet->write_number($ic50Row, TYPEH->{$type} + 1, $ic50);
+                $stats->Add(ic50Computed => 1);
+            } else {
+                $ic50Sheet->write_string($ic50Row, TYPEH->{$type} + 1, "N/K");
+            }
         }
         # Now all the tuple lists are sorted and scaled. We do a sort of merge-y thing to put them
         # into the output in dosage order. We start on row 2.

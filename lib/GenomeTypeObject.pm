@@ -1864,7 +1864,7 @@ sub flattened_feature_aliases
     return @aliases;
 }
 
-=head3 metrics
+=head2 metrics
 
     my $metricHash = $gto->metrics();
 
@@ -1923,7 +1923,7 @@ sub metrics {
 }
 
 
-=head3 n_metric
+=head2 n_metric
 
     my $length = $gto->n_metric($thresh);
 
