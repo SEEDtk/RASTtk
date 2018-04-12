@@ -142,8 +142,6 @@ sub new {
     # Get the roles.tbl file.
     $retVal->Log("Processing weighted.tbl.\n");
     open(my $rh, "<$checkDir/weighted.tbl") || die "Could not open weighted.tbl in $checkDir: $!";
-    # Skip the header.
-    my $line = <$rh>;
     # Loop through the taxonomic groups.
     while (! eof $rh) {
         my ($taxon, $size, $name) = ScriptUtils::get_line($rh);
@@ -194,7 +192,7 @@ sub new {
     $retVal->Log("Processing taxon_map.tbl.\n");
     open(my $th, "<$checkDir/taxon_map.tbl") || die "Could not open taxon_map.tbl in $checkDir: $!";
     # Discared the header.
-    $line = <$th>;
+    my $line = <$th>;
     # Loop through the taxonomic IDs.
     while (! eof $th) {
         my ($taxonID, $groupID) = ScriptUtils::get_line($th);
