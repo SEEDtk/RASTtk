@@ -45,13 +45,19 @@ The command-line options are the following.
 
 Percent of features to remove. The default is C<25>.
 
+=item recursive
+
+Specifies the name of a directory. Instead of processing the GTOs listed in the parameters, all GTOs in the directory
+will be proecssed.
+
 =back
 
 =cut
 
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('outDir gto1 gto2 ... gtoN',
-        ['removal|r=f', 'percent of features to remove', { default => 25 }]
+        ['removal|r=f', 'percent of features to remove', { default => 25 }],
+        ['recursive=s', 'process all GTOs in the specified directory']
         );
 # Compute the removal percentage.
 my $removal = $opt->removal;
@@ -62,6 +68,14 @@ if (! $outDir) {
     die "No output directory specified.";
 } elsif (! -d $outDir) {
     die "Invalid output directory $outDir.";
+}
+# Check for the recursion options.
+if ($opt->recursive) {
+    my $dir = $opt->recursive;
+    opendir(my $dh, $dir) || die "Could not open $dir: $!";
+    my @files = grep { $_ =~ /\.gto$/ } readdir $dh;
+    @gtos = map { "$dir/$_" } @files;
+    print scalar(@gtos) . " GTO files found in $dir.\n";
 }
 # Loop through the GTOs.
 for my $gtoFile (@gtos) {
