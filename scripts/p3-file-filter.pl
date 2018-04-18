@@ -12,7 +12,7 @@ lines instead of a set of key fields.
 The positional parameters are the name of the filter file and the indices (1-based) or names of the key columns in the filter file.
 If the latter parameter is absent, the value of the C<--col> parameter will be used (same name or index as the input file).
 
-The standard input can be overriddn using the options in L<P3Utils/ih_options>.
+The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are the following.
 
