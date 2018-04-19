@@ -13,7 +13,9 @@ use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
 use DBI;
 use HTTP::Request::Common;
-use IPC::Run;
+eval {
+    require IPC::Run;
+};
 use SeedUtils;
 our $have_redis;
 eval {
