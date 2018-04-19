@@ -1995,4 +1995,40 @@ sub is_complete {
     return $retVal;
 }
 
+=head3 cripple
+
+    $gto->cripple($removal);
+
+Remove the specified percentage of the features from this genome. This is useful in testing quality metrics.
+
+=over 4
+
+=item removal
+
+The percent of features to remove, from C<0> (none) to C<100> (all).
+
+=back
+
+=cut
+
+sub cripple {
+    my ($self, $removal) = @_;
+    # Get a list of feature IDs.
+    my @fids = map { $_->{id} } @{$self->features};
+    # Compute the number of features to delete.
+    my $undeleted = scalar(@fids);
+    my $deleted = 0;
+    my $deleteSize = int($removal * $undeleted / 100);
+    # Loop until we've filled the delete list.
+    while ($deleted < $deleteSize) {
+        # Pick a random feature to delete.
+        my $i = int(rand($undeleted));
+        my ($removed) = splice @fids, $i, 1;
+        $undeleted--;
+        $deleted++;
+        $self->delete_feature($removed);
+    }
+}
+
+
 1;

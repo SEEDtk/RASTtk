@@ -84,23 +84,7 @@ for my $gtoFile (@gtos) {
     print "Processing $gtoFile.\n";
     # Read in this GTO.
     my $gto = GenomeTypeObject->create_from_file($gtoFile);
-    # Get a list of feature IDs.
-    my @fids = map { $_->{id} } @{$gto->features};
-    # Compute the number of features to delete.
-    my $undeleted = scalar(@fids);
-    my $deleted = 0;
-    my $deleteSize = int($removal * $undeleted / 100);
-    # Loop until we've filled the delete list.
-    while ($deleted < $deleteSize) {
-        # Pick a random feature to delete.
-        my $i = int(rand($undeleted));
-        my ($removed) = splice @fids, $i, 1;
-        $undeleted--;
-        $deleted++;
-        $gto->delete_feature($removed);
-    }
-    # Now actually delete the chosen features.
-    print "$deleted features removed from genome.\n";
+    $gto->cripple($removal);
     # Write the result.
     my $outFile = "$outDir/$baseName";
     print "Writing new GTO to $outFile.\n";
