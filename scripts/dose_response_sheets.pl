@@ -95,7 +95,7 @@ if (-f $output) {
     print "Deleting old $output.\n";
     unlink $output;
 }
-my $workbook = Spreadsheet::WriteExcel->new($output);
+my $workbook = Spreadsheet::WriteExcel->new($output) || die "Could not create workbook.";
 print "Spreadsheet created as $output.\n";
 # Read in the cell line and drug IDs of interest.
 my $clHash = ReadNames("$pDir/cell_lines", cl => $lineFile);
@@ -371,6 +371,11 @@ sub ReadNames {
                     $stats->Add("$type-skipped" => 1);
                 }
             }
+        }
+    }
+    for my $name (keys %names) {
+        if (! $found{$name}) {
+            print "No identifier found for $type $name.\n";
         }
     }
     print scalar(keys %retVal) . " identifiers found for " . scalar(keys %found) . " $type names.\n";
