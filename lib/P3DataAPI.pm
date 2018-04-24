@@ -63,6 +63,10 @@ our $token_path;
 if ($^O eq 'MSWin32')
 {
     my $dir = $ENV{HOME} || $ENV{HOMEPATH};
+    if (! $dir) {
+        require FIG_Config;
+        $dir = $FIG_Config::userHome;
+    }
     $token_path = "$dir/.patric_token";
 } else {
     $token_path = "$ENV{HOME}/.patric_token";
