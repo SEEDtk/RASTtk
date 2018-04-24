@@ -2707,7 +2707,10 @@ sub run {
         chomp @tmp;
         print STDERR "$tmp[0]: running $cmd\n";
     }
-    (system($cmd) == 0) || die("FAILED: $cmd");
+    my $rc = system($cmd);
+    if ($rc) {
+        die("FAILED with code $rc: $cmd");
+    }
 }
 
 sub map_to_families
@@ -2786,15 +2789,15 @@ sub write_encoded_object
     }
     elsif ( $oh && (! ref $oh) )
     {
-	# print STDERR "write to $oh 2\n";
-	$do_close = 1;
+        # print STDERR "write to $oh 2\n";
+        $do_close = 1;
         open( $handle, ">", $oh )
             || die "Could not open output file $oh: $!";
     }
     elsif ( $oh && ( ref( $oh ) eq 'SCALAR' ) )
     {
-	# print STDERR "write to $oh\n";
-	$do_close = 1;
+        # print STDERR "write to $oh\n";
+        $do_close = 1;
         open( $handle, ">", $oh )
             || die "Could not open output file $oh: $!";
         $suffix = "";                      # No newline when writing to string
@@ -2822,7 +2825,7 @@ sub write_encoded_object
     print $handle $json->encode($obj), ( $pretty ? () : $suffix ) or die "Error writing $!";
     if ($do_close)
     {
-	close($handle) or die "Cannot close: $!";
+        close($handle) or die "Cannot close: $!";
     }
 }
 
