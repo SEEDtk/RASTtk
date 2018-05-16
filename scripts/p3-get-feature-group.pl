@@ -31,6 +31,9 @@ if ($title) {
     print "$title\n";
 }
 my $ws = P3WorkspaceClientExt->new();
+if (! $ws->{token}) {
+    die "You must login with p3-login.";
+}
 
 my $home = $ws->home_workspace;
 my $group_path = "$home/Feature Groups/$group";

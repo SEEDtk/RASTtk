@@ -24,6 +24,9 @@ if (! $group) {
     die "No group name specified.";
 }
 my $ws = P3WorkspaceClientExt->new();
+if (! $ws->{token}) {
+    die "You must login with p3-login.";
+}
 
 my $home = $ws->home_workspace;
 my $group_path = "$home/Genome Groups/$group";
@@ -46,7 +49,7 @@ eval {
 };
 if (!$res)
 {
-    die "Error creating genome group" . ($opt->show_error ? ": $@" : ());
+    die "Error creating genome group: $@";
 }
 
 
