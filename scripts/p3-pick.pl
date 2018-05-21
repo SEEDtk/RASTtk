@@ -9,7 +9,16 @@ them to the output.
 
 The single positional parameter is the number of rows to pick.
 
-The standard input may be overridden by the command-line options given in L<P3Utils/ih_options>.
+The standard input may be overridden by the command-line options given in L<P3Utils/ih_options>. The following additional
+options may be specified.
+
+=over 4
+
+=item nohead
+
+Input file has no headers.
+
+=back
 
 =cut
 
@@ -17,7 +26,8 @@ use strict;
 use P3Utils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('count', P3Utils::ih_options());
+my $opt = P3Utils::script_opts('count', P3Utils::ih_options(),
+        ['nohead', 'file has no headers']);
 # Get the desired row count.
 my ($count) = @ARGV;
 if (! defined $count) {
@@ -30,8 +40,11 @@ if (! defined $count) {
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Copy the header line.
-my $line = <$ih>;
-print $line;
+my $line;
+if (! $opt->nohead) {
+    my $line = <$ih>;
+    print $line;
+}
 # Read in all the data lines.
 my @lines = <$ih>;
 # Compute the number of lines from which we are selecting.
