@@ -22,8 +22,18 @@ use warnings;
 use FIG_Config;
 use ScriptUtils;
 use Stats;
-use Spreadsheet::WriteExcel;
 use IC50;
+my $mode;
+eval {
+    require Excel::Writer::XLSX;
+    $mode = 'x';
+    print "Excel::Writer loaded.\n";
+};
+if ($@) {
+    require Spreadsheet::WriteExcel;
+    $mode = '';
+    print "WriteExcel loaded.\n";
+}
 
 =head1 Extract Dose Response Data from PATRIC Files Into a Spreadsheet
 
@@ -55,8 +65,26 @@ The command-line options are the following.
 
 =item workbook
 
-The name of the output spreadsheet. If the file exists, it will be destroyed. The default is C<growth.xlsm> in the
+The name of the output spreadsheet. If the file exists, it will be destroyed. The default is C<growth.xls> in the
 input directory.
+
+=item prob
+
+The name of the probability file. This file is tab-delimited, with two header rows. Each data row starts with a CCLE
+cell line ID. For each drug, there are three columns of data, headed by a drug ID. The first such column
+(with a sub-head of C<Prob>) contains the probability rating of the drug / cell-line combination. This value will be
+put on the IC50 page in a column headed by a source type followed by C<-R>.
+
+=item predictions
+
+The name of the predictions file. This file is tab-delimited, with one header row. Each data row starts with a CCLE
+cell line ID. For each drug, there is a column containing a prediction of growth modification for the drug / cell line
+combination. This value will be put on the IC50 page in a column headed by a source type followed by C<-P>.
+
+=item ic50only
+
+If specified, the individual pages will not be produced, only the IC50 page. Use this when there are a lot of drug/line
+combinations.
 
 =back
 
@@ -72,6 +100,9 @@ $| = 1;
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('pDir drugFile lineFile',
         ['workbook|wb|w=s', 'output file name'],
+        ['predictions|p=s', 'prediction file'],
+        ['prob|P=s', 'probability file'],
+        ['ic50only', 'only create IC50 sheet']
         );
 # Validate the parameters.
 my ($pDir, $drugFile, $lineFile) = @ARGV;
@@ -89,17 +120,114 @@ if (! $pDir) {
     die "$lineFile is missing or empty.";
 }
 my $stats = Stats->new();
+# Save the options.
+my $allSheets = ! $opt->ic50only;
 # Compute the output file name and create the spreadsheet writer.
-my $output = $opt->workbook // "$pDir/growth.xls";
+my $output = $opt->workbook // "$pDir/growth.xls$mode";
 if (-f $output) {
     print "Deleting old $output.\n";
     unlink $output;
 }
-my $workbook = Spreadsheet::WriteExcel->new($output) || die "Could not create workbook.";
+my $workbook;
+print "Creating $output.\n";
+if ($mode) {
+    $workbook = Excel::Writer::XLSX->new($output);
+} else {
+    $workbook = Spreadsheet::WriteExcel->new($output);
+}
+if (! $workbook) {
+    die "Could not create workbook.";
+}
 print "Spreadsheet created as $output.\n";
 # Read in the cell line and drug IDs of interest.
 my $clHash = ReadNames("$pDir/cell_lines", cl => $lineFile);
 my $drugHash = ReadNames("$pDir/drugs", drugs => $drugFile);
+# We are now going to set up the prediction/probability numbers. This tracks the next available
+# column on the IC50 page.
+my $sCol = IC50L + 1;
+# This is a three-level hash. It contains the predicted probability of success for each drug/cl pair
+# for each version of the drug. The third key is the source (taken from the column header drug ID).
+my %probMap;
+# This hash contains the sources found, mapping each one to a column number.
+my %probType;
+if ($opt->prob) {
+    open(my $ph, '<', $opt->prob) || die "Could not open probability file: $!";
+    # Read the headers. This hash will map each drug ID to a column number.
+    my %drugCols;
+    my @cols = ScriptUtils::get_line($ph);
+    my @data = ScriptUtils::get_line($ph);
+    for (my $i = 0; $i < @cols; $i++) {
+        if ($drugHash->{$cols[$i]} && $data[$i] eq 'Prob') {
+            $drugCols{$cols[$i]} = $i;
+            $stats->Add(probCol => 1);
+        }
+    }
+    print scalar(keys %drugCols) . " drug columns found in probability file.\n";
+    # Now loop through the cell lines, saving the scores.
+    my $count = 0;
+    while (! eof $ph) {
+        @data = ScriptUtils::get_line($ph);
+        my $line = $clHash->{$data[0]};
+        if ($line) {
+            for my $drug (keys %drugCols) {
+                my $dname = $drugHash->{$drug};
+                my ($source) = split /\./, $drug;
+                $probMap{$dname}{$line}{$source} = $data[$drugCols{$drug}];
+                $count++;
+                $probType{$source} = 1;
+            }
+            $stats->Add(probLine => 1);
+        }
+    }
+    print "$count probability values stored.\n";
+    # Set up the sources.
+    for my $source (sort keys %probType) {
+        $probType{$source} = $sCol;
+        $sCol++;
+        $stats->Add(probType => 1);
+    }
+}
+# This is another three-level hash. It contains the predicted growth reduction for each drug/cl pair
+# for each version of the drug. The third key is the source (taken from the column header drug ID).
+my %predMap;
+# This hash contains the sources found, mapping each one to a column number.
+my %predType;
+if ($opt->predictions) {
+    open(my $ph, '<', $opt->predictions) || die "Could not open predictions file: $!";
+    # Read the headers. This hash will map each drug ID to a column number.
+    my %drugCols;
+    my @cols = ScriptUtils::get_line($ph);
+    for (my $i = 0; $i < @cols; $i++) {
+        if ($drugHash->{$cols[$i]}) {
+            $drugCols{$cols[$i]} = $i;
+            $stats->Add(predCol => 1);
+        }
+    }
+    print scalar(keys %drugCols) . " drug columns found in predictions file.\n";
+    # Now loop through the cell lines, saving the scores.
+    my $count = 0;
+    while (! eof $ph) {
+        my @data = ScriptUtils::get_line($ph);
+        my $line = $clHash->{$data[0]};
+        if ($line) {
+            for my $drug (keys %drugCols) {
+                my $dname = $drugHash->{$drug};
+                my ($source) = split /\./, $drug;
+                $predMap{$dname}{$line}{$source} = $data[$drugCols{$drug}];
+                $count++;
+                $predType{$source} = 1;
+            }
+            $stats->Add(predLine => 1);
+        }
+    }
+    print "$count prediction values stored.\n";
+    # Set up the sources.
+    for my $source (sort keys %predType) {
+        $predType{$source} = $sCol;
+        $sCol++;
+        $stats->Add(predType => 1);
+    }
+}
 # This is a two-level hash. It contains a list of [dosage,growth] tuples for each drug/cl pair.
 # We use it to sort and process the data.
 my %growthMap;
@@ -227,6 +355,12 @@ $ic50Sheet->write_string(0, 1, "Cell line");
 for my $type (keys %{TYPEH()}) {
     $ic50Sheet->write_string(0, TYPEH->{$type} + 1, $type);
 }
+for my $type (keys %probType) {
+    $ic50Sheet->write_string(0, $probType{$type}, "$type-R");
+}
+for my $type (keys %predType) {
+    $ic50Sheet->write_string(0, $predType{$type}, "$type-P");
+}
 my $ic50Row = 0;
 # Now process the drug / cell-line pairs.
 for my $drug (sort keys %growthMap) {
@@ -235,30 +369,34 @@ for my $drug (sort keys %growthMap) {
     my $ic50Map = $ic50{$drug} // {};
     for my $cl (sort keys %$clMap) {
         my $ic50H = $ic50Map->{$cl} // {};
-        print "Processing sheet $drug $cl.\n";
-        # Here we need to open a sheet for this drug/CL pair.
-        my $sheet = $workbook->add_worksheet("$drug $cl");
+        print "Processing pair $drug $cl.\n";
         $stats->Add(pairFound => 1);
-        $sheet->write_string(2, 0, "Dosage");
-        for my $type (keys %{TYPEH()}) {
-            $sheet->write_string(2, TYPEH->{$type}, $type);
+        # Here we need to open a sheet for this drug/CL pair.
+        my $sheet;
+        if ($allSheets) {
+            $sheet = $workbook->add_worksheet(substr("$drug $cl", 0, 31));
+            $sheet->write_string(2, 0, "Dosage");
+            for my $type (keys %{TYPEH()}) {
+                $sheet->write_string(2, TYPEH->{$type}, $type);
+            }
+            # The first row contains the offsets.
+            $sheet->write_string(0, 0, "Offset");
+            # The second row contains the computed IC50s.
+            $sheet->write_string(1, 0, "IC50");
+            # Past the end, the first two rows contain IC50 numbers from the web.
+            $sheet->write_string(1, IC50L, "IC50");
+            for my $type (keys %{IC50H()}) {
+                $sheet->write_string(0, IC50H->{$type}, $type);
+                my $value = $ic50H->{$type};
+                if (defined $value) {
+                    $sheet->write_number(1, IC50H->{$type}, $value);
+                }
+            }
         }
+        # Do the IC50 sheet stuff.
         $ic50Row++;
         $ic50Sheet->write_string($ic50Row, 0, $drug);
         $ic50Sheet->write_string($ic50Row, 1, $cl);
-        # The first row contains the offsets.
-        $sheet->write_string(0, 0, "Offset");
-        # The second row contains the computed IC50s.
-        $sheet->write_string(1, 0, "IC50");
-        # Past the end, the first two rows contain IC50 numbers from the web.
-        $sheet->write_string(1, IC50L, "IC50");
-        for my $type (keys %{IC50H()}) {
-            $sheet->write_string(0, IC50H->{$type}, $type);
-            my $value = $ic50H->{$type};
-            if (defined $value) {
-                $sheet->write_number(1, IC50H->{$type}, $value);
-            }
-        }
         # Get the map of source types to tuple lists. We must sort the lists and compute the offsets
         # To get each one starting at 100.
         print "Computing offsets and sorting dosages.\n";
@@ -268,7 +406,9 @@ for my $drug (sort keys %growthMap) {
             my $tuples = $pairMap->{$type};
             my @sorted = sort { $a->[0] <=> $b->[0] } @$tuples;
             my $offset = 100 - $sorted[0][1];
-            $sheet->write_number(0, TYPEH->{$type}, $offset);
+            if ($allSheets) {
+                $sheet->write_number(0, TYPEH->{$type}, $offset);
+            }
             for my $tuple (@sorted) {
                 $tuple->[1] += $offset;
             }
@@ -279,41 +419,58 @@ for my $drug (sort keys %growthMap) {
             my $pairs = $pairMap->{$type};
             my $ic50 = $ic50Thing->computeFromPairs($pairs);
             if (defined $ic50) {
-                $sheet->write_number(1, TYPEH->{$type}, $ic50);
+                if ($allSheets) {
+                    $sheet->write_number(1, TYPEH->{$type}, $ic50);
+                }
                 $ic50Sheet->write_number($ic50Row, TYPEH->{$type} + 1, $ic50);
                 $stats->Add(ic50Computed => 1);
             } else {
-                $ic50Sheet->write_string($ic50Row, TYPEH->{$type} + 1, "N/K");
+                $ic50Sheet->write_formula($ic50Row, TYPEH->{$type} + 1, "=NA()");
             }
         }
-        # Now all the tuple lists are sorted and scaled. We do a sort of merge-y thing to put them
-        # into the output in dosage order. We start on row 2.
-        print "Writing data.\n";
-        my $row = 3;
-        while (@types) {
-            # Get the minimum of the top dosage in each type.
-            my $minDosage = 1000000;
-            for my $type (@types) {
-                my $dosage = $pairMap->{$type}[0][0];
-                if ($minDosage > $dosage) { $minDosage = $dosage; }
+        # Process the probabilities and predictions (if any).
+        for my $type (keys %probType) {
+            my $prob = $probMap{$drug}{$cl}{$type};
+            if (defined $prob) {
+                $ic50Sheet->write_number($ic50Row, $probType{$type}, $prob);
             }
-            # Output everything at this dosage level. Note we keep a list of types with data still in them.
-            $sheet->write_number($row, 0, $minDosage);
-            my @keepers;
-            for my $type (@types) {
-                my $tuples = $pairMap->{$type};
-                if ($minDosage == $tuples->[0][0]) {
-                    my $tuple = shift @$tuples;
-                    if (@$tuples) {
+        }
+        for my $type (keys %predType) {
+            my $pred = $predMap{$drug}{$cl}{$type};
+            if (defined $pred) {
+                $ic50Sheet->write_number($ic50Row, $predType{$type}, $pred);
+            }
+        }
+        if ($allSheets) {
+            # Now all the tuple lists are sorted and scaled. We do a sort of merge-y thing to put them
+            # into the output in dosage order. We start on row 2.
+            print "Writing data.\n";
+            my $row = 3;
+            while (@types) {
+                # Get the minimum of the top dosage in each type.
+                my $minDosage = 1000000;
+                for my $type (@types) {
+                    my $dosage = $pairMap->{$type}[0][0];
+                    if ($minDosage > $dosage) { $minDosage = $dosage; }
+                }
+                # Output everything at this dosage level. Note we keep a list of types with data still in them.
+                $sheet->write_number($row, 0, $minDosage);
+                my @keepers;
+                for my $type (@types) {
+                    my $tuples = $pairMap->{$type};
+                    if ($minDosage == $tuples->[0][0]) {
+                        my $tuple = shift @$tuples;
+                        if (@$tuples) {
+                            push @keepers, $type;
+                        }
+                        $sheet->write_number($row, TYPEH->{$type}, $tuple->[1]);
+                    } else {
                         push @keepers, $type;
                     }
-                    $sheet->write_number($row, TYPEH->{$type}, $tuple->[1]);
-                } else {
-                    push @keepers, $type;
                 }
+                @types = @keepers;
+                $row++;
             }
-            @types = @keepers;
-            $row++;
         }
     }
 }

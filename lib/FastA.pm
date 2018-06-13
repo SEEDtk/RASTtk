@@ -163,6 +163,19 @@ sub next {
     return $retVal;
 }
 
+=head3 at_end
+
+    my $eofFlag = $fqhandle->at_end();
+
+Return TRUE if the current sequence is the last one in the file, else FALSE.
+
+=cut
+
+sub at_end {
+    my ($self) = @_;
+    return (eof $self->{ih});
+}
+
 =head3 Write
 
     $fqhandle->Write($oh);
