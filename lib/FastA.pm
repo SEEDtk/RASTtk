@@ -188,14 +188,21 @@ Write the current record to the specified file handle in FASTA format.
 
 An open file handle onto which the current record's sequences should be written.
 
+=item comment (optional)
+
+A comment to add to the output.
+
 =back
 
 =cut
 
 sub Write {
-    my ($self, $oh) = @_;
-    my $id = $self->id;
-    print $oh ">$id\n$self->{left}\n";
+    my ($self, $oh, $comment) = @_;
+    my $header = $self->id;
+    if ($comment) {
+        $header .= " $comment";
+    }
+    print $oh ">$header\n$self->{left}\n";
 }
 
 
