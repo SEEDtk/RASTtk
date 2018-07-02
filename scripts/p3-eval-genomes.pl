@@ -10,7 +10,7 @@ The standard output will contain the consistency and completeness numbers append
 Each output file will have two sections-- a completeness section followed by a consistency section. Each section begins
 with a set of labeled values. The label begins in the first column and is separated from the number by
 a colon and whitespace. The labels for completeness are C<Good Seed>, C<Completeness>, C<Contamination>, and C<Taxon>. The labels for
-consistency are C<Coarse Consistency> and C<Fine Consistency>. Beneath the labels (there are always exactly two) are
+consistency are C<Coarse Consistency> and C<Fine Consistency>. Beneath the labels are
 zero or more role descriptors, all tab-delimited. Each role descriptor consists of (0) a role ID, (1) a predicted count,
 and (2) an expected count.
 
@@ -39,7 +39,8 @@ If specified, the output directory is erased before any output is produced.
 
 =item web
 
-If specified, web pages for all of the genome evaluations will be produced in the output directory.
+If specified, web pages for all of the genome evaluations will be produced in the output directory. (This option is not
+yet implemented.)
 
 =back
 
