@@ -114,9 +114,7 @@ if __name__ == '__main__':
         for n_col in range(X_all.shape[1]):
             n_pred = predictions[n_row, n_col]
             n_real = X_all[n_row, n_col]
-
-            if n_pred != n_real:
-                summary.append(col_names[n_col, 1] + "\t" + str(int(predictions[n_row, n_col])) + "\t" + str(int(X_all[n_row, n_col])))
+            summary.append(col_names[n_col, 1] + "\t" + str(int(n_pred)) + "\t" + str(int(n_real)))
         sfh = open(gto_sum_file, 'ab')
         np.savetxt(sfh, summary, fmt="%s", delimiter='\t')
         sfh.close()

@@ -9,7 +9,7 @@ The standard output will contain the consistency and completeness numbers append
 
 Each output file will have two sections-- a completeness section followed by a consistency section. Each section begins
 with a set of labeled values. The label begins in the first column and is separated from the number by
-a colon and whitespace. The labels for completeness are C<Good Seed>, C<Completeness>, C<Contamination>, and C<Taxon>. The labels for
+a colon and whitespace. The labels for completeness are C<Good Seed>, C<Completeness>, C<Contamination>, and C<Group>. The labels for
 consistency are C<Coarse Consistency> and C<Fine Consistency>. Beneath the labels are
 zero or more role descriptors, all tab-delimited. Each role descriptor consists of (0) a role ID, (1) a predicted count,
 and (2) an expected count.
@@ -42,6 +42,16 @@ If specified, the output directory is erased before any output is produced.
 If specified, web pages for all of the genome evaluations will be produced in the output directory. (This option is not
 yet implemented.)
 
+=item gtoCol
+
+If specified, the index (1-based) or name of an input column containing the names for pre-fetched L<GenomeTypeObject> files for the
+specified genomes. This option allows greatly improved performance.
+
+=item templates
+
+Name of the directory containing the web page templates and style file. The default is C<RASTtk/lib/BinningReports> in the
+SEEDtk code directory.
+
 =back
 
 =cut
@@ -61,7 +71,10 @@ use Math::Round;
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(), EvalCon::role_options(),
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
         ['clear', 'clear output directory before starting'],
-        ['web', 'create web pages as well as output files for evaluations']
+        ['web', 'create web pages as well as output files for evaluations'],
+        ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
+        ['templates=s', 'name of the directory containing the binning templates',
+                { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }],
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -98,8 +111,30 @@ if (! $opt->nohead) {
     push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
     P3Utils::print_cols($outHeaders);
 }
-# Get the web option.
+# Compute the GTO file column.
+my $gtoCol = $opt->gtocol;
+if (defined $gtoCol) {
+    print STDERR "GTO file names will be taken from column $gtoCol.\n";
+    $gtoCol = P3Utils::find_column($gtoCol, $outHeaders);
+}
+# Get the web options.
 my $web = $opt->web;
+my $templateDir = $opt->templates;
+my $detailTT = "$templateDir/details.tt";
+if ($web) {
+    # Prepare the output directory for the web pages.
+    if (! -s $detailTT) {
+        die "Could not find web template in $templateDir.";
+    } else {
+        # Read the template file.
+        print STDERR "Reading web template file from $detailTT.\n";
+        open(my $th, "<$detailTT") || die "Could not open template file: $!";
+        $detailTT = join("", <$th>);
+        # Copy the style file.
+        print STDERR "Installing web page styles in $outDir.\n";
+        File::Copy::Recursive::fcopy("$templateDir/packages.css", $outDir) || die "Could not copy style file: $!";
+    }
+}
 # Create the consistency helper.
 my $evalCon = EvalCon->new_from_script($opt);
 # Get access to the statistics object.
@@ -121,12 +156,22 @@ while (! eof $ih) {
         my ($genome, $row) = @$couplet;
         $stats->Add(genomeIn => 1);
         print STDERR "Processing $genome.\n";
-        my $gto = $p3->gto_of($genome);
-        if (! $gto) {
-            print STDERR "Genome $genome not found in PATRIC.\n";
-            $stats->Add(genomeNotFound => 1);
+        my $gto;
+        if (defined $gtoCol && $row->[$gtoCol]) {
+            $gto = GenomeTypeObject->create_from_file($row->[$gtoCol]);
+            if (! $gto) {
+                print STDERR "Genome $genome not found in file $row->[$gtoCol].\n";
+                $stats->Add(genomeBadFile => 1);
+            }
         } else {
-            # Start the output file.
+            $gto = $p3->gto_of($genome, eval => 1);
+            if (! $gto) {
+                print STDERR "Genome $genome not found in PATRIC.\n";
+                $stats->Add(genomeNotFound => 1);
+            }
+        }
+        if ($gto) {
+            # We have the genome. Start the output file.
             my $outFile = "$outDir/$genome.out";
             open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
             # Find out if we have a good seed.
@@ -144,18 +189,15 @@ while (! eof $ih) {
             my $taxon = $evalH->{taxon} // 'N/F';
             print $oh "Completeness: $complete\n";
             print $oh "Contamination: $contam\n";
-            print $oh "Taxon: $taxon\n";
+            print $oh "Group: $taxon\n";
             $stats->Add(genomeComplete => 1) if GtoChecker::completeX($complete);
             $stats->Add(genomeClean => 1) if GtoChecker::contamX($contam);
-            # Now output the problematic roles.
+            # Now output the role counts.
             my $roleH = $evalH->{roleData};
             if ($roleH) {
                 for my $role (sort keys %$roleH) {
                     my $count = $roleH->{$role};
-                    if ($count != 1) {
-                        print $oh "$role\t1\t$count\n";
-                        $stats->Add(evalGprobRole => 1);
-                    }
+                    print $oh "$role\t1\t$count\n";
                 }
             } else {
                 $stats->Add(evalGFailed => 1);
@@ -193,16 +235,25 @@ while (! eof $ih) {
             }
         }
         close $sh;
-        # Now, write the standard output.
+        # Now, write the standard output and optionally produce the web pages.
         for my $couplet (@$couplets) {
             my ($genome, $row) = @$couplet;
             my $result = $results{$genome};
             if ($result) {
                 P3Utils::print_cols([@$row, @$result]);
                 $stats->Add(genomeOut => 1);
+                if ($web) {
+                    my $gto = $gtos{$genome};
+                    # Store the quality metrics in the GTO.
+                    BinningReports::UpdateGTO($gto, "$outDir/$genome.out", $cMap);
+                    # Create the detail page.
+                    my $html = BinningReports::Detail(undef, undef, $detailTT, $gto, $nMap);
+                    open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
+                    print $wh $html;
+                    close $wh;
+                }
             }
         }
-        ##TODO produce web pages
     }
 }
 # All done. Dump the stats.

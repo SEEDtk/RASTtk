@@ -80,6 +80,7 @@
 <th>Length (bp)</th>
 <th>Good Features</th>
 <th>Feature link</th>
+<th>Feature IDs</th>
 </tr>
 [% FOR d IN c %]
 <tr>
@@ -91,6 +92,7 @@
 <td>[% d.len %]</td>
 <td>[% d.good %]</td>
 <td><a target="_blank" href="[% d.fid_url %]">[% d.n_fids %] feature[% IF d.n_fids > 1 %]s[% END %]</a></td>
+<td>[% d.fid_list %]</td>
 </tr>
 [% END -%]
 </table>

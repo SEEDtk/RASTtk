@@ -552,6 +552,10 @@ The number of features containing problematic roles.
 
 The URL to list the features.
 
+=item fid_list
+
+A comma-delimited list of the feature IDs.
+
 =item good
 
 The number of good features in the contig.
@@ -655,7 +659,8 @@ sub Detail {
             if ($nFids) {
                 my $url = fid_list_url(\@fids);
                 my $contigDatum = { name => $contigID, len => $contigH->{$contigID},
-                                    n_fids => $nFids, fid_url => $url, good => $good };
+                                    n_fids => $nFids, fid_url => $url, good => $good,
+                                    fid_list => join(", ", @fids) };
                 push @contigs, $contigDatum;
             }
         }
@@ -996,7 +1001,7 @@ sub copy_gto {
 
 =head3 UpdateGTO
 
-    BinningReports::UpdateGTO($gto, $skDir, $cgDir, \%roleMap);
+    BinningReports::UpdateGTO($gto, $qualityFile, \%roleMap);
 
 Merge the quality measures into a L<GenomeTypeObject>. The C<genome_quality_measure> member will be created with all the
 associated sub-members required by the binning detail report. The resultant GTO can be passed to the L</Detail> method
@@ -1008,24 +1013,22 @@ for creation of a binning report page.
 
 A L<GenomeTypeObject> to be updated with quality information.
 
-=item skDir
+=item qualityFile
 
-The name of the directory containing the output from the consistency tool.
-
-=item cgDir
-
-The name of the directory containing the output from the completeness tool.
+The name of the file containing the quality report output. This consists of a completeness report followed by a
+consistency report. Each report begins with a set of labeled values and is followed by tab-delimited lines containing
+(0) a role ID, (1) the predicted number of occurrences, and (2) the actual number of occurrences.
 
 =item roleMap
 
-Reference to a hash mapping each role ID to a checksum.
+Reference to a hash mapping each role checksum to an ID.
 
 =back
 
 =cut
 
 sub UpdateGTO {
-    my ($gto, $skDir, $cgDir, $roleMap) = @_;
+    my ($gto, $qualityFile, $roleMap) = @_;
     # This will be our quality measure object.
     my %q;
     $gto->{genome_quality_measure} = \%q;
@@ -1041,31 +1044,32 @@ sub UpdateGTO {
     # This hash will contain the good roles. Good roles have a matching predicted and actual count.
     my %good;
     # This hash will contain the potentially problematic roles. Each role is mapped to its expected and
-    # actual occurrences. Both the consistency and completeness checker have problematic roles. We do the
+    # actual occurrences. Both the consistency and completeness checker have problematic roles. We read
     # completeness checker first, so if any roles overlap, the consistency checker overrides the completeness
     # result.
-    my %ppr;
-    if (open(my $ih, "<$cgDir/evaluate.out")) {
+    my (%ppr, %checkGdata, %skData);
+    if (open(my $ih, "<$qualityFile")) {
+        # Start in completeness mode.
+        my $hash = \%checkGdata;
+        my $comment = 'Universal role.';
+        my $mode = 0;
         while (! eof $ih) {
             my $line = <$ih>;
-            my ($role, $actual) = ($line =~ /^(\S+)\t(\d+)/);
-            if ($role) {
-                if ($actual != 1) {
-                    $ppr{$role} = [1, $actual, 'Universal role.'];
-                } else {
-                    $good{$role} = 1;
+            if ($line =~ /^([^:]+):\s+(.+)/) {
+                # Here we have a heading line.
+                if ($mode) {
+                    # We were processing data lines, so we need to rig for a new section.
+                    $hash = \%skData;
+                    $comment = '';
+                    $mode = 0;
                 }
-            }
-        }
-    }
-    if (open(my $ih, "<$skDir/evaluate.out")) {
-        while (! eof $ih) {
-            my $line = <$ih>;
-            my ($role, $pred, $actual) = ($line =~ /^(\S+)\t(\d+)\S*\t(\d+)/);
-            if ($role) {
-                if ($pred != $actual) {
-                    $ppr{$role} = [$pred, $actual, ''];
-                } elsif ($actual > 0) {
+                # Store the heading key/value pair in the appropriate hash.
+                $hash->{$1} = $2;
+            } elsif ($line =~ /^(\S+)\t(\d+)\t(\d+)/) {
+                # Here we have a data line.
+                my ($role, $pred, $actual) = ($1, $2, $3);
+                $ppr{$role} = [$pred, $actual, $comment];
+                if ($pred == $actual) {
                     $good{$role} = 1;
                 }
             }
@@ -1107,30 +1111,6 @@ sub UpdateGTO {
             }
             if ($bad) {
                 push @{$contigCount{$contig}}, $fid;
-            }
-        }
-    }
-    # We are almost done. We have the problematic role report data. Now we need the actual numbers.
-    my %checkGdata;
-    if (open(my $ih, "<$cgDir/evaluate.log")) {
-        my $line = <$ih>;
-        chomp $line;
-        my @keys = split /\t/, $line;
-        while (! eof $ih) {
-            $line = <$ih>;
-            chomp $line;
-            my @data = split /\t/, $line;
-            for my $key (@keys) {
-                $checkGdata{$key} = shift @data;
-            }
-        }
-    }
-    my %skData;
-    if (open(my $ih, "<$skDir/evaluate.log")) {
-        while (! eof $ih) {
-            my $line = <$ih>;
-            if ($line =~ /^([^_]+_Consistency)=\t([0-9\.]+)\%/) {
-                $skData{$1} = $2;
             }
         }
     }
