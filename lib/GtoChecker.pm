@@ -75,6 +75,13 @@ A hash mapping each taxonomic group ID to its total role weight.
 
 =back
 
+=cut
+
+# Good/Bad criteria
+use constant MIN_CHECKM => 80;
+use constant MIN_SCIKIT => 87;
+use constant MAX_CONTAM => 10;
+
 =head2 Special Methods
 
 =head3 new
@@ -102,6 +109,11 @@ The name of the file containing the master list of roles. This is a tab-delimite
 record is the role ID, the second is the role checksum, and the third is the role name. The default file is C<roles.in.subsystems>
 in the global data directory.
 
+=item roleHashes
+
+If specified, overrides B<rolesInSubsystems>. A 2-tuple containing (0) a reference to a hash that maps role IDs to names,
+and (1) a reference to a hash that maps role checksums to role IDs.
+
 =item logH
 
 Open handle for an output stream to contain log messages. The default is to not write log messages.
@@ -124,6 +136,17 @@ sub new {
     my $roleFile = $options{rolesInSubsystems} // "$FIG_Config::global/roles.in.subsystems";
     # We will track the roles of interest in here. When we read roles.in.subsystems we will fill in the role names.
     my %nameMap;
+    # This will map role checksums to role IDs.
+    my %roleMap;
+    # This will be set to TRUE if we already have the name and role maps from the client.
+    my $preLoaded;
+    # These will be the pointers to the name and role maps. If the client specified the role hashes, we put them in here.
+    my ($nameMap, $roleMap) = (\%nameMap, \%roleMap);
+    if ($options{roleHashes}) {
+        $nameMap = $options{roleHashes}[0];
+        $roleMap = $options{roleHashes}[1];
+        $preLoaded = 1;
+    }
     # This will be our map of taxonomic group IDs to role hashes.
     my %roleLists;
     # This will map group IDs to total weight.
@@ -132,11 +155,9 @@ sub new {
     my %taxNames;
     # This will map taxon IDs to group IDs.
     my %taxonMap;
-    # This will map role checksums to role IDs.
-    my %roleMap;
     # Create and bless the object.
-    my $retVal = { taxonMap => \%taxonMap, taxNames => \%taxNames, roleMap => \%roleMap,
-            nameMap => \%nameMap, taxSizes => \%taxSizes, stats => $stats,
+    my $retVal = { taxonMap => \%taxonMap, taxNames => \%taxNames, roleMap => $roleMap,
+            nameMap => $nameMap, taxSizes => \%taxSizes, stats => $stats,
             roleLists => \%roleLists, logH => $logH };
     bless $retVal, $class;
     # Get the roles.tbl file.
@@ -168,25 +189,39 @@ sub new {
     close $rh; undef $rh;
     my $markerCount = scalar keys %nameMap;
     $retVal->Log("$markerCount marker roles found in " . scalar(keys %roleLists) . " taxonomic groups.\n");
-    # Now we need to know the name and checksum of each marker role. This is found in roles.in.subsystems.
-    $retVal->Log("Processing $roleFile.\n");
-    open($rh, "<$roleFile") || die "Could not open $roleFile: $!";
-    # Loop through the roles.
-    while (! eof $rh) {
-        my ($role, $checksum, $name) = ScriptUtils::get_line($rh);
-        if ($nameMap{$role}) {
-            $stats->Add(roleNamed => 1);
-            $nameMap{$role} = $name;
-            $roleMap{$checksum} = $role;
-        } else {
-            $stats->Add(roleNotUsed => 1);
+    # If we are NOT preloaded, we need to create the role-parsing hashes.
+    if (! $preLoaded) {
+        # Now we need to know the name and checksum of each marker role. This is found in roles.in.subsystems.
+        $retVal->Log("Processing $roleFile.\n");
+        open($rh, "<$roleFile") || die "Could not open $roleFile: $!";
+        # Loop through the roles.
+        while (! eof $rh) {
+            my ($role, $checksum, $name) = ScriptUtils::get_line($rh);
+            if ($nameMap{$role}) {
+                $stats->Add(roleNamed => 1);
+                $nameMap{$role} = $name;
+                $roleMap{$checksum} = $role;
+            } else {
+                $stats->Add(roleNotUsed => 1);
+            }
         }
-    }
-    close $rh; undef $rh;
-    # Verify we got all the roles.
-    my $roleCount = scalar(keys %roleMap);
-    if ($roleCount != $markerCount) {
-        die "$markerCount role markers in roles.tbl, but only $roleCount were present in $roleFile.";
+        close $rh; undef $rh;
+        # Verify we got all the roles.
+        my $roleCount = scalar(keys %roleMap);
+        if ($roleCount != $markerCount) {
+            die "$markerCount role markers in roles.tbl, but only $roleCount were present in $roleFile.";
+        }
+    } else {
+        # Here we are pre-loaded. Verify that we have all the roles we need.
+        my $notFound;
+        for my $role (keys %nameMap) {
+            if (! $nameMap->{$role}) {
+                $notFound++;
+            }
+        }
+        if ($notFound) {
+            die "$notFound roles missing from pre-loaded role hashes.";
+        }
     }
     # All that is left is to read in the taxonomic ID mapping.
     $retVal->Log("Processing taxon_map.tbl.\n");
@@ -229,8 +264,82 @@ sub Log {
     }
 }
 
-
 =head2 Query Methods
+
+=head3 completeX
+
+    my $ok = GtoChecker::completeX($pct);
+
+Return TRUE if the specified percent complete is sufficient.
+
+=over 4
+
+=item pct
+
+A percent completeness.
+
+=item RETURN
+
+Returns TRUE if the value is high enough, else FALSE.
+
+=back
+
+=cut
+
+sub completeX {
+    my ($pct) = @_;
+    return ($pct >= MIN_CHECKM);
+}
+
+=head3 consistX
+
+    my $ok = GtoChecker::consistX($pct);
+
+Return TRUE if the specified percent fine consistency is sufficient.
+
+=over 4
+
+=item pct
+
+A percent fine consistency.
+
+=item RETURN
+
+Returns TRUE if the value is high enough, else FALSE.
+
+=back
+
+=cut
+
+sub consistX {
+    my ($pct) = @_;
+    return ($pct >= MIN_SCIKIT);
+}
+
+=head3 contamX
+
+    my $ok = GtoCheck::contamX($pct);
+
+Return TRUE if the specified percent contamination is acceptable.
+
+=over 4
+
+=item pct
+
+A percent of genome contamination.
+
+=item RETURN
+
+Returns TRUE if the value is low enough, else FALSE.
+
+=back
+
+=cut
+
+sub contamX {
+    my ($pct) = @_;
+    return ($pct <= MAX_CONTAM);
+}
 
 =head3 role_name
 

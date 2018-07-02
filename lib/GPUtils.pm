@@ -348,7 +348,7 @@ A L<GenomeTypeObject> for the specified genome.
 
 =item RETURN
 
-Returns TRUE if the genome is good, else FALSE.
+Returns TRUE (C<1>) if the genome is good, else FALSE (C<0>).
 
 =back
 

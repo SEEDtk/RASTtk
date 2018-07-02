@@ -96,8 +96,8 @@ A reference to a list corresponding to an in-memory copy of the col.h map from a
 
 sub role_options {
     return (['predictors|P=s', 'function predictors directory'],
-            ['roleFile|roleFile|R=s', 'role definition file'],
-            ['rolesToUse|rolestouse|roles|r=s', 'usefule role list file']);
+            ['roleFile|rolefile|R=s', 'role definition file'],
+            ['rolesToUse|rolestouse|r=s', 'usefule role list file']);
 }
 
 =head3 new
@@ -195,7 +195,7 @@ sub new {
     }
     # Create the object and bless it.
     my $retVal = {
-        cMap => \%cMap, nMap => \%nMap, roles => \@roles, predictors => $predictors
+        cMap => \%cMap, nMap => \%nMap, roles => \@roles, predictors => $predictors, stats => $stats
     };
     bless $retVal, $class;
     # Return it to the client.
@@ -223,7 +223,49 @@ sub new_from_script {
     return EvalCon::new($class, predictors => $opt->predictors, roleFile => $opt->rolefile, rolesToUse => $opt->rolestouse);
 }
 
+
 =head2 Query Methods
+
+=head3 predictors
+
+    my $predictorDir = $eval->predictors;
+
+Return the directory containing the function predictors.
+
+=cut
+
+sub predictors {
+    my ($self) = @_;
+    return $self->{predictors};
+}
+
+=head3 stats
+
+    my $stats = $eval->stats;
+
+Return the internal L<Stats> object.
+
+=cut
+
+sub stats {
+    my ($self) = @_;
+    return $self->{stats};
+}
+
+=head3 roleHashes
+
+    my ($nMap, $cMap) = $eval->roleHashes;
+
+Return references to the role name map (ID to name) and the role checksum map (checksum to ID) so they can be used by the
+client for role parsing.
+
+=cut
+
+sub roleHashes {
+    my ($self) = @_;
+    return ($self->{nMap}, $self->{cMap});
+}
+
 
 =head3 roles
 
@@ -316,6 +358,7 @@ sub roles_of_gto {
     return \%retVal;
 }
 
+
 =head2 Public Manipulation Methods
 
 =head3 BuildGtoMatrix
@@ -341,13 +384,11 @@ The output directory to contain the matrix. Three files-- C<row.h>, C<col.h>, an
 sub BuildGtoMatrix {
     my ($self, $gto, $outDir) = @_;
     # Start the matrix output files.
-    $self->_MatrixOpen($outDir);
-    # Get the role counts for the genome.
-    my $countsH = $self->roles_of_gto($gto);
-    # Write the genome.
-    $self->_MatrixAdd($gto->{id}, $countsH);
+    $self->OpenMatrix($outDir);
+    # Put this genome in it.
+    $self->AddGtoToMatrix($gto);
     # Close the matrix files.
-    $self->_MatrixClose();
+    $self->CloseMatrix();
 }
 
 =head3 BuildFileMatrix
@@ -398,14 +439,14 @@ sub BuildFileMatrix {
     }
     close $ih;
     # Create the matrix files.
-    $self->_MatrixOpen($outDir);
+    $self->OpenMatrix($outDir);
     # Loop through the genomes, folding them in.
     for my $genome (sort keys %counts) {
         my $countH = $counts{$genome};
         $self->_MatrixAdd($genome, $countH);
     }
     # Close the matrix files.
-    $self->_MatrixClose();
+    $self->CloseMatrix();
 }
 
 =head3 LoadMatrix
@@ -501,7 +542,7 @@ sub PartitionMatrix {
         }
     }
     # Start the output.
-    $self->_MatrixOpen($outDir, \@newRoles);
+    $self->OpenMatrix($outDir, \@newRoles);
     open(my $yh, ">$outDir/y") || die "Could not open y-file in $outDir: $!";
     # Process the rows.
     my $r = 0;
@@ -513,14 +554,14 @@ sub PartitionMatrix {
     }
     # Close the output.
     close $yh;
-    $self->_MatrixClose();
+    $self->CloseMatrix();
 }
 
-=head2 Internal Utilities
+=head2 Incremental Matrix Build
 
-=head3 _MatrixOpen
+=head3 OpenMatrix
 
-    $eval->_MatrixOpen($outDir, $roles);
+    $eval->OpenMatrix($outDir, $roles);
 
 Initialize a matrix directory. The C<col.h> will be written and C<row.h> and C<X> open for output.
 
@@ -538,7 +579,7 @@ A list of the roles to use. If omitted, the main role list is used.
 
 =cut
 
-sub _MatrixOpen {
+sub OpenMatrix {
     my ($self, $outDir, $roles) = @_;
     # Get the role list.
     $roles //= $self->{roles};
@@ -546,7 +587,7 @@ sub _MatrixOpen {
     open(my $ch, ">$outDir/col.h") || die "Could not create col.h in $outDir: $!";
     my $n = scalar @$roles;
     for (my $i = 0; $i < $n; $i++) {
-        print "$i\t$roles->[$i]\n";
+        print $ch "$i\t$roles->[$i]\n";
     }
     close $ch;
     # Open the other two files.
@@ -557,6 +598,53 @@ sub _MatrixOpen {
     $self->{xh} = $xh;
     $self->{rCount} = 0;
 }
+
+=head3 AddGtoToMatrix
+
+    $eval->AddGtoToMatrix($gto);
+
+Add the role data from the specified L<GenomeTypeObject> to the predictor matrix currently being built.
+
+=over 4
+
+=item gto
+
+A L<GenomeTypeObject> to serve as the next row of the predictor matrix.
+
+=back
+
+=cut
+
+sub AddGtoToMatrix {
+    my ($self, $gto) = @_;
+    # Get the role counts for the genome.
+    my $countsH = $self->roles_of_gto($gto);
+    # Write the genome.
+    $self->_MatrixAdd($gto->{id}, $countsH);
+}
+
+=head3 CloseMatrix
+
+    $eval->CloseMatrix();
+
+Close the matrix files.
+
+=cut
+
+sub CloseMatrix {
+    my ($self) = @_;
+    # Close the files.
+    close $self->{rh};
+    close $self->{xh};
+    # Clear the status variables.
+    $self->{rh} = undef;
+    $self->{xh} = undef;
+    # Record this update.
+    $self->{stats}->Add(matrixOut => 1);
+}
+
+
+=head2 Internal Utilities
 
 =head3 _MatrixAdd
 
@@ -595,27 +683,6 @@ sub _MatrixAdd {
     # Write it out.
     my $xh = $self->{xh};
     print $xh "$mRow\n";
-}
-
-
-=head3 _MatrixClose
-
-    $eval->_MatrixClose();
-
-Close the matrix files.
-
-=cut
-
-sub _MatrixClose {
-    my ($self) = @_;
-    # Close the files.
-    close $self->{rh};
-    close $self->{xh};
-    # Clear the status variables.
-    $self->{rh} = undef;
-    $self->{xh} = undef;
-    # Record this update.
-    $self->{stats}->Add(matrixOut => 1);
 }
 
 
