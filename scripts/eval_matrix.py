@@ -43,7 +43,7 @@ def run_predictor(n_col):
     results = clf.predict(X_feat)
     results = results.tolist()
     results.append(n_col)
-    eprint("Completed %d: %s predictor." % (n_col, role_ID))
+    #eprint("Completed %d: %s predictor." % (n_col, role_ID))
     return results
 
 
