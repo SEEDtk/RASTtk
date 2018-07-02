@@ -208,7 +208,7 @@ while (! eof $ih) {
             my $outFile = "$outDir/$genome.out";
             my $oh;
             if (! $terse) {
-                open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+                open($oh, ">$outFile") || die "Could not open $outFile: $!";
             }
             # Find out if we have a good seed.
             my $seedFlag = GPUtils::good_seed($gto);
