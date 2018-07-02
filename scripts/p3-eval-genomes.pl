@@ -121,6 +121,7 @@ if (defined $gtoCol) {
 my $web = $opt->web;
 my $templateDir = $opt->templates;
 my $detailTT = "$templateDir/details.tt";
+my ($prefix, $suffix);
 if ($web) {
     # Prepare the output directory for the web pages.
     if (! -s $detailTT) {
@@ -131,8 +132,15 @@ if ($web) {
         open(my $th, "<$detailTT") || die "Could not open template file: $!";
         $detailTT = join("", <$th>);
         # Copy the style file.
-        print STDERR "Installing web page styles in $outDir.\n";
-        File::Copy::Recursive::fcopy("$templateDir/packages.css", $outDir) || die "Could not copy style file: $!";
+        $prefix = "<html><head>\n<style type=\"text/css\">\n";
+        close $th; undef $th;
+        open($th, "<$templateDir/packages.css") || die "Could not open style file: $!";
+        while (! eof $th) {
+            $prefix .= <$th>;
+        }
+        close $th; undef $th;
+        $prefix .= "</style></head><body>\n";
+        $suffix = "\n</body></html>\n";
     }
 }
 # Create the consistency helper.
@@ -247,9 +255,9 @@ while (! eof $ih) {
                     # Store the quality metrics in the GTO.
                     BinningReports::UpdateGTO($gto, "$outDir/$genome.out", $cMap);
                     # Create the detail page.
-                    my $html = BinningReports::Detail(undef, undef, $detailTT, $gto, $nMap);
+                    my $html = BinningReports::Detail(undef, undef, \$detailTT, $gto, $nMap);
                     open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
-                    print $wh $html;
+                    print $wh $prefix . $html . $suffix;
                     close $wh;
                 }
             }

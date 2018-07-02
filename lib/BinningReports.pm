@@ -986,8 +986,8 @@ sub copy_gto {
     my $qData = $gto->{genome_quality_measure};
     my $consis = $qData->{consis_data};
     # print STDERR Dumper($consis);
-    $retVal{scikit_coarse} = $consis->{Coarse_Consistency};
-    $retVal{scikit_fine} = $consis->{Fine_Consistency};
+    $retVal{scikit_coarse} = $consis->{'Coarse Consistency'};
+    $retVal{scikit_fine} = $consis->{'Fine Consistency'};
     my $metrics = $qData->{genome_metrics};
     $retVal{n50} = $metrics->{N50};
     $retVal{dna_bp} = $metrics->{totlen};
@@ -1066,11 +1066,13 @@ sub UpdateGTO {
                 # Store the heading key/value pair in the appropriate hash.
                 $hash->{$1} = $2;
             } elsif ($line =~ /^(\S+)\t(\d+)\t(\d+)/) {
+                $mode = 1;
                 # Here we have a data line.
                 my ($role, $pred, $actual) = ($1, $2, $3);
-                $ppr{$role} = [$pred, $actual, $comment];
                 if ($pred == $actual) {
                     $good{$role} = 1;
+                } else {
+                    $ppr{$role} = [$pred, $actual, $comment];
                 }
             }
         }
