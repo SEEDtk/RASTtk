@@ -193,6 +193,18 @@ Reference to a hash that maps each role ID to a list of feature IDs for features
 
 Reference to a hash that maps each role ID to a 2-tuple consisting of (0) the number of expected occurrences and (1) the number of actual occurrences.
 
+=item over_roles
+
+Number of over-represented roles.
+
+=item under_roles
+
+Number of under-represented roles.
+
+=item pred_roles
+
+Number of predicted roles.
+
 =back
 
 =item contigs
@@ -996,6 +1008,10 @@ sub copy_gto {
     $retVal{checkg_completeness} = $checkg->{Completeness};
     $retVal{checkg_contamination} = $checkg->{Contamination};
     $retVal{checkg_group} = $checkg->{Group};
+    my $ppr = $qData->{problematic_roles_report};
+    $retVal{over_roles} = $ppr->{over_roles};
+    $retVal{under_roles} = $ppr->{under_roles};
+    $retVal{pred_roles} = $ppr->{pred_roles};
     return %retVal;
 }
 
@@ -1043,11 +1059,16 @@ sub UpdateGTO {
     $q{genome_metrics} = $metricH;
     # This hash will contain the good roles. Good roles have a matching predicted and actual count.
     my %good;
+    # These hashes contain the numbers from the evaluators.
+    my (%checkGdata, %skData);
+    # This hash tracks role representation. The role ID is mapped to 0 (correct), 1 (over-represented), or
+    # -1 (under-represented).
+    my %predR;
     # This hash will contain the potentially problematic roles. Each role is mapped to its expected and
     # actual occurrences. Both the consistency and completeness checker have problematic roles. We read
     # completeness checker first, so if any roles overlap, the consistency checker overrides the completeness
     # result.
-    my (%ppr, %checkGdata, %skData);
+    my %ppr;
     if (open(my $ih, "<$qualityFile")) {
         # Start in completeness mode.
         my $hash = \%checkGdata;
@@ -1067,15 +1088,35 @@ sub UpdateGTO {
                 $hash->{$1} = $2;
             } elsif ($line =~ /^(\S+)\t(\d+)\t(\d+)/) {
                 $mode = 1;
-                # Here we have a data line.
+                # Here we have a data line. Note the complicated metrics on determining role representation
+                # (over, under, or correct) and role goodness (if at least one instance is predicted and it
+                # has at least one instance). A role is only bad if it doesn't belong or is missing outright.
                 my ($role, $pred, $actual) = ($1, $2, $3);
                 if ($pred == $actual) {
-                    $good{$role} = 1;
+                    $predR{$role} = 0;
                 } else {
                     $ppr{$role} = [$pred, $actual, $comment];
+                    if ($pred > $actual) {
+                        $predR{$role} = 1;
+                    } else {
+                        $predR{$role} = -1;
+                    }
+                }
+                if ($pred >= 1 && $actual >= 1) {
+                    $good{$role} = 1;
                 }
             }
         }
+    }
+    # We pause here to compute the representation metrics.
+    my ($overR, $underR, $predR) = (0, 0, 0);
+    for my $role (keys %predR) {
+        if ($predR{$role} < 0) {
+            $underR++;
+        } elsif ($predR{$role} > 0) {
+            $overR++;
+        }
+        $predR++;
     }
     # Now we need to map the roles to feature IDs. This hash will map a role ID to a list of features.
     # We step through all the features, and if the checksum matches a role ID in the PPR, we put it in
@@ -1119,7 +1160,8 @@ sub UpdateGTO {
     # All of this must now be assembled into the GTO.
     $q{checkg_data} = \%checkGdata;
     $q{consis_data} = \%skData;
-    $q{problematic_roles_report} = { role_fids => \%fids, role_ppr => \%ppr };
+    $q{problematic_roles_report} = { role_fids => \%fids, role_ppr => \%ppr, over_roles => $overR,
+                                     under_roles => $underR, pred_roles => $predR };
     $q{contig_data} = \%contigCount;
 }
 

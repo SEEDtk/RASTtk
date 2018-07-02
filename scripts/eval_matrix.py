@@ -54,7 +54,7 @@ parser.add_argument("trainDir", help="Directory which contains built predictors"
                     type=str)
 parser.add_argument("testDir", help="Directory containing built matrix of GTO roles",
                     type=str)
-parser.add_argument("outDir", help="output directory",
+parser.add_argument("outDir", help="output directory (0 for no output)",
                     type=str)
 parser.add_argument("-c", "--classifier", dest="clfType", default="RandomForestClassifier", help="Type of sklearn classifier to use")
 parser.add_argument("--LDA", action="store_true",
@@ -62,7 +62,8 @@ parser.add_argument("--LDA", action="store_true",
 args = parser.parse_args()
 if __name__ == '__main__':
     eprint("Using predictors from " + args.trainDir + ".")
-    eprint("Output will be in " + args.outDir + ".")
+    if (args.outDir != '0'):
+        eprint("Output will be in " + args.outDir + ".")
     if not os.path.isdir(args.testDir):
         sys.stderr.write("not a valid testDir: %s\n" % (args.testDir))
         sys.exit(-1)
@@ -105,19 +106,20 @@ if __name__ == '__main__':
     all_summary = []
     for n_row in range(X_all.shape[0]):
         gtoID = genomes[n_row, 1]
-        gto_sum_file = args.outDir + "/" + gtoID + ".out"
         coarseNum = str(np.round(coarse_const[n_row], decimals = 1))
         fineNum = str(np.round(fine_const[n_row], decimals = 1))
-        summary = ["Coarse Consistency: " + coarseNum]
-        summary.append("Fine Consistency: " + fineNum)
         all_summary.append(gtoID + "\t" + coarseNum + "\t" + fineNum)
-        for n_col in range(X_all.shape[1]):
-            n_pred = predictions[n_row, n_col]
-            n_real = X_all[n_row, n_col]
-            summary.append(col_names[n_col, 1] + "\t" + str(int(n_pred)) + "\t" + str(int(n_real)))
-        sfh = open(gto_sum_file, 'ab')
-        np.savetxt(sfh, summary, fmt="%s", delimiter='\t')
-        sfh.close()
+        if args.outDir != '0':
+            gto_sum_file = args.outDir + "/" + gtoID + ".out"
+            summary = ["Coarse Consistency: " + coarseNum]
+            summary.append("Fine Consistency: " + fineNum)
+            for n_col in range(X_all.shape[1]):
+                n_pred = predictions[n_row, n_col]
+                n_real = X_all[n_row, n_col]
+                summary.append(col_names[n_col, 1] + "\t" + str(int(n_pred)) + "\t" + str(int(n_real)))
+            sfh = open(gto_sum_file, 'ab')
+            np.savetxt(sfh, summary, fmt="%s", delimiter='\t')
+            sfh.close()
 
     np.savetxt(args.testDir + "/summary.out", all_summary, fmt="%s", delimiter ="\t")
     eprint("Finished %d evaluations with %d roles in %0.2f seconds." % (predictions.shape[0], predictions.shape[1], time.time()-stime))

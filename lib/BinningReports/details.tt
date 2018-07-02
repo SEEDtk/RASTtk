@@ -32,6 +32,12 @@
 <th>DNA size (bp)</th><td>[% g.dna_bp %]</td>
 </tr><tr>
 <th>Contigs N50 (bp)</th><td>[% g.n50 %]</td>
+</tr><tr>
+<th>Overpresent Roles</th><td>[% g.over_roles %]</td>
+</tr><tr>
+<th>Underpresent Roles</th><td>[% g.under_roles %]</td>
+</tr><tr>
+<th>Predicted Roles</th><td>[% g.pred_roles %]</td>
 [% IF g.coverage %]
 </tr><tr>
 <th>Mean Coverage</th><td>[% g.coverage %]</td>

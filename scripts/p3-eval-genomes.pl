@@ -52,6 +52,11 @@ specified genomes. This option allows greatly improved performance.
 Name of the directory containing the web page templates and style file. The default is C<RASTtk/lib/BinningReports> in the
 SEEDtk code directory.
 
+=item terse
+
+If specified, the reports on the individual genomes will not be produced, only the basic numbers. If this is specified, the
+output directory is ignored, and the C<--clear> and C<--web> options are prohibited.
+
 =back
 
 =cut
@@ -65,13 +70,16 @@ use GtoChecker;
 use File::Copy::Recursive;
 use GPUtils;
 use Math::Round;
+use Time::HiRes;
 
-
+$| = 1;
+my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(), EvalCon::role_options(),
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
         ['clear', 'clear output directory before starting'],
         ['web', 'create web pages as well as output files for evaluations'],
+        ['terse', 'suppress individual genome role reports (incompatible with web)'],
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
         ['templates=s', 'name of the directory containing the binning templates',
                 { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }],
@@ -89,16 +97,28 @@ if (! $workDir) {
     print STDERR "Erasing $workDir.\n";
     File::Copy::Recursive::pathempty($workDir) || die "Could not clear $workDir: $!";
 }
-if (! $outDir) {
-    die "No output directory specified.";
-} elsif (-f $outDir) {
-    die "Invalid output directory $outDir.";
-} elsif (! -d $outDir) {
-    print STDERR "Creating $outDir.\n";
-    File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
-} elsif ($opt->clear) {
-    print STDERR "Erasing $outDir.\n";
-    File::Copy::Recursive::pathempty($outDir) || die "Could not clear $outDir: $!";
+# Check for terse mode.
+my $terse = $opt->terse;
+if ($terse) {
+    if ($opt->web) {
+        die "Cannot specify web output in terse mode.";
+    }
+    if ($opt->clear) {
+        print STDERR "Output directory is not used and will not be cleared.\n";
+    }
+    $outDir = '0';
+} else {
+    if (! $outDir) {
+        die "No output directory specified.";
+    } elsif (-f $outDir) {
+        die "Invalid output directory $outDir.";
+    } elsif (! -d $outDir) {
+        print STDERR "Creating $outDir.\n";
+        File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
+    } elsif ($opt->clear) {
+        print STDERR "Erasing $outDir.\n";
+        File::Copy::Recursive::pathempty($outDir) || die "Could not clear $outDir: $!";
+    }
 }
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
@@ -150,6 +170,8 @@ my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
 my $evalG = GtoChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
+my $timer = Math::Round::round(time - $start);
+$stats->Add(timeLoading => $timer);
 # Loop through the input.
 while (! eof $ih) {
     # Get this batch of input.
@@ -172,19 +194,24 @@ while (! eof $ih) {
                 $stats->Add(genomeBadFile => 1);
             }
         } else {
+            $stats->Add(genomeFetched => 1);
+            $start = time;
             $gto = $p3->gto_of($genome, eval => 1);
             if (! $gto) {
                 print STDERR "Genome $genome not found in PATRIC.\n";
                 $stats->Add(genomeNotFound => 1);
             }
+            $stats->Add(timeFetching => Math::Round::round(time - $start));
         }
         if ($gto) {
             # We have the genome. Start the output file.
             my $outFile = "$outDir/$genome.out";
-            open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+            my $oh;
+            if (! $terse) {
+                open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+            }
             # Find out if we have a good seed.
             my $seedFlag = GPUtils::good_seed($gto);
-            print $oh "Good Seed: $seedFlag\n";
             if ($seedFlag) {
                 $stats->Add(genomeGoodSeed => 1);
             } else {
@@ -195,30 +222,35 @@ while (! eof $ih) {
             my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
             my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
             my $taxon = $evalH->{taxon} // 'N/F';
-            print $oh "Completeness: $complete\n";
-            print $oh "Contamination: $contam\n";
-            print $oh "Group: $taxon\n";
+            if (! $terse) {
+                print $oh "Good Seed: $seedFlag\n";
+                print $oh "Completeness: $complete\n";
+                print $oh "Contamination: $contam\n";
+                print $oh "Group: $taxon\n";
+            }
             $stats->Add(genomeComplete => 1) if GtoChecker::completeX($complete);
             $stats->Add(genomeClean => 1) if GtoChecker::contamX($contam);
             # Now output the role counts.
-            my $roleH = $evalH->{roleData};
-            if ($roleH) {
-                for my $role (sort keys %$roleH) {
-                    my $count = $roleH->{$role};
-                    print $oh "$role\t1\t$count\n";
+            if (! $terse) {
+                my $roleH = $evalH->{roleData};
+                if ($roleH) {
+                    for my $role (sort keys %$roleH) {
+                        my $count = $roleH->{$role};
+                        print $oh "$role\t1\t$count\n";
+                    }
+                } else {
+                    $stats->Add(evalGFailed => 1);
                 }
-            } else {
-                $stats->Add(evalGFailed => 1);
+                close $oh;
+                # If we are building a web page, we need to keep the GTO.
+                if ($web) {
+                    $gtos{$genome} = $gto;
+                }
             }
-            close $oh;
             # Store the evaluation results.
             $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
             # Add this genome to the evalCon matrix.
             $evalCon->AddGtoToMatrix($gto);
-            # If we are building a web page, we need to keep the GTO.
-            if ($web) {
-                $gtos{$genome} = $gto;
-            }
         }
     }
     # Now evaluate the batch for consistency.
@@ -226,10 +258,12 @@ while (! eof $ih) {
     if (! keys %results) {
         print STDERR "No genomes found in batch-- skipping.\n";
     } else {
+        $start = time;
         my $rc = system('eval_matrix', $evalCon->predictors, $workDir, $outDir);
         if ($rc) {
             die "EvalCon returned error code $rc.";
         }
+        $stats->Add(timeConsistency => Math::Round::round(time - $start));
         $stats->Add(evalConRun => 1);
         # Read back the results to get the consistencies.
         open(my $sh, "<$workDir/summary.out") || die "Could not open evalCon summary file: $!";
