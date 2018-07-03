@@ -16,7 +16,7 @@
 #
 
 
-package GtoChecker;
+package GenomeChecker;
 
     use strict;
     use warnings;
@@ -26,14 +26,14 @@ package GtoChecker;
     use FIG_Config;
     use SeedUtils;
 
-=head1 Data Structures to Check GTOs for Completeness
+=head1 Data Structures to Check Genomes for Completeness
 
-This object manages data structures to check GTOs for completeness and contamination. The algorithm is simple, and
+This object manages data structures to check genome for completeness and contamination. The algorithm is simple, and
 is based on files created by the scripts L<taxon_analysis.pl>, L<group_marker_roles.pl>, and L<compute_taxon_map.pl>
 plus the global role-mapping file C<roles.in.subsystems>.
 
-For each taxonomic group, there is a list of roles that appear singly in 95% of the genomes in that taxonomic grouping
-and an associated weight for each. Completeness is measured by the wieghted percent of those roles that actually occur.
+For each taxonomic group, there is a list of roles that appear singly in 97% of the genomes in that taxonomic grouping
+and an associated weight for each. Completeness is measured by the weighted percent of those roles that actually occur.
 Contamination is measured by the weighted number of duplicates found.
 
 This object contains the following fields.
@@ -77,16 +77,11 @@ A hash mapping each taxonomic group ID to its total role weight.
 
 =cut
 
-# Good/Bad criteria
-use constant MIN_CHECKM => 80;
-use constant MIN_SCIKIT => 87;
-use constant MAX_CONTAM => 10;
-
 =head2 Special Methods
 
 =head3 new
 
-    my $checker = GtoChecker->new($checkDir, %options);
+    my $checker = GenomeChecker->new($checkDir, %options);
 
 Create a new GTO checker object.
 
@@ -266,81 +261,6 @@ sub Log {
 
 =head2 Query Methods
 
-=head3 completeX
-
-    my $ok = GtoChecker::completeX($pct);
-
-Return TRUE if the specified percent complete is sufficient.
-
-=over 4
-
-=item pct
-
-A percent completeness.
-
-=item RETURN
-
-Returns TRUE if the value is high enough, else FALSE.
-
-=back
-
-=cut
-
-sub completeX {
-    my ($pct) = @_;
-    return ($pct >= MIN_CHECKM);
-}
-
-=head3 consistX
-
-    my $ok = GtoChecker::consistX($pct);
-
-Return TRUE if the specified percent fine consistency is sufficient.
-
-=over 4
-
-=item pct
-
-A percent fine consistency.
-
-=item RETURN
-
-Returns TRUE if the value is high enough, else FALSE.
-
-=back
-
-=cut
-
-sub consistX {
-    my ($pct) = @_;
-    return ($pct >= MIN_SCIKIT);
-}
-
-=head3 contamX
-
-    my $ok = GtoCheck::contamX($pct);
-
-Return TRUE if the specified percent contamination is acceptable.
-
-=over 4
-
-=item pct
-
-A percent of genome contamination.
-
-=item RETURN
-
-Returns TRUE if the value is low enough, else FALSE.
-
-=back
-
-=cut
-
-sub contamX {
-    my ($pct) = @_;
-    return ($pct <= MAX_CONTAM);
-}
-
 =head3 role_name
 
     my $name = $checker->role_name($role);
@@ -370,15 +290,15 @@ sub role_name {
 
 =head3 Check
 
-    my $dataH = $checker->Check($gto);
+    my $dataH = $checker->Check($geo);
 
-Check a L<GenomeTypeObject> for completeness and contamination. A hash of the problematic roles will be returned as well.
+Check a L<GenomeEvalObject> for completeness and contamination. A hash of the problematic roles will be returned as well.
 
 =over 4
 
-=item gto
+=item geo
 
-The L<GenomeTypeObject> to be checked.
+The L<GenomeEvalObject> to be checked.
 
 =item RETURN
 
@@ -413,7 +333,7 @@ Name of the taxonomic group used.
 =cut
 
 sub Check {
-    my ($self, $gto) = @_;
+    my ($self, $geo) = @_;
     # These will be the return values.
     my ($complete, $contam, $multi);
     my $taxGroup = 'root';
@@ -424,7 +344,7 @@ sub Check {
     # Get the role map. We use this to compute role IDs from role names.
     my $roleMap = $self->{roleMap};
     # Compute the appropriate taxonomic group for this GTO and get its role list.
-    my $taxon = $gto->{ncbi_taxonomy_id};
+    my $taxon = $geo->taxon;
     my $groupID = $self->{taxonMap}{$taxon};
     if (! defined $groupID) {
         # No group. We will return undef for the results.
@@ -439,34 +359,13 @@ sub Check {
         my $markers = scalar keys %roleData;
         my $size = $self->{taxSizes}{$groupID};
         $self->Log("$markers markers with total weight $size for group $groupID: $self->{taxNames}{$groupID}.\n");
-        # Now we run through the features of the GTO, tallying the roles found.
-        $self->Log("Processing features.\n");
-        my $featList = $gto->{features};
-        for my $feat (@$featList) {
-            my $function = $feat->{function};
-            $stats->Add(featureProcessed => 1);
-            if ($function) {
-                my @roles = SeedUtils::roles_of_function($function);
-                for my $role (@roles) {
-                    my $checksum = RoleParse::Checksum($role);
-                    if (! $roleMap->{$checksum}) {
-                        $stats->Add(roleNotMarker => 1);
-                    } else {
-                        my $roleID = $roleMap->{$checksum};
-                        if (exists $roleData{$roleID}) {
-                            $stats->Add(roleMarker => 1);
-                            $roleData{$roleID}++;
-                        } else {
-                            $stats->Add(roleNotMarker => 1);
-                        }
-                    }
-                }
-            }
-        }
+        # Get the role counts for the genome.
+        my $countsH = $geo->roleCounts;
         # Now we count the markers.
         my ($found, $extra, $total) = (0, 0, 0);
         for my $roleID (keys %roleData) {
-            my $count = $roleData{$roleID};
+            my $count = $countsH->{$roleID} // 0;
+            $roleData{$roleID} = $count;
             if ($count >= 1) {
                 my $weight = $roleHash->{$roleID};
                 $found += $weight;

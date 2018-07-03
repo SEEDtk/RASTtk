@@ -310,86 +310,8 @@ sub roles {
     return @retVal;
 }
 
-=head3 roles_of_gto
-
-    my $roleHash = $eval->roles_of_gto($gto, %options);
-
-This script takes a GTO as input and produces a hash that maps each role ID to a count of the features containing the
-role. Only roles of interest (those from the C<roles.to.use> file) will be included in the output.
-
-=over 4
-
-=item gto
-
-A L<GenomeTypeObject> containing a genome to be processed.
-
-=item RETURN
-
-Returns a reference to a hash that maps each role ID to a count of features containing the role.
-
-=back
-
-=cut
-
-sub roles_of_gto {
-    my ($self, $gto) = @_;
-    # Get the statistics object.
-    my $stats = $self->{stats};
-    # Get the list of roles of interest.
-    my %roles = map { $_ => 1 } @{$self->{roles}};
-    # This will be the return hash.
-    my %retVal;
-    # Loop through the features in this GTO.
-    for my $feature (@{$gto->{features}}) {
-        my $fid = $feature->{id};
-        my $function = $feature->{function};
-        $stats->Add(featureMapped => 1);
-        if ($function) {
-            $stats->Add(functionMapped => 1);
-            for my $role ($self->roles($function)) {
-                if ($roles{$role}) {
-                    $retVal{$role}++;
-                    $stats->Add(roleUsed => 1);
-                }
-            }
-        }
-    }
-    # Return the hash.
-    return \%retVal;
-}
-
 
 =head2 Public Manipulation Methods
-
-=head3 BuildGtoMatrix
-
-    $eval->BuildGtoMatrix($gto, $outDir);
-
-Create matrix structures from the specified L<GenomeTypeObject> in the specified output directory.
-
-=over 4
-
-=item gto
-
-A L<GenomeTypeObject> whose roles are to be formed into a matrix file set.
-
-=item outDir
-
-The output directory to contain the matrix. Three files-- C<row.h>, C<col.h>, and C<X>-- will be created.
-
-=back
-
-=cut
-
-sub BuildGtoMatrix {
-    my ($self, $gto, $outDir) = @_;
-    # Start the matrix output files.
-    $self->OpenMatrix($outDir);
-    # Put this genome in it.
-    $self->AddGtoToMatrix($gto);
-    # Close the matrix files.
-    $self->CloseMatrix();
-}
 
 =head3 BuildFileMatrix
 
@@ -599,28 +521,28 @@ sub OpenMatrix {
     $self->{rCount} = 0;
 }
 
-=head3 AddGtoToMatrix
+=head3 AddGeoToMatrix
 
-    $eval->AddGtoToMatrix($gto);
+    $eval->AddGeoToMatrix($geo);
 
-Add the role data from the specified L<GenomeTypeObject> to the predictor matrix currently being built.
+Add the role data from the specified L<GenomeEvalObject> to the predictor matrix currently being built.
 
 =over 4
 
-=item gto
+=item geo
 
-A L<GenomeTypeObject> to serve as the next row of the predictor matrix.
+A L<GenomeEvalObject> to serve as the next row of the predictor matrix.
 
 =back
 
 =cut
 
-sub AddGtoToMatrix {
-    my ($self, $gto) = @_;
+sub AddGeoToMatrix {
+    my ($self, $geo) = @_;
     # Get the role counts for the genome.
-    my $countsH = $self->roles_of_gto($gto);
+    my $countsH = $geo->roleCounts;
     # Write the genome.
-    $self->_MatrixAdd($gto->{id}, $countsH);
+    $self->_MatrixAdd($geo->id, $countsH);
 }
 
 =head3 CloseMatrix

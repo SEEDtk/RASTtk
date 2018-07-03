@@ -30,7 +30,7 @@ The following additional command-line options are supported.
 
 =item checkDir
 
-The directory containing the completeness-checker input files (see L<GtoChecker> for details). The default is
+The directory containing the completeness-checker input files (see L<GenomeChecker> for details). The default is
 C<CheckG> in the SEEDtk globals directory.
 
 =item clear
@@ -57,6 +57,11 @@ SEEDtk code directory.
 If specified, the reports on the individual genomes will not be produced, only the basic numbers. If this is specified, the
 output directory is ignored, and the C<--clear> and C<--web> options are prohibited.
 
+=item refCol
+
+If specified, the index (1-based) or name of an input column that contains the PATRIC ID of a reference genome. The reference
+genome will be used on the web page produced.
+
 =back
 
 =cut
@@ -66,7 +71,8 @@ use P3DataAPI;
 use P3Utils;
 use BinningReports;
 use EvalCon;
-use GtoChecker;
+use GenomeChecker;
+use GEO;
 use File::Copy::Recursive;
 use GPUtils;
 use Math::Round;
@@ -131,11 +137,16 @@ if (! $opt->nohead) {
     push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
     P3Utils::print_cols($outHeaders);
 }
-# Compute the GTO file column.
+# Compute the GTO file and reference genome columns.
 my $gtoCol = $opt->gtocol;
 if (defined $gtoCol) {
     print STDERR "GTO file names will be taken from column $gtoCol.\n";
     $gtoCol = P3Utils::find_column($gtoCol, $outHeaders);
+}
+my $refCol = $opt->refcol;
+if (defined $refCol) {
+    print STDERR "Reference genome IDs will be taken from column $refCol.\n";
+    $refCol = P3Utils::find_column($refCol, $outHeaders);
 }
 # Get the web options.
 my $web = $opt->web;
@@ -169,89 +180,108 @@ my $evalCon = EvalCon->new_from_script($opt);
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
-my $evalG = GtoChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
+my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
 my $timer = Math::Round::round(time - $start);
 $stats->Add(timeLoading => $timer);
+# Set up the options for creating the GEOs.
+my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, abridged => ! $web,
+        logH => \*STDERR);
+# This hash will map genome IDs to the reference genome GEOs.
+my %refGenomes;
+# This hash will map target genome IDs to their GEOs.
+my %geoMap;
 # Loop through the input.
 while (! eof $ih) {
     # Get this batch of input.
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Start the predictor matrix for the consistency checker.
     $evalCon->OpenMatrix($workDir);
-    # This will hold the GTOs built.
-    my %gtos;
-    # This will hold results for the output. It will map genome IDs to [coarse, fine, complete, contam, goodSeed];
-    my %results;
+    # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
+    my (@gtoFiles, @pGenomes);
     for my $couplet (@$couplets) {
         my ($genome, $row) = @$couplet;
         $stats->Add(genomeIn => 1);
-        print STDERR "Processing $genome.\n";
-        my $gto;
+        $geoMap{$genome} = 1;
         if (defined $gtoCol && $row->[$gtoCol]) {
-            $gto = GenomeTypeObject->create_from_file($row->[$gtoCol]);
-            if (! $gto) {
-                print STDERR "Genome $genome not found in file $row->[$gtoCol].\n";
-                $stats->Add(genomeBadFile => 1);
-            }
+            push @gtoFiles, $row->[$gtoCol];
         } else {
-            $stats->Add(genomeFetched => 1);
-            $start = time;
-            $gto = $p3->gto_of($genome, eval => 1);
-            if (! $gto) {
-                print STDERR "Genome $genome not found in PATRIC.\n";
-                $stats->Add(genomeNotFound => 1);
-            }
-            $stats->Add(timeFetching => Math::Round::round(time - $start));
+            push @pGenomes, $genome;
         }
-        if ($gto) {
-            # We have the genome. Start the output file.
-            my $outFile = "$outDir/$genome.out";
-            my $oh;
-            if (! $terse) {
-                open($oh, ">$outFile") || die "Could not open $outFile: $!";
+        if (defined $refCol && $row->[$refCol]) {
+            push @pGenomes, $row->[$refCol];
+            $refGenomes{$genome} = $row->[$refCol];
+        }
+    }
+    # Get the data for the genomes.
+    $start = time;
+    my $gHash;
+    if (@gtoFiles) {
+        $gHash = GEO->CreateFromGtoFile(\@gtoFiles, %geoOptions);
+        for my $genome (keys %$gHash) {
+            $geoMap{$genome} = $gHash->{$genome};
+        }
+    }
+    if (@pGenomes) {
+        $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
+        for my $genome (keys %$gHash) {
+            if ($geoMap{$genome}) {
+                $geoMap{$genome} = $gHash->{$genome};
             }
-            # Find out if we have a good seed.
-            my $seedFlag = GPUtils::good_seed($gto);
-            if ($seedFlag) {
-                $stats->Add(genomeGoodSeed => 1);
-            } else {
-                $stats->Add(genomeBadSeed => 1);
+        }
+        for my $genome (keys %refGenomes) {
+            my $refGeo = $gHash->{$refGenomes{$genome}};
+            if ($refGeo) {
+                $refGenomes{$genome} = $refGeo;
             }
-            # Compute the consistency and completeness.
-            my $evalH = $evalG->Check($gto);
-            my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
-            my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
-            my $taxon = $evalH->{taxon} // 'N/F';
-            if (! $terse) {
-                print $oh "Good Seed: $seedFlag\n";
-                print $oh "Completeness: $complete\n";
-                print $oh "Contamination: $contam\n";
-                print $oh "Group: $taxon\n";
-            }
-            $stats->Add(genomeComplete => 1) if GtoChecker::completeX($complete);
-            $stats->Add(genomeClean => 1) if GtoChecker::contamX($contam);
+        }
+    }
+    $stats->Add(timeFetching => Math::Round::round(time - $start));
+    # This will hold results for the output. It will map genome IDs to [coarse, fine, complete, contam, goodSeed];
+    my %results;
+    for my $genome (keys %geoMap) {
+        my $geo = $geoMap{$genome};
+        # We have the genome. Start the output file.
+        my $outFile = "$outDir/$genome.out";
+        my $oh;
+        if (! $terse) {
+            open($oh, ">$outFile") || die "Could not open $outFile: $!";
+        }
+        # Find out if we have a good seed.
+        my $seedFlag = $geo->good_seed;
+        if ($seedFlag) {
+            $stats->Add(genomeGoodSeed => 1);
+        } else {
+            $stats->Add(genomeBadSeed => 1);
+        }
+        # Compute the consistency and completeness.
+        my $evalH = $evalG->Check($geo);
+        my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
+        my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
+        my $taxon = $evalH->{taxon} // 'N/F';
+        if (! $terse) {
+            # Output the check results.
+            print $oh "Good Seed: $seedFlag\n";
+            print $oh "Completeness: $complete\n";
+            print $oh "Contamination: $contam\n";
+            print $oh "Group: $taxon\n";
             # Now output the role counts.
-            if (! $terse) {
-                my $roleH = $evalH->{roleData};
-                if ($roleH) {
-                    for my $role (sort keys %$roleH) {
-                        my $count = $roleH->{$role};
-                        print $oh "$role\t1\t$count\n";
-                    }
-                } else {
-                    $stats->Add(evalGFailed => 1);
+            my $roleH = $evalH->{roleData};
+            if ($roleH) {
+                for my $role (sort keys %$roleH) {
+                    my $count = $roleH->{$role};
+                    print $oh "$role\t1\t$count\n";
                 }
-                close $oh;
-                # If we are building a web page, we need to keep the GTO.
-                if ($web) {
-                    $gtos{$genome} = $gto;
-                }
+            } else {
+                $stats->Add(evalGFailed => 1);
             }
-            # Store the evaluation results.
-            $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
-            # Add this genome to the evalCon matrix.
-            $evalCon->AddGtoToMatrix($gto);
+            close $oh;
         }
+        $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
+        $stats->Add(genomeClean => 1) if GEO::contamX($contam);
+        # Store the evaluation results.
+        $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
+        # Add this genome to the evalCon matrix.
+        $evalCon->AddGeoToMatrix($geo);
     }
     # Now evaluate the batch for consistency.
     $evalCon->CloseMatrix();
@@ -272,7 +302,7 @@ while (! eof $ih) {
             my ($genome, $coarse, $fine) = P3Utils::get_fields($line);
             $results{$genome}[0] = $coarse;
             $results{$genome}[1] = $fine;
-            if (GtoChecker::consistX($fine)) {
+            if (GEO::consistX($fine)) {
                 $stats->Add(genomeConsistent => 1);
             }
         }
@@ -285,11 +315,11 @@ while (! eof $ih) {
                 P3Utils::print_cols([@$row, @$result]);
                 $stats->Add(genomeOut => 1);
                 if ($web) {
-                    my $gto = $gtos{$genome};
+                    my $geo = $geoMap{$genome};
                     # Store the quality metrics in the GTO.
-                    BinningReports::UpdateGTO($gto, "$outDir/$genome.out", $cMap);
+                    $geo->AddQuality("$outDir/$genome.out", $refGenomes{$genome});
                     # Create the detail page.
-                    my $html = BinningReports::Detail(undef, undef, \$detailTT, $gto, $nMap);
+                    my $html = BinningReports::Detail(undef, undef, \$detailTT, $geo, $nMap);
                     open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
                     print $wh $prefix . $html . $suffix;
                     close $wh;
