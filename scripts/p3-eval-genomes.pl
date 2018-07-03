@@ -62,6 +62,11 @@ output directory is ignored, and the C<--clear> and C<--web> options are prohibi
 If specified, the index (1-based) or name of an input column that contains the PATRIC ID of a reference genome. The reference
 genome will be used on the web page produced.
 
+=item resume
+
+Specifies a genome ID. All rows of the input will be skipped until the genome ID is found, and then processing will continue
+with the next row after that. The standard output will not contain a header. Use this option to resume after a failure.
+
 =back
 
 =cut
@@ -79,6 +84,7 @@ use Math::Round;
 use Time::HiRes;
 
 $| = 1;
+my $exitCode = 0;
 my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(), EvalCon::role_options(),
@@ -90,6 +96,7 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['templates=s', 'name of the directory containing the binning templates',
                 { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }],
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
+        ['resume=s', 'resume after error with specified genome'],
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -133,11 +140,6 @@ my $p3 = P3DataAPI->new();
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-# Form the full header set and write it out.
-if (! $opt->nohead) {
-    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
-    P3Utils::print_cols($outHeaders);
-}
 # Compute the GTO file and reference genome columns.
 my $gtoCol = $opt->gtocol;
 if (defined $gtoCol) {
@@ -187,163 +189,200 @@ $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
 my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, abridged => ! $web,
         logH => \*STDERR);
-# Loop through the input.
-while (! eof $ih) {
-    # Get this batch of input.
-    my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
-    # This hash will map reference genome IDs to the target genomes.
-    my %refGenomes;
-    # This hash will map target genome IDs to their GEOs.
-    my %geoMap;
-    # This hash remembers which genomes we need to evaluate.
-    my %mainGenomes;
-    # Start the predictor matrix for the consistency checker.
-    $evalCon->OpenMatrix($workDir);
-    # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
-    my (@gtoFiles, %pGenomes);
-    for my $couplet (@$couplets) {
-        my ($genome, $row) = @$couplet;
-        $stats->Add(genomeIn => 1);
-        $mainGenomes{$genome} = 1;
-        if (defined $gtoCol && $row->[$gtoCol]) {
-            push @gtoFiles, $row->[$gtoCol];
-        } else {
-            $pGenomes{$genome} = 1;
-        }
-        if (defined $refCol && $row->[$refCol]) {
-            my $rGenome = $row->[$refCol];
-            $pGenomes{$rGenome} = 1;
-            $refGenomes{$rGenome} = $genome;
+# Process the resume option.
+if ($opt->resume) {
+    my $found;
+    my $count = 0;
+    my $lastGenome = $opt->resume;
+    print STDERR "Searching for $lastGenome.\n";
+    while (! eof $ih && ! $found) {
+        my $line = <$ih>;
+        my @fields = P3Utils::get_fields($line);
+        $count++;
+        if ($fields[$keyCol] eq $lastGenome) {
+            $found = 1;
         }
     }
-    # Get the data for the genomes.
-    $start = time;
-    my $gHash;
-    if (@gtoFiles) {
-        $gHash = GEO->CreateFromGtoFile(\@gtoFiles, %geoOptions);
-        for my $genome (keys %$gHash) {
-            $geoMap{$genome} = $gHash->{$genome};
-            print STDERR "Target genome $genome queued for evaluation.\n";
-        }
-    }
-    my @pGenomes = sort keys %pGenomes;
-    if (scalar @pGenomes) {
-        $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
-        for my $genome (keys %$gHash) {
-            if ($mainGenomes{$genome}) {
-                my $geo = $gHash->{$genome};
-                if (! $geo) {
-                    print STDERR "Target genome $genome was not found.\n";
-                } else {
-                    $geoMap{$genome} = $geo;
-                    print STDERR "Target genome $genome queued for evaluation.\n";
-                }
-            }
-        }
-        for my $genome (keys %refGenomes) {
-            my $refGeo = $gHash->{$genome};
-            if ($refGeo) {
-                my $target = $refGenomes{$genome};
-                my $geo = $geoMap{$target};
-                if ($geo) {
-                    $geo->SetRefGenome($refGeo);
-                    print STDERR "$genome stored as reference for $target.\n";
-                }
-            }
-        }
-    }
-    $stats->Add(timeFetching => Math::Round::round(time - $start));
-    # This will hold results for the output. It will map genome IDs to [coarse, fine, complete, contam, goodSeed];
-    my %results;
-    for my $genome (keys %geoMap) {
-        my $geo = $geoMap{$genome};
-        # We have the genome. Start the output file.
-        my $outFile = "$outDir/$genome.out";
-        my $oh;
-        if (! $terse) {
-            open($oh, ">$outFile") || die "Could not open $outFile: $!";
-        }
-        # Find out if we have a good seed.
-        my $seedFlag = $geo->good_seed;
-        if ($seedFlag) {
-            $stats->Add(genomeGoodSeed => 1);
-        } else {
-            $stats->Add(genomeBadSeed => 1);
-        }
-        # Compute the consistency and completeness.
-        my $evalH = $evalG->Check($geo);
-        my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
-        my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
-        my $taxon = $evalH->{taxon} // 'N/F';
-        if (! $terse) {
-            # Output the check results.
-            print $oh "Good Seed: $seedFlag\n";
-            print $oh "Completeness: $complete\n";
-            print $oh "Contamination: $contam\n";
-            print $oh "Group: $taxon\n";
-            # Now output the role counts.
-            my $roleH = $evalH->{roleData};
-            if ($roleH) {
-                for my $role (sort keys %$roleH) {
-                    my $count = $roleH->{$role};
-                    print $oh "$role\t1\t$count\n";
-                }
-            } else {
-                $stats->Add(evalGFailed => 1);
-            }
-            close $oh;
-        }
-        $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
-        $stats->Add(genomeClean => 1) if GEO::contamX($contam);
-        # Store the evaluation results.
-        $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
-        # Add this genome to the evalCon matrix.
-        $evalCon->AddGeoToMatrix($geo);
-    }
-    # Now evaluate the batch for consistency.
-    $evalCon->CloseMatrix();
-    if (! keys %results) {
-        print STDERR "No genomes found in batch-- skipping.\n";
-    } else {
-        $start = time;
-        my $rc = system('eval_matrix', $evalCon->predictors, $workDir, $outDir);
-        if ($rc) {
-            die "EvalCon returned error code $rc.";
-        }
-        $stats->Add(timeConsistency => Math::Round::round(time - $start));
-        $stats->Add(evalConRun => 1);
-        # Read back the results to get the consistencies.
-        open(my $sh, "<$workDir/summary.out") || die "Could not open evalCon summary file: $!";
-        while (! eof $sh) {
-            my $line = <$sh>;
-            my ($genome, $coarse, $fine) = P3Utils::get_fields($line);
-            $results{$genome}[0] = $coarse;
-            $results{$genome}[1] = $fine;
-            if (GEO::consistX($fine)) {
-                $stats->Add(genomeConsistent => 1);
-            }
-        }
-        close $sh;
-        # Now, write the standard output and optionally produce the web pages.
+    print STDERR "$count lines skipped.\n";
+} elsif (! $opt->nohead) {
+    # Not resuming. Form the full header set and write it out.
+    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
+    P3Utils::print_cols($outHeaders);
+}
+# If an error occurs, we still display stats.
+my $lastGenome = "";
+eval {
+    # Loop through the input.
+    while (! eof $ih) {
+        # Get this batch of input.
+        my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
+        # This hash will map reference genome IDs to the target genomes.
+        my %refGenomes;
+        # This hash will map target genome IDs to their GEOs.
+        my %geoMap;
+        # This hash remembers which genomes we need to evaluate.
+        my %mainGenomes;
+        # Start the predictor matrix for the consistency checker.
+        $evalCon->OpenMatrix($workDir);
+        # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
+        my (@gtoFiles, %pGenomes);
         for my $couplet (@$couplets) {
             my ($genome, $row) = @$couplet;
-            my $result = $results{$genome};
-            if ($result) {
-                P3Utils::print_cols([@$row, @$result]);
-                $stats->Add(genomeOut => 1);
-                if ($web) {
-                    my $geo = $geoMap{$genome};
-                    # Store the quality metrics in the GTO.
-                    $geo->AddQuality("$outDir/$genome.out", $refGenomes{$genome});
-                    # Create the detail page.
-                    my $html = BinningReports::Detail(undef, undef, \$detailTT, $geo, $nMap);
-                    open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
-                    print $wh $prefix . $html . $suffix;
-                    close $wh;
+            $stats->Add(genomeIn => 1);
+            $mainGenomes{$genome} = 1;
+            if (defined $gtoCol && $row->[$gtoCol]) {
+                push @gtoFiles, $row->[$gtoCol];
+            } else {
+                $pGenomes{$genome} = 1;
+            }
+            if (defined $refCol && $row->[$refCol]) {
+                my $rGenome = $row->[$refCol];
+                $pGenomes{$rGenome} = 1;
+                $refGenomes{$rGenome} = $genome;
+            }
+        }
+        # Get the data for the genomes.
+        $start = time;
+        my $gHash;
+        if (@gtoFiles) {
+            $gHash = GEO->CreateFromGtoFile(\@gtoFiles, %geoOptions);
+            for my $genome (keys %$gHash) {
+                $geoMap{$genome} = $gHash->{$genome};
+                print STDERR "Target genome $genome queued for evaluation.\n";
+            }
+        }
+        my @pGenomes = sort keys %pGenomes;
+        if (scalar @pGenomes) {
+            $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
+            for my $genome (keys %$gHash) {
+                if ($mainGenomes{$genome}) {
+                    my $geo = $gHash->{$genome};
+                    if (! $geo) {
+                        print STDERR "Target genome $genome was not found.\n";
+                    } else {
+                        $geoMap{$genome} = $geo;
+                        print STDERR "Target genome $genome queued for evaluation.\n";
+                    }
+                }
+            }
+            for my $genome (keys %refGenomes) {
+                my $refGeo = $gHash->{$genome};
+                if ($refGeo) {
+                    my $target = $refGenomes{$genome};
+                    my $geo = $geoMap{$target};
+                    if ($geo) {
+                        $geo->SetRefGenome($refGeo);
+                        print STDERR "$genome stored as reference for $target.\n";
+                    }
                 }
             }
         }
+        $stats->Add(timeFetching => Math::Round::round(time - $start));
+        # This will hold results for the output. It will map genome IDs to [coarse, fine, complete, contam, goodSeed];
+        my %results;
+        for my $genome (keys %geoMap) {
+            my $geo = $geoMap{$genome};
+            # We have the genome. Start the output file.
+            my $outFile = "$outDir/$genome.out";
+            my $oh;
+            if (! $terse) {
+                open($oh, ">$outFile") || die "Could not open $outFile: $!";
+            }
+            # Find out if we have a good seed.
+            my $seedFlag = $geo->good_seed;
+            if ($seedFlag) {
+                $stats->Add(genomeGoodSeed => 1);
+            } else {
+                $stats->Add(genomeBadSeed => 1);
+            }
+            # Compute the consistency and completeness.
+            my $evalH = $evalG->Check($geo);
+            my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
+            my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
+            my $taxon = $evalH->{taxon} // 'N/F';
+            if (! $terse) {
+                # Output the check results.
+                print $oh "Good Seed: $seedFlag\n";
+                print $oh "Completeness: $complete\n";
+                print $oh "Contamination: $contam\n";
+                print $oh "Group: $taxon\n";
+                # Now output the role counts.
+                my $roleH = $evalH->{roleData};
+                if ($roleH) {
+                    for my $role (sort keys %$roleH) {
+                        my $count = $roleH->{$role};
+                        print $oh "$role\t1\t$count\n";
+                    }
+                } else {
+                    $stats->Add(evalGFailed => 1);
+                }
+                close $oh;
+            }
+            $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
+            $stats->Add(genomeClean => 1) if GEO::contamX($contam);
+            # Store the evaluation results.
+            $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
+            # Add this genome to the evalCon matrix.
+            $evalCon->AddGeoToMatrix($geo);
+        }
+        # Now evaluate the batch for consistency.
+        $evalCon->CloseMatrix();
+        if (! keys %results) {
+            print STDERR "No genomes found in batch-- skipping.\n";
+        } else {
+            $start = time;
+            my $rc = system('eval_matrix', $evalCon->predictors, $workDir, $outDir);
+            if ($rc) {
+                die "EvalCon returned error code $rc.";
+            }
+            $stats->Add(timeConsistency => Math::Round::round(time - $start));
+            $stats->Add(evalConRun => 1);
+            # Read back the results to get the consistencies.
+            open(my $sh, "<$workDir/summary.out") || die "Could not open evalCon summary file: $!";
+            while (! eof $sh) {
+                my $line = <$sh>;
+                my ($genome, $coarse, $fine) = P3Utils::get_fields($line);
+                $results{$genome}[0] = $coarse;
+                $results{$genome}[1] = $fine;
+                if (GEO::consistX($fine)) {
+                    $stats->Add(genomeConsistent => 1);
+                }
+            }
+            close $sh;
+            # Now, write the standard output and optionally produce the web pages.
+            for my $couplet (@$couplets) {
+                my ($genome, $row) = @$couplet;
+                my $result = $results{$genome};
+                if ($result) {
+                    P3Utils::print_cols([@$row, @$result]);
+                    $stats->Add(genomeOut => 1);
+                    if ($web) {
+                        my $geo = $geoMap{$genome};
+                        # Store the quality metrics in the GTO.
+                        $geo->AddQuality("$outDir/$genome.out", $refGenomes{$genome});
+                        # Create the detail page.
+                        my $html = BinningReports::Detail(undef, undef, \$detailTT, $geo, $nMap);
+                        open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
+                        print $wh $prefix . $html . $suffix;
+                        close $wh;
+                    }
+                }
+                # Denote this is our last successfully-processed genome.
+                $lastGenome = $genome;
+            }
+        }
     }
+};
+if ($@) {
+    # Here an error occurred.
+    if ($lastGenome) {
+        print STDERR "FATAL ERROR: last genome processed was $lastGenome.\n";
+    } else {
+        print STDERR "FATAL ERROR before any output.\n";
+    }
+    print STDERR "$@\n";
+    $exitCode = 255;
 }
 # All done. Dump the stats.
 print STDERR "All done.\n" . $stats->Show();
+exit($exitCode);
