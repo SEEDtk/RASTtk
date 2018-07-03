@@ -1167,7 +1167,7 @@ Returns a hyperlink displaying the contig ID. When clicked, it will show all the
 
 sub _contig_link {
     my ($contigID) = @_;
-    my $retVal = qq(<a href ="https://www.patricbrc.org/view/FeatureList/?and(eq(annotation,PATRIC),eq(sequence_id,$contigID),eq(feature_type,CDS))">$contigID</a>);
+    my $retVal = qq(<a href ="https://www.patricbrc.org/view/FeatureList/?and(eq(annotation,PATRIC),eq(sequence_id,$contigID),eq(feature_type,CDS))" target="_blank">$contigID</a>);
     return $retVal;
 }
 
