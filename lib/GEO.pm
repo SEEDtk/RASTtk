@@ -82,6 +82,10 @@ The following optional fields may also be present.
 
 =over 4
 
+=item refGeo
+
+A L<GEO> for an associated reference genome believed to be close, but of better quality.
+
 =item fidLocs
 
 Reference to a hash that maps each feature belonging to an mapped role to its location.
@@ -895,9 +899,31 @@ sub scores {
 
 =head2 Public Manipulation Methods
 
+=head3 setRefGenome
+
+    $geo->SetRefGenome($geo2);
+
+Store the GEO of a reference genome.
+
+=over 4
+
+=item geo2
+
+The GEO of a close genome of higher quality.
+
+=back
+
+=cut
+
+sub SetRefGenome {
+    my ($self, $geo2) = @_;
+    $self->{refGeo} = $geo2;
+}
+
+
 =head3 AddQuality
 
-    $geo->AddQuality($summaryFile, $refGeo);
+    $geo->AddQuality($summaryFile);
 
 Add the quality information for this genome to this object, using the data in the specified summary file.
 This method fills in the C<quality> member described above.
@@ -932,10 +958,12 @@ use constant SHORT_FEATURE => 180;
 use constant CONTIG_EDGE => 5;
 
 sub AddQuality {
-    my ($self, $summaryFile, $refGeo) = @_;
+    my ($self, $summaryFile) = @_;
     # This will be the quality member.
     my %quality;
     $self->{quality} = \%quality;
+    # Get the reference genome (if any).
+    my $refGeo = $self->{refGeo};
     # This will be the role prediction hash.
     my %roles;
     $quality{roles} = \%roles;

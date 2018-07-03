@@ -89,6 +89,7 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
         ['templates=s', 'name of the directory containing the binning templates',
                 { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }],
+        ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -186,30 +187,33 @@ $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
 my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, abridged => ! $web,
         logH => \*STDERR);
-# This hash will map genome IDs to the reference genome GEOs.
-my %refGenomes;
-# This hash will map target genome IDs to their GEOs.
-my %geoMap;
 # Loop through the input.
 while (! eof $ih) {
     # Get this batch of input.
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
+    # This hash will map reference genome IDs to the target genomes.
+    my %refGenomes;
+    # This hash will map target genome IDs to their GEOs.
+    my %geoMap;
+    # This hash remembers which genomes we need to evaluate.
+    my %mainGenomes;
     # Start the predictor matrix for the consistency checker.
     $evalCon->OpenMatrix($workDir);
     # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
-    my (@gtoFiles, @pGenomes);
+    my (@gtoFiles, %pGenomes);
     for my $couplet (@$couplets) {
         my ($genome, $row) = @$couplet;
         $stats->Add(genomeIn => 1);
-        $geoMap{$genome} = 1;
+        $mainGenomes{$genome} = 1;
         if (defined $gtoCol && $row->[$gtoCol]) {
             push @gtoFiles, $row->[$gtoCol];
         } else {
-            push @pGenomes, $genome;
+            $pGenomes{$genome} = 1;
         }
         if (defined $refCol && $row->[$refCol]) {
-            push @pGenomes, $row->[$refCol];
-            $refGenomes{$genome} = $row->[$refCol];
+            my $rGenome = $row->[$refCol];
+            $pGenomes{$rGenome} = 1;
+            $refGenomes{$rGenome} = $genome;
         }
     }
     # Get the data for the genomes.
@@ -219,19 +223,32 @@ while (! eof $ih) {
         $gHash = GEO->CreateFromGtoFile(\@gtoFiles, %geoOptions);
         for my $genome (keys %$gHash) {
             $geoMap{$genome} = $gHash->{$genome};
+            print STDERR "Target genome $genome queued for evaluation.\n";
         }
     }
-    if (@pGenomes) {
+    my @pGenomes = sort keys %pGenomes;
+    if (scalar @pGenomes) {
         $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
         for my $genome (keys %$gHash) {
-            if ($geoMap{$genome}) {
-                $geoMap{$genome} = $gHash->{$genome};
+            if ($mainGenomes{$genome}) {
+                my $geo = $gHash->{$genome};
+                if (! $geo) {
+                    print STDERR "Target genome $genome was not found.\n";
+                } else {
+                    $geoMap{$genome} = $geo;
+                    print STDERR "Target genome $genome queued for evaluation.\n";
+                }
             }
         }
         for my $genome (keys %refGenomes) {
-            my $refGeo = $gHash->{$refGenomes{$genome}};
+            my $refGeo = $gHash->{$genome};
             if ($refGeo) {
-                $refGenomes{$genome} = $refGeo;
+                my $target = $refGenomes{$genome};
+                my $geo = $geoMap{$target};
+                if ($geo) {
+                    $geo->SetRefGenome($refGeo);
+                    print STDERR "$genome stored as reference for $target.\n";
+                }
             }
         }
     }
