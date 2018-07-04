@@ -49,6 +49,34 @@ Reference to a list of the role IDs to use for quality control.
 
 Name of the function predictors directory.
 
+=item stats
+
+A L<Stats> object containing statistics about the process.
+
+=item matrix_X
+
+An reference to a list of lists, corresponding to an in-memory copy of the X matrix from a predictor directory.
+
+=item matrix_row
+
+A reference to a list corresponding to an in-memory copy of the row.h map from a predictor directory.
+
+=item matrix_col
+
+A reference to a list corresponding to an in-memory copy of the col.h map from a predictor directory.
+
+=item rh
+
+Open handle for the current C<row.h> file.
+
+=item xh
+
+Open handle for the current C<X> file.
+
+=item rCount
+
+Number of rows currently in the C<X> and X<row.h> files.
+
 =back
 
 =head2 Special Methods
@@ -73,22 +101,6 @@ not have one.
 
 The C<roles.to.use> file containing the IDs of the roles for which predictors exist. The default is the file of that name
 in the function predictors directory, or the one in the SEEDtk global directory if the predictors do not have one.
-
-=item stats
-
-A L<Stats> object containing statistics about the process.
-
-=item matrix_X
-
-An reference to a list of lists, corresponding to an in-memory copy of the X matrix from a predictor directory.
-
-=item matrix_row
-
-A reference to a list corresponding to an in-memory copy of the row.h map from a predictor directory.
-
-=item matrix_col
-
-A reference to a list corresponding to an in-memory copy of the col.h map from a predictor directory.
 
 =back
 
@@ -132,18 +144,6 @@ If a C<roles.to.use> file and/or a C<roles.in.subsystems> file exists in this di
 =item stats
 
 A L<Stats> object containing statistics about the data processed. If not specified, one will be created for this object.
-
-=item rh
-
-Open handle for the current C<row.h> file.
-
-=item xh
-
-Open handle for the current C<X> file.
-
-=item rCount
-
-Number of rows currently in the C<X> and X<row.h> files.
 
 =back
 

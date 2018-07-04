@@ -1,4 +1,4 @@
-<h1>Metagenomics Binning Report for job [% job_id %]</h1>
+<h1>Metagenomics Binning Report for [% job_id %]</h1>
 
 <p><a href="https://docs.patricbrc.org//tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
 
@@ -10,6 +10,7 @@ Reads files [% params.paired_end_libs.1 %] and [% params.paired_end_libs.2 %]
 [% END %]
 </p>
 <h2>Generated bins</h2>
+[% IF params.genome_group %]
 <p>The bins from this run have been placed into the genome group <em>
 [% IF genome_group_path %]
 <a target="_blank" href="https://www.patricbrc.org/view/GenomeGroup[% genome_group_path %]#view_tab=genomes">[% params.genome_group %]</a>
@@ -17,9 +18,11 @@ Reads files [% params.paired_end_libs.1 %] and [% params.paired_end_libs.2 %]
 [% params.genome_group %]
 [% END %]
 </em>.</p>
+[% END %]
 
-<p>The following bins met the quality criteria of CheckM completeness >= [% min_checkm %]%,
-fine consistency >= [% min_scikit %]%, and CheckM contamination <= [% max_contam %]%:</p>
+<p>The following bins met the quality criteria of completeness >= [% min_checkm %]%,
+fine consistency >= [% min_scikit %]%, contamination <= [% max_contam %]%, and have
+a single PheS protein of reasonable size:</p>
 
 <table class='p3basic'>
 [% PROCESS qual_headers %]
@@ -44,13 +47,14 @@ The following bins did not meet the quality criteria:</p>
 <th>Reference Genome</th>
 <th>Coarse consistency (%)</th>
 <th>Fine consistency (%)</th>
-<th>CheckM completeness (%)</th>
-<th>CheckM contamination (%)</th>
+<th>Completeness (%)</th>
+<th>Contamination (%)</th>
 <th>Contig count</th>
 <th>DNA size (bp)</th>
 <th>Contigs N50 (bp)</th>
 <th>Mean Coverage</th>
 <th>Potentially Problematic Roles</th>
+<th>Good PheS</th>
 </tr>
 [% END %]
 
@@ -65,12 +69,13 @@ The following bins did not meet the quality criteria:</p>
 </td>
 <td>[% g.scikit_coarse %]</td>
 <td [% g.scikit_color %]>[% g.scikit_fine %]</td>
-<td [% g.completeness_color %]>[% g.checkm_completeness %]</td>
-<td [% g.contamination_color %]>[% g.checkm_contamination %]</td>
+<td [% g.completeness_color %]>[% g.checkg_completeness %]</td>
+<td [% g.contamination_color %]>[% g.checkg_contamination %]</td>
 <td>[% g.contigs %]</td>
 <td>[% g.dna_bp %]</td>
 <td>[% g.n50 %]</td>
 <td>[% g.coverage %]</td>
 <td><a href="[% g.report_url %]">[% g.ppr %] roles</a></td>
+<td [% g.seed_color %]>[% g.good_seed %]</td>
 </tr>
 [% END %]

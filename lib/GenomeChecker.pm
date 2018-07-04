@@ -25,6 +25,7 @@ package GenomeChecker;
     use Stats;
     use FIG_Config;
     use SeedUtils;
+    use Math::Round;
 
 =head1 Data Structures to Check Genomes for Completeness
 
@@ -380,6 +381,75 @@ sub Check {
     # Return the results.
     my $retVal = { complete => $complete, contam => $contam, multi => $multi, roleData => \%roleData, taxon => $taxGroup };
     return $retVal;
+}
+
+=head3 Check2
+
+    my ($complete, $contam, $taxon, $seedFlag) = $checker->Check2($geo, $oh);
+
+This performs the same job as L</Check> (evaluating a genome for completeness and contamination),
+but it returns a list of the key metrics in printable form. If an output file handle is
+provided, it will also write the results to the output file.
+
+=over 4
+
+=item geo
+
+The L<GenomeEvalObject> to be checked.
+
+=item oh (optional)
+
+If specified, an open file handle to which the output should be written. This consists of the labeled metrics
+followed by the (role, predicted, actual) tuples in tab-delimited format.
+
+=item RETURN
+
+Returns a list containing the percent completeness, percent contamination, the name of the taxonomic grouping
+used, and a flag that is 'Y' if the seed protein is good and 'N' otherwise. The two percentages will be rounded
+to the nearest tenth of a percent.
+
+=back
+
+=cut
+
+sub Check2 {
+    my ($self, $geo, $oh) = @_;
+    # Get the stats object.
+    my $stats = $self->{stats};
+    # Do the evaluation and format the output values.
+    my $evalH = $self->Check($geo);
+    my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
+    my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
+    my $taxon = $evalH->{taxon} // 'N/F';
+    my $seedFlag = ($geo->good_seed ? 'Y' : '');
+    my $roleH = $evalH->{roleData};
+    # Update the statistics.
+    if (! $roleH) {
+        $stats->Add(evalGFailed => 1);
+    } else {
+        $stats->Add(genomeComplete => 1) if GEO::completeX($evalH->{complete});
+        $stats->Add(genomeClean => 1) if GEO::contamX($evalH->{contam});
+    }
+    if ($seedFlag) {
+        $stats->Add(genomeGoodSeed => 1);
+    } else {
+        $stats->Add(genomeBadSeed => 1);
+    }
+    if ($oh) {
+        # Output the check results.
+        print $oh "Good Seed: $seedFlag\n";
+        print $oh "Completeness: $complete\n";
+        print $oh "Contamination: $contam\n";
+        print $oh "Group: $taxon\n";
+        # Now output the role counts.
+        if ($roleH) {
+            for my $role (sort keys %$roleH) {
+                my $count = $roleH->{$role};
+                print $oh "$role\t1\t$count\n";
+            }
+        }
+    }
+    return ($complete, $contam, $taxon, $seedFlag);
 }
 
 

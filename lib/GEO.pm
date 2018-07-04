@@ -84,7 +84,7 @@ The following optional fields may also be present.
 
 =item refGeo
 
-A L<GEO> for an associated reference genome believed to be close, but of better quality.
+Reference to a list of L<GEO> objects for associated reference genomes believed to be close, but of better quality.
 
 =item fidLocs
 
@@ -392,7 +392,7 @@ found will be ignored.
 
 =cut
 
-sub CreateFromGtoFile {
+sub CreateFromGtoFiles {
     my ($class, $files, %options) = @_;
     # This will be the return hash.
     my %retVal;
@@ -634,6 +634,20 @@ sub good_seed {
     return $self->{good_seed};
 }
 
+=head3 is_good
+
+    my $goodFlag = $geo->is_good;
+
+Return TRUE if this is a good genome, FALSE if it is not good or has not been evaluated.
+
+=cut
+
+sub is_good {
+    my ($self) = @_;
+    my $retVal = ($self->good_seed && $self->is_consistent && $self->is_complete && $self->is_clean);
+    return $retVal;
+}
+
 =head3 taxon
 
     my $taxon = $geo->taxon;
@@ -705,6 +719,34 @@ sub contigCount {
     my $contigs = $self->{contigs};
     if ($contigs) {
         $retVal = scalar keys %$contigs;
+    }
+    return $retVal;
+}
+
+=head3 bestRef
+
+    my $refGeo = $geo->bestRef
+
+Return the best reference genome in the reference genome list (defined as having the closest ID number), or C<undef> if there are no reference genomes.
+
+=cut
+
+sub bestRef {
+    my ($self) = @_;
+    my $retVal;
+    my $base = $self->{id};
+    my $refsL = $self->{refGeo} // [];
+    my @refs = @$refsL;
+    if (scalar @refs) {
+        $retVal = pop @refs;
+        my $min = abs($base - $retVal->{id});
+        for my $ref (@refs) {
+            my $dist = abs($base - $ref->{id});
+            if ($dist < $min) {
+                $min = $dist;
+                $retVal = $ref;
+            }
+        }
     }
     return $retVal;
 }
@@ -899,9 +941,9 @@ sub scores {
 
 =head2 Public Manipulation Methods
 
-=head3 setRefGenome
+=head3 AddRefGenome
 
-    $geo->SetRefGenome($geo2);
+    $geo->AddRefGenome($geo2);
 
 Store the GEO of a reference genome.
 
@@ -915,9 +957,9 @@ The GEO of a close genome of higher quality.
 
 =cut
 
-sub SetRefGenome {
+sub AddRefGenome {
     my ($self, $geo2) = @_;
-    $self->{refGeo} = $geo2;
+    push @{$self->{refGeo}}, $geo2;
 }
 
 
@@ -934,10 +976,6 @@ This method fills in the C<quality> member described above.
 
 The name of the genome summary file produced by L<p3-eval-genomes.pl> for this genome. This contains the role
 information and the quality metrics.
-
-=item refGeo (optional)
-
-If specified, the evaluation object for the closest reference genome. This is used when a role is missing.
 
 =back
 
@@ -962,8 +1000,9 @@ sub AddQuality {
     # This will be the quality member.
     my %quality;
     $self->{quality} = \%quality;
-    # Get the reference genome (if any).
-    my $refGeo = $self->{refGeo};
+    # Get the reference genomes (if any).
+    my $refGeoL = $self->{refGeo} // [];
+    my $refGeoCount = scalar @$refGeoL;
     # This will be the role prediction hash.
     my %roles;
     $quality{roles} = \%roles;
@@ -1091,15 +1130,23 @@ sub AddQuality {
                 # Finally, we must record this feature as a bad feature for the contig.
                 push @{$contigs{$contigID}}, $fid;
             }
-        } elsif ($refGeo) {
+        } elsif ($refGeoCount) {
             # The role is missing, but we have a reference genome. Get its instances
             # of the same role.
-            my $fids = $refGeo->{roleFids}{$role};
-            if (! $fids) {
-                push @roleComments, "Role is not present in the reference genome.";
+            my @fids;
+            for my $refGeo (@$refGeoL) {
+                my $fids = $refGeo->{roleFids}{$role};
+                if ($fids && scalar @$fids) {
+                    push @fids, @$fids;
+                }
+            }
+            my $genomeWord = ($refGeoCount == 1 ? 'genome' : 'genomes');
+            my $fidCount = scalar @fids;
+            if (! $fidCount) {
+                push @roleComments, "Role is not present in the reference $genomeWord.";
             } else {
-                my $verb = (scalar @$fids == 1 ? 'performs' : 'perform');
-                push @roleComments, _fid_link(@$fids) . " $verb this role in the reference genome.";
+                my $verb = ($fidCount == 1 ? 'performs' : 'perform');
+                push @roleComments, _fid_link(@fids) . " $verb this role in the reference $genomeWord.";
             }
         }
         # Form all the comments for this role.

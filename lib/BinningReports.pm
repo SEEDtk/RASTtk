@@ -131,7 +131,7 @@ use constant URL_BASE => 'https://www.patricbrc.org/view/Genome';
 
 =head3 Summary
 
-    my $summary = BinningReports::Summary($jobID, $params, $bins_json, $summary_tt, $genome_group_path, \@gtos, \%report_url_map);
+    my $summary = BinningReports::Summary($jobID, $params, $bins_json, $summary_tt, $genome_group_path, \@geos, \%report_url_map);
 
 Produce the summary report.
 
@@ -147,7 +147,8 @@ The L</params> structure used to invoke the binning.
 
 =item bins_json
 
-The L</bins_json> structure produced by the binning.
+The L</bins_json> structure produced by the binning. If undefined, then it will be assumed this is not a binning job. If a hash reference
+is specified, it is presumed to be the output of L</parse_bins_json>.
 
 =item summary_tt
 
@@ -157,7 +158,7 @@ The template to be used for the summary report. This template expects the follow
 
 =item job_id
 
-The PATRIC job identifier.
+The PATRIC job identifier, or C<undef> if no PATRIC job was involved.
 
 =item min_checkm
 
@@ -225,17 +226,17 @@ The fine consistency score.
 
 A style tag for the background color of the fine consistency score, or a null string.
 
-=item checkm_completeness
+=item checkg_completeness
 
-The CheckM completeness score.
+The EvalG completeness score.
 
 =item completeness_color
 
 A style tag for the background color of the checkm completeness score, or a null string.
 
-=item checkm_contamination
+=item checkg_contamination
 
-The CheckM contamination score.
+The EvalG contamination score.
 
 =item contamination_color
 
@@ -268,6 +269,14 @@ The mean coverage for the bin.
 =item report_url
 
 URL for the bin's report page.
+
+=item good_seed
+
+C<Y> if the bin has a good PheS protein, else a hard space.
+
+=item seed_color
+
+A style tag for the good-seed cell, or a null string.
 
 =back
 
@@ -342,6 +351,7 @@ sub Summary {
             $gThing{scikit_color} = "";
             $gThing{completeness_color} = "";
             $gThing{contamination_color} = "";
+            $gThing{seed_color} = "";
             if (! $bin->is_complete) {
                 $gThing{completeness_color} = WARN_COLOR;
                 $good = 0;
@@ -354,8 +364,11 @@ sub Summary {
                 $gThing{contamination_color} = WARN_COLOR;
                 $good = 0;
             }
+            $gThing{good_seed} = 'Y';
             if (! $bin->good_seed) {
                 $good = 0;
+                $gThing{good_seed} = '&nbsp;';
+                $gThing{seed_color} = WARN_COLOR;
             }
             # Now we know.
             if ($good) {
@@ -397,7 +410,7 @@ The L</params> structure used to invoke the binning. This is for future use only
 =item bins_json (optional)
 
 The L</bins_json> structure produced by the binning. If this is omitted, then coverage and reference-genome data will
-be left off the output page.
+be left off the output page. In addition, the output of L</parse_bins_json> can be passed in, instead.
 
 =item details_tt
 
@@ -629,6 +642,7 @@ Parse the L</bins_json> object and return a map of bin names to coverage and ref
 =item bins_json
 
 The L</bins_json> object produced by the binning report. If this value is undefined, an empty hash will be returned.
+If it is a hash reference, the hash reference will be returned unchanged.
 
 =item RETURN
 
@@ -653,25 +667,29 @@ The mean coverage of the bin.
 
 sub parse_bins_json {
     my ($bins_json) = @_;
-    my %retVal;
+    my $retVal = {};
     if ($bins_json) {
-        for my $binThing (@$bins_json) {
-            my $name = $binThing->{name};
-            my $refs = $binThing->{refGenomes};
-            my @refList = map { { genome => $_, url => join('/', URL_BASE , uri_escape($_)) } } @$refs;
-            my ($cov, $count) = (0, 0);
-            for my $covItem (@{$binThing->{coverage}}) {
-                $cov += $covItem;
-                $count++;
+        if (ref $bins_json eq 'HASH') {
+            $retVal = $bins_json;
+        } else {
+            for my $binThing (@$bins_json) {
+                my $name = $binThing->{name};
+                my $refs = $binThing->{refGenomes};
+                my @refList = map { { genome => $_, url => join('/', URL_BASE , uri_escape($_)) } } @$refs;
+                my ($cov, $count) = (0, 0);
+                for my $covItem (@{$binThing->{coverage}}) {
+                    $cov += $covItem;
+                    $count++;
+                }
+                if ($count > 1) {
+                    $cov /= $count;
+                }
+                $cov = int($cov * 100) / 100;
+                $retVal->{$name} = { refs => \@refList, coverage => $cov };
             }
-            if ($count > 1) {
-                $cov /= $count;
-            }
-            $cov = int($cov * 100) / 100;
-            $retVal{$name} = { refs => \@refList, coverage => $cov };
         }
     }
-    return \%retVal;
+    return $retVal;
 }
 
 =head3 copy_gto
@@ -747,6 +765,74 @@ sub copy_geo {
     $retVal{contigs} = $geo->contigCount;
     ($retVal{over_roles}, $retVal{under_roles}, $retVal{pred_roles}) = $geo->roleStats;
     return %retVal;
+}
+
+=head3 template_options
+
+This is a list of the command-line option specifiers used for the binning reports. The options are as follows.
+
+=over 4
+
+=item templates
+
+Name of the directory containing the web page templates and style file. The default is C<RASTtk/lib/BinningReports> in the
+SEEDtk code directory.
+
+=back
+
+=cut
+
+sub template_options {
+    return
+        (['templates=s', 'name of the directory containing the binning templates',
+                { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }]);
+}
+
+=head3 build_strings
+
+    my ($prefix, $suffix, $detailTT) = BinningReports::build_strings($dir);
+
+Return the HTML prefix, suffix, and detail template for building binning report web pages.
+
+=over
+
+=item dir
+
+A L<Getopt::Long::Descriptive::Opts> object containing the C<templates> parameter for location the templates directory, or the
+name of the templates directory itself.
+
+=item RETURN
+
+Returns a list consisting of the HTML web page prefix, the HTML web page suffix, and finally the detail template to be passed to the L</Detail> method.
+
+=back
+
+=cut
+
+sub build_strings {
+    my ($opt) = @_;
+    my $templateDir = (ref $opt ? $opt->templates : $opt);
+    my $detailTT = "$templateDir/details.tt";
+    my ($prefix, $suffix);
+    # Prepare the text strings for the web pages.
+    if (! -s $detailTT) {
+        die "Could not find web template in $templateDir.";
+    } else {
+        # Read the template file.
+        open(my $th, "<$detailTT") || die "Could not open template file: $!";
+        $detailTT = join("", <$th>);
+        # Copy the style file.
+        $prefix = "<html><head>\n<style type=\"text/css\">\n";
+        close $th; undef $th;
+        open($th, "<$templateDir/packages.css") || die "Could not open style file: $!";
+        while (! eof $th) {
+            $prefix .= <$th>;
+        }
+        close $th; undef $th;
+        $prefix .= "</style></head><body>\n";
+        $suffix = "\n</body></html>\n";
+    }
+    return($prefix, $suffix, $detailTT);
 }
 
 

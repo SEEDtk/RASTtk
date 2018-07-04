@@ -24,6 +24,8 @@ PATRIC genome IDs in the key column (as specified by L<P3Utils/col_options>).
 
 The options in L<EvalCon/role_options> may be used to specify the predictors for doing the consistency checks.
 
+The options in L<BinningReports/template_options> may be used to specify the templates and web helper files.
+
 The following additional command-line options are supported.
 
 =over 4
@@ -46,11 +48,6 @@ yet implemented.)
 
 If specified, the index (1-based) or name of an input column containing the names for pre-fetched L<GenomeTypeObject> files for the
 specified genomes. This option allows greatly improved performance.
-
-=item templates
-
-Name of the directory containing the web page templates and style file. The default is C<RASTtk/lib/BinningReports> in the
-SEEDtk code directory.
 
 =item terse
 
@@ -87,14 +84,13 @@ $| = 1;
 my $exitCode = 0;
 my $start = time;
 # Get the command-line options.
-my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(), EvalCon::role_options(),
+my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(),
+        EvalCon::role_options(), BinningReports::template_options(),
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
         ['clear', 'clear output directory before starting'],
         ['web', 'create web pages as well as output files for evaluations'],
         ['terse', 'suppress individual genome role reports (incompatible with web)'],
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
-        ['templates=s', 'name of the directory containing the binning templates',
-                { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports" }],
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
         ['resume=s', 'resume after error with specified genome'],
         );
@@ -153,29 +149,9 @@ if (defined $refCol) {
 }
 # Get the web options.
 my $web = $opt->web;
-my $templateDir = $opt->templates;
-my $detailTT = "$templateDir/details.tt";
-my ($prefix, $suffix);
+my ($prefix, $suffix, $detailTT);
 if ($web) {
-    # Prepare the output directory for the web pages.
-    if (! -s $detailTT) {
-        die "Could not find web template in $templateDir.";
-    } else {
-        # Read the template file.
-        print STDERR "Reading web template file from $detailTT.\n";
-        open(my $th, "<$detailTT") || die "Could not open template file: $!";
-        $detailTT = join("", <$th>);
-        # Copy the style file.
-        $prefix = "<html><head>\n<style type=\"text/css\">\n";
-        close $th; undef $th;
-        open($th, "<$templateDir/packages.css") || die "Could not open style file: $!";
-        while (! eof $th) {
-            $prefix .= <$th>;
-        }
-        close $th; undef $th;
-        $prefix .= "</style></head><body>\n";
-        $suffix = "\n</body></html>\n";
-    }
+    ($prefix, $suffix, $detailTT) = BinningReports::build_strings($opt);
 }
 # Create the consistency helper.
 my $evalCon = EvalCon->new_from_script($opt);
@@ -247,7 +223,7 @@ eval {
         $start = time;
         my $gHash;
         if (@gtoFiles) {
-            $gHash = GEO->CreateFromGtoFile(\@gtoFiles, %geoOptions);
+            $gHash = GEO->CreateFromGtoFiles(\@gtoFiles, %geoOptions);
             for my $genome (keys %$gHash) {
                 $geoMap{$genome} = $gHash->{$genome};
                 print STDERR "Target genome $genome queued for evaluation.\n";
@@ -273,7 +249,7 @@ eval {
                     my $target = $refGenomes{$genome};
                     my $geo = $geoMap{$target};
                     if ($geo) {
-                        $geo->SetRefGenome($refGeo);
+                        $geo->AddRefGenome($refGeo);
                         print STDERR "$genome stored as reference for $target.\n";
                     }
                 }
@@ -290,38 +266,8 @@ eval {
             if (! $terse) {
                 open($oh, ">$outFile") || die "Could not open $outFile: $!";
             }
-            # Find out if we have a good seed.
-            my $seedFlag = $geo->good_seed;
-            if ($seedFlag) {
-                $stats->Add(genomeGoodSeed => 1);
-            } else {
-                $stats->Add(genomeBadSeed => 1);
-            }
-            # Compute the consistency and completeness.
-            my $evalH = $evalG->Check($geo);
-            my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
-            my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
-            my $taxon = $evalH->{taxon} // 'N/F';
-            if (! $terse) {
-                # Output the check results.
-                print $oh "Good Seed: $seedFlag\n";
-                print $oh "Completeness: $complete\n";
-                print $oh "Contamination: $contam\n";
-                print $oh "Group: $taxon\n";
-                # Now output the role counts.
-                my $roleH = $evalH->{roleData};
-                if ($roleH) {
-                    for my $role (sort keys %$roleH) {
-                        my $count = $roleH->{$role};
-                        print $oh "$role\t1\t$count\n";
-                    }
-                } else {
-                    $stats->Add(evalGFailed => 1);
-                }
-                close $oh;
-            }
-            $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
-            $stats->Add(genomeClean => 1) if GEO::contamX($contam);
+            # Compute the consistency and completeness. This also writes the output file.
+            my ($complete, $contam, $taxon, $seedFlag) = $evalG->Check2($geo, $oh);
             # Store the evaluation results.
             $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
             # Add this genome to the evalCon matrix.
@@ -361,7 +307,7 @@ eval {
                     if ($web) {
                         my $geo = $geoMap{$genome};
                         # Store the quality metrics in the GTO.
-                        $geo->AddQuality("$outDir/$genome.out", $refGenomes{$genome});
+                        $geo->AddQuality("$outDir/$genome.out");
                         # Create the detail page.
                         my $html = BinningReports::Detail(undef, undef, \$detailTT, $geo, $nMap);
                         open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
