@@ -373,7 +373,7 @@ eval {
                 $count0++;
                 $lastGenome = $genome;
             }
-            print STDERR "$count0 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . "seconds/genome.\n";
+            print STDERR "$count0 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . " seconds/genome.\n";
         }
     }
 };
