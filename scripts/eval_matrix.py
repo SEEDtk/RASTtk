@@ -100,8 +100,8 @@ if __name__ == '__main__':
     score_table = np.hstack((score_table, coarse_const.round(2).reshape(-1,1)))
     score_table = np.hstack((score_table, fine_const.round(2).reshape(-1,1)))
 
-    if not os.path.isdir(args.outDir):
-            os.mkdir(args.outDir)
+    if args.outDir != '0' and not os.path.isdir(args.outDir):
+        os.mkdir(args.outDir)
 
     all_summary = []
     for n_row in range(X_all.shape[0]):
