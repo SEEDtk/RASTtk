@@ -60,6 +60,7 @@ use File::Copy::Recursive;
 use GEO;
 use Data::Dumper;
 
+$| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), EvalCon::role_options(),
         ['recursive', 'process all samples in subdirectories'],
