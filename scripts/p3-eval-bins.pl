@@ -111,6 +111,11 @@ for my $sample (@samples) {
     } else {
         # Here we have a sample that needs evaluation. We need to create GEOs for all the reference genomes and the bin genomes.
         print "Loading genomes for $sample.\n";
+        # Compute the actual sample name.
+        my $sName = $sample;
+        if ($sName =~ /([^\/\\]+)$/) {
+            $sName = $1;
+        }
         # Now we find all the GTOs of interest.
         opendir(my $dh, $sample) || die "Could not open directory $sample: $!";
         my @files = map { "$sample/$_" } grep { $_ =~ /^bin\d+.gto|\d+\.\d+\.json$/ } readdir $dh;
@@ -188,7 +193,7 @@ for my $sample (@samples) {
             # Loop through the genomes again, storing the quality metrics in the GEOs and creating the summary output file.
             open(my $oh, ">$outDir/index.tbl") || die "Could not create summary output file: $!";
             P3Utils::print_cols(['Sample', 'Bin ID', 'Bin Name', 'Ref ID', 'Ref Name', 'Contigs', 'Base Pairs', 'N50', 'Coarse Consistency', 'Fine Consistency',
-                    'Completeness', 'Contamination', 'Taxonomic Grouping', 'Good PheS', 'Good'], $oh);
+                    'Completeness', 'Contamination', 'Taxonomic Grouping', 'Good PheS', 'Good'], oh => $oh);
             for my $geo (@evalGeos) {
                 my $genome = $geo->id;
                 print "Processing output for $genome.\n";
@@ -208,14 +213,14 @@ for my $sample (@samples) {
                 }
                 my $seedFlag = ($geo->good_seed ? 1 : 0);
                 my $goodFlag = ($geo->is_good ? 1 : 0);
-                P3Utils::print_cols([$genome, $geo->name, $refID, $refName, $geo->contigCount, $metrics->{totlen}, $metrics->{N50}, $coarse,
-                        $fine, $complete, $contam, $group, $seedFlag, $goodFlag], $oh);
+                P3Utils::print_cols([$sName, $genome, $geo->name, $refID, $refName, $geo->contigCount, $metrics->{totlen}, $metrics->{N50}, $coarse,
+                        $fine, $complete, $contam, $group, $seedFlag, $goodFlag], oh => $oh);
             }
             close $oh; undef $oh;
             # Now we need to create the summary page. First we need to create URLs for the bins.
             my %urlMap = map { $_->id => ($_->id . ".html") } @evalGeos;
             open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
-            my $html = BinningReports::Summary($sample, { contigs => "$sample.contigs.fasta" }, $binHash, $summaryTFile, '', \@evalGeos, \%urlMap);
+            my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@evalGeos, \%urlMap);
             print $oh $prefix . $html . $suffix;
             close $oh;
         }
