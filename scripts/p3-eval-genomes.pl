@@ -212,6 +212,8 @@ if ($opt->resume) {
 # If an error occurs, we still display stats.
 my $lastGenome = "";
 eval {
+    my $start0 = time;
+    my $count0 = 0;
     # Loop through the input.
     while (! eof $ih) {
         # Get this batch of input.
@@ -368,8 +370,10 @@ eval {
                     }
                 }
                 # Denote this is our last successfully-processed genome.
+                $count0++;
                 $lastGenome = $genome;
             }
+            print STDERR "$count0 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . "seconds/genome.\n";
         }
     }
 };
