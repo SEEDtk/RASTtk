@@ -723,6 +723,20 @@ sub contigCount {
     return $retVal;
 }
 
+=head3 refList
+
+    my $refGeoList = $geo->refList;
+
+Return a reference to a list of the reference genome L<GEO> objects. If there are none, an empty list will be returned.
+
+=cut
+
+sub refList {
+    my ($self) = @_;
+    my $retVal = $self->{refGeo} // [];
+    return $retVal;
+}
+
 =head3 bestRef
 
     my $refGeo = $geo->bestRef

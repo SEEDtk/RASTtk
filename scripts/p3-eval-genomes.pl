@@ -63,6 +63,7 @@ genome will be used on the web page produced.
 
 Specifies a genome ID. All rows of the input will be skipped until the genome ID is found, and then processing will continue
 with the next row after that. The standard output will not contain a header. Use this option to resume after a failure.
+If this option is specified, C<web> is prohibited.
 
 =back
 
@@ -152,6 +153,9 @@ my $web = $opt->web;
 my ($prefix, $suffix, $detailTT);
 if ($web) {
     ($prefix, $suffix, $detailTT) = BinningReports::build_strings($opt);
+    if ($opt->resume) {
+        die "Cannot resume if web page output is desired.";
+    }
 }
 # Create the consistency helper.
 my $evalCon = EvalCon->new_from_script($opt);
@@ -190,6 +194,8 @@ my $lastGenome = "";
 eval {
     my $start0 = time;
     my $count0 = 0;
+    # The GEOs for the summary web page will be kept in here.
+    my @summary;
     # Loop through the input.
     while (! eof $ih) {
         # Get this batch of input.
@@ -313,6 +319,8 @@ eval {
                         open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
                         print $wh $prefix . $html . $suffix;
                         close $wh;
+                        # Save this GEO for the summary page.
+                        push @summary, $geo;
                     }
                 }
                 # Denote this is our last successfully-processed genome.
@@ -321,6 +329,15 @@ eval {
             }
             print STDERR "$count0 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . " seconds/genome.\n";
         }
+    }
+    # Here we have processed all the genomes. If we are doing a summary page, we do it now.
+    if ($web) {
+        my $summaryTFile = $opt->templates . '/summary.tt';
+        my %urlMap = map { $_->id => ($_->id . ".html") } @summary;
+        open(my $oh, ">$outDir/index.html") || die "Could not open summary web page: $!";
+        my $html = BinningReports::Summary('', {}, undef, $summaryTFile, '', \@summary, \%urlMap);
+        print $oh $prefix . $html . $suffix;
+        close $oh;
     }
 };
 if ($@) {

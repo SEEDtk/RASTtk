@@ -1,3 +1,4 @@
+[% IF job_id %]
 <h1>Metagenomics Binning Report for [% job_id %]</h1>
 
 <p><a href="https://docs.patricbrc.org//tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
@@ -24,14 +25,27 @@ Reads files [% params.paired_end_libs.1 %] and [% params.paired_end_libs.2 %]
 fine consistency >= [% min_scikit %]%, contamination <= [% max_contam %]%, and have
 a single PheS protein of reasonable size:</p>
 
+[% ELSE %]
+<h1>Genome Quality Report</h1>
+
+<p><a href="https://docs.patricbrc.org//tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
+
+<h2>Good Genomes</h2>
+
+[% END %]
 <table class='p3basic'>
 [% PROCESS qual_headers %]
 [% FOR g IN good %]
 [% PROCESS qual_row %]
 [% END %]
 </table>
+
+[% IF job_id %]
 <P>
 The following bins did not meet the quality criteria:</p>
+[% ELSE %]
+<h2>Other Genomes</h2>
+[% END %]
 
 <table class='p3basic'>
 [% PROCESS qual_headers %]
@@ -52,7 +66,9 @@ The following bins did not meet the quality criteria:</p>
 <th>Contig count</th>
 <th>DNA size (bp)</th>
 <th>Contigs N50 (bp)</th>
+[% IF job_id %]
 <th>Mean Coverage</th>
+[% END %]
 <th>Potentially Problematic Roles</th>
 <th>Good PheS</th>
 </tr>
@@ -74,7 +90,9 @@ The following bins did not meet the quality criteria:</p>
 <td>[% g.contigs %]</td>
 <td>[% g.dna_bp %]</td>
 <td>[% g.n50 %]</td>
+[% IF job_id %]
 <td>[% g.coverage %]</td>
+[% END %]
 <td><a href="[% g.report_url %]">[% g.ppr %] roles</a></td>
 <td [% g.seed_color %]>[% g.good_seed %]</td>
 </tr>

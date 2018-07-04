@@ -139,7 +139,8 @@ Produce the summary report.
 
 =item jobID
 
-The PATRIC job identifier for the binning run.
+The PATRIC job identifier for the binning run. If this is C<undef>, then the report is assumed to be a genome report, not a binning report.
+The language is changed somewhat and there is no coverage column.
 
 =item params
 
@@ -329,58 +330,61 @@ sub Summary {
         my $genomeURL = join('/', URL_BASE, uri_escape($genomeID));
         my $pprRoleData = $bin->roleReport;
         my $refData = $refGmap->{$genomeName};
-        # Only proceed if we connected the pieces. We need a fall-back in case of errors.
-        if ($refData) {
-            # Connect the coverage and reference genome data.
-            $gThing{refs} = $refData->{refs};
-            $gThing{coverage} = $refData->{coverage};
-            $gThing{genome_url} = $genomeURL;
-            # Compute the ppr count.
-            my $pprs = 0;
-            for my $role (keys %$pprRoleData) {
-                my $pa = $pprRoleData->{$role} // [0,0];
-                my ($predicted, $actual) = @$pa;
-                if ($predicted != $actual) {
-                    $pprs++;
-                }
-            }
-            # Store the PPR count in the main descriptor.
-            $gThing{ppr} = $pprs;
-            # Is this bin good or bad?
-            my $good = 1;
-            $gThing{scikit_color} = "";
-            $gThing{completeness_color} = "";
-            $gThing{contamination_color} = "";
-            $gThing{seed_color} = "";
-            if (! $bin->is_complete) {
-                $gThing{completeness_color} = WARN_COLOR;
-                $good = 0;
-            }
-            if (! $bin->is_consistent) {
-                $gThing{scikit_color} = WARN_COLOR;
-                $good = 0;
-            }
-            if (! $bin->is_clean) {
-                $gThing{contamination_color} = WARN_COLOR;
-                $good = 0;
-            }
-            $gThing{good_seed} = 'Y';
-            if (! $bin->good_seed) {
-                $good = 0;
-                $gThing{good_seed} = '&nbsp;';
-                $gThing{seed_color} = WARN_COLOR;
-            }
-            # Now we know.
-            if ($good) {
-                push @good, \%gThing;
-                $found{good}++;
-            } else {
-                push @bad, \%gThing;
-                $found{bad}++;
-            }
-            # Update the total-bin count.
-            $found{total}++;
+        if (! $refData) {
+            # No reference data. We have to build it from the GEO.
+            my $refList = $bin->refList;
+            my @refDataRefList = map { { genome => $_->id, url => join('/', URL_BASE , uri_escape($_->id)) } } @$refList;
+            $refData = { refs => \@refDataRefList, coverage => 0 };
         }
+        # Connect the coverage and reference genome data.
+        $gThing{refs} = $refData->{refs};
+        $gThing{coverage} = $refData->{coverage};
+        $gThing{genome_url} = $genomeURL;
+        # Compute the ppr count.
+        my $pprs = 0;
+        for my $role (keys %$pprRoleData) {
+            my $pa = $pprRoleData->{$role} // [0,0];
+            my ($predicted, $actual) = @$pa;
+            if ($predicted != $actual) {
+                $pprs++;
+            }
+        }
+        # Store the PPR count in the main descriptor.
+        $gThing{ppr} = $pprs;
+        # Is this bin good or bad?
+        my $good = 1;
+        $gThing{scikit_color} = "";
+        $gThing{completeness_color} = "";
+        $gThing{contamination_color} = "";
+        $gThing{seed_color} = "";
+        if (! $bin->is_complete) {
+            $gThing{completeness_color} = WARN_COLOR;
+            $good = 0;
+        }
+        if (! $bin->is_consistent) {
+            $gThing{scikit_color} = WARN_COLOR;
+            $good = 0;
+        }
+        if (! $bin->is_clean) {
+            $gThing{contamination_color} = WARN_COLOR;
+            $good = 0;
+        }
+        $gThing{good_seed} = 'Y';
+        if (! $bin->good_seed) {
+            $good = 0;
+            $gThing{good_seed} = '&nbsp;';
+            $gThing{seed_color} = WARN_COLOR;
+        }
+        # Now we know.
+        if ($good) {
+            push @good, \%gThing;
+            $found{good}++;
+        } else {
+            push @bad, \%gThing;
+            $found{bad}++;
+        }
+        # Update the total-bin count.
+        $found{total}++;
     }
     # We have now compiled the information we need for the report. Create the template engine.
     my $templateEngine = Template->new(ABSOLUTE => 1);
