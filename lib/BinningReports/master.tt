@@ -1,43 +1,28 @@
-<h1>Genome Package Directory Report</h1>
+<h1>Sample Directory Report</h1>
 
-<p>[% good_count %] <a href="#good_bins">good genomes</a>, [% bad_count %] <a href="#bad_bins">bad genomes</a>.</p>
+<p>[% good_count %] <a href="#good_bins">good genomes</a> and [% bad_count %] <a href="#bad_bins">bad genomes</a> from [% sample_count %] samples.</p>
 
-<h2><a name="good_bins">Good Genomes ([% good_count %])</a></h2>
 <table class='p3basic'>
 [% PROCESS qual_headers %]
-[% FOR g IN good %]
-[% PROCESS qual_row %]
-[% END %]
-</table>
-
-<h2><a name="bad_bins">Bad Genomes ([% bad_count %])</a></h2>
-<table class="p3basic">
-[% PROCESS qual_headers %]
-[% FOR g IN bad %]
+[% FOR s IN samples %]
 [% PROCESS qual_row %]
 [% END %]
 </table>
 
 [% BLOCK qual_headers %]
 <tr>
-<th>Genome ID</th>
-<th>Genome Name</th>
-<th>Coarse consistency (%)</th>
-<th>Fine consistency (%)</th>
-<th>EvalG completeness (%)</th>
-<th>EvalG contamination (%)</th>
-<th>Good Seed</th>
+<th>Sample ID</th>
+<th>Good Bins</th>
+<th>Bad Bins</th>
+<th>Total Bins</th>
 </tr>
 [% END %]
 
 [% BLOCK qual_row %]
 <tr>
-<td><a target="_blank" href="[% g.genome_url %]">[% g.genome_id %]</a></td>
-<td><a target="_blank" href="[% g.report_url %]">[% g.genome_name %]</a></td>
-<td>[% g.scikit_coarse %]</td>
-<td>[% g.scikit_fine %]</td>
-<td>[% g.checkg_completeness %]</td>
-<td>[% g.checkg_contamination %]</td>
-<td>[% g.good_seed %]</td>
+<td><a target="_blank" href="[% s.sample %]/index.html">[% s.sample %]</a></td>
+<td>[% s.good %]</td>
+<td>[% s.bad %]</td>
+<td>[% s.total %]</td>
 </tr>
 [% END %]
