@@ -590,6 +590,43 @@ sub contamX {
     return ($pct <= MAX_CONTAM);
 }
 
+=head3 qscoreX
+
+    my $score = GEO::qscoreX($coarse, $fine, $complete, $contam);
+
+Return the overall quality score from the basic quality metrics-- coarse consistency, fine consistency, completeness, and contamination.
+
+=over 4
+
+=item coarse
+
+The coarse consistency, in percent.
+
+=item fine
+
+The fine consistency, in percent.
+
+=item complete
+
+The percent completeness.
+
+=item contam
+
+The percent contamination.
+
+=item RETURN
+
+Returns a number from -500 to 209 indicating the relative quality of the genome.
+
+=back
+
+=cut
+
+sub qscoreX {
+    my ($coarse, $fine, $complete, $contam) = @_;
+    my $retVal = $fine * 1.09 + $complete - 5 * $contam;
+    return $retVal;
+}
 
 =head2 Query Methods
 
