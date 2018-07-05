@@ -26,6 +26,7 @@ my $opt = P3Utils::script_opts('', P3Utils::ih_options(),
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $cols) = P3Utils::find_headers($ih, evalOutput => 'Good Seed', 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination');
+push @$outHeaders, 'Good Genome';
 # The input rows will be kept in here. The hash is two-level, {goodness}{qscore};
 my %rows = (0 => {}, 1 => {});
 # Loop through the input.
@@ -36,7 +37,7 @@ while (! eof $ih) {
     my ($goodSeed, $coarse, $fine, $complete, $contam) = P3Utils::get_cols(\@fields, $cols);
     my $goodness =  (($goodSeed && GEO::consistX($fine) && GEO::completeX($complete) && GEO::contamX($contam)) ? 1 : 0);
     my $qScore = GEO::qscoreX($coarse, $fine, $complete, $contam);
-    push @{$rows{$goodness}{$qScore}}, $line;
+    push @{$rows{$goodness}{$qScore}}, join("\t", @fields, $goodness) . "\n";
 }
 # Write the output.
 P3Utils::print_cols($outHeaders);
