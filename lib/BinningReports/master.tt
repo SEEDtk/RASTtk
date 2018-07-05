@@ -1,6 +1,6 @@
 <h1>Sample Directory Report</h1>
 
-<p>[% good_count %] <a href="#good_bins">good genomes</a> and [% bad_count %] <a href="#bad_bins">bad genomes</a> from [% sample_count %] samples.</p>
+<p>[% good_count %] good genomes and [% bad_count %] bad genomes from [% sample_count %] samples.</p>
 
 <table class='p3basic'>
 [% PROCESS qual_headers %]
