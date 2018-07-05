@@ -331,7 +331,7 @@ eval {
         }
     }
     # Here we have processed all the genomes. If we are doing a summary page, we do it now.
-    if ($web) {
+    if ($web && scalar(@summary) > 1) {
         my $summaryTFile = $opt->templates . '/summary.tt';
         my %urlMap = map { $_->id => ($_->id . ".html") } @summary;
         open(my $oh, ">$outDir/index.html") || die "Could not open summary web page: $!";

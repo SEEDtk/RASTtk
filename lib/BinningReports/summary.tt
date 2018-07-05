@@ -20,20 +20,20 @@ Reads files [% params.paired_end_libs.1 %] and [% params.paired_end_libs.2 %]
 [% END %]
 </em>.</p>
 [% END %]
-<p>[% found.good %] good bins and [% found.bad %] bad bins were found out of [% found.total %].</p>
+<p>[% found.good %] <a href="#goodList">good bins</a> and [% found.bad %] <a href="#badList">bad bins</a> were found out of [% found.total %].</p>
 
-<p>The following bins met the quality criteria of completeness >= [% min_checkm %]%,
+<p><a name="goodList">The following bins met the quality criteria of completeness >= [% min_checkm %]%,
 fine consistency >= [% min_scikit %]%, contamination <= [% max_contam %]%, and have
-a single PheS protein of reasonable size:</p>
+a single PheS protein of reasonable size:</a></p>
 
 [% ELSE %]
 <h1>Genome Quality Report</h1>
 
 <p><a href="https://docs.patricbrc.org//tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
 
-<p>[% found.good %] good genomes and [% found.bad %] bad genomes were found out of [% found.total %].</p>
+<p>[% found.good %] <a href="#goodList">good genomes</a> and [% found.bad %] <a href="#badList">bad genomes</a> were found out of [% found.total %].</p>
 
-<h2>Good Genomes</h2>
+<h2><a name="goodList">Good Genomes</a></h2>
 
 [% END %]
 <table class='p3basic'>
@@ -42,7 +42,7 @@ a single PheS protein of reasonable size:</p>
 [% PROCESS qual_row %]
 [% END %]
 </table>
-
+<a name="badList"></a>
 [% IF job_id %]
 <P>
 The following bins did not meet the quality criteria:</p>
