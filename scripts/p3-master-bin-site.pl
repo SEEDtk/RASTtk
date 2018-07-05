@@ -55,7 +55,7 @@ if (! $binDir) {
 my ($prefix, $suffix) = BinningReports::build_strings($opt);
 # These structures will contain the data for the master index page.
 my @s;
-my %master = (samples => \@s, bad_count => 0, good_count => 0, sample_count => 0);
+my %master = (bad_count => 0, good_count => 0, sample_count => 0);
 # Get all the completed samples in the input directory.
 print "Searching $binDir.\n";
 opendir(my $dh, $binDir) || die "Could not open $binDir: $!";
@@ -94,6 +94,7 @@ for my $sample (@samples) {
 }
 # Create the master page from the template.
 print "Creating master index.\n";
+$master{samples} = [ sort { $b->{goodCount} <=> $a->{goodCount} && $b cmp $a } @s];
 my $templateEngine = Template->new(ABSOLUTE => 1);
 my $middle = '';
 $templateEngine->process($opt->templates . "/master.tt", \%master, \$middle) || die "Error in HTML template: " . $templateEngine->error();
