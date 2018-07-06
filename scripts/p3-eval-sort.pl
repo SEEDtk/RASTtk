@@ -54,6 +54,11 @@ while (! eof $ih) {
             $goodness = 0;
         }
     }
+    if ($goodness) {
+        $stats->Add(good => 1);
+    } else {
+        $stats->Add(bad => 1);
+    }
     my $qScore = GEO::qscoreX($coarse, $fine, $complete, $contam);
     push @{$rows{$goodness}{$qScore}}, join("\t", @fields, $goodness) . "\n";
 }
