@@ -418,17 +418,20 @@ sub Check2 {
     my $stats = $self->{stats};
     # Do the evaluation and format the output values.
     my $evalH = $self->Check($geo);
-    my $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
-    my $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
-    my $taxon = $evalH->{taxon} // 'N/F';
+    my ($complete, $contam, $taxon) = (0, 100, 'N/F');
+    if (defined $evalH->{complete}) {
+        $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
+        $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
+        $taxon = $evalH->{taxon};
+    }
     my $seedFlag = ($geo->good_seed ? 'Y' : '');
     my $roleH = $evalH->{roleData};
     # Update the statistics.
     if (! $roleH) {
         $stats->Add(evalGFailed => 1);
     } else {
-        $stats->Add(genomeComplete => 1) if GEO::completeX($evalH->{complete});
-        $stats->Add(genomeClean => 1) if GEO::contamX($evalH->{contam});
+        $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
+        $stats->Add(genomeClean => 1) if GEO::contamX($contam);
     }
     if ($seedFlag) {
         $stats->Add(genomeGoodSeed => 1);

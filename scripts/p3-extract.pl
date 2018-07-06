@@ -19,6 +19,10 @@ The following additional options are supported.
 
 Output all the columns. This simply copies the file.
 
+=item reverse
+
+Output all the columns not listed, rather than the listed columns.
+
 =item nohead
 
 If specified, the file is presumed to have no headers.
@@ -32,7 +36,8 @@ use P3Utils;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(), ['nohead', 'file has no headers'],
-        ['all', 'output all columns']
+        ['all', 'output all columns'],
+        ['reverse|v', 'output all columns not specified'],
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
@@ -51,6 +56,12 @@ if ($opt->all) {
     my ($inHeaders) = P3Utils::process_headers($ih, $opt, 'keyless');
     # Compute the column indices.
     my @idxes = map { P3Utils::find_column($_, $inHeaders) } @cols;
+    # In reverse mode, eliminate the columns listed rather than keeping only them.
+    if ($opt->reverse) {
+        my %wrong = map {$_ => 1} @idxes;
+        my $n = scalar(@$inHeaders) - 1;
+        @idxes = grep { ! $wrong{$_} } 0 .. $n;
+    }
     # Compute the output headers.
     if (! $opt->nohead) {
         my @outHeaders = map { $inHeaders->[$_] } @idxes;

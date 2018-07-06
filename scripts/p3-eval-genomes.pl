@@ -65,6 +65,12 @@ Specifies a genome ID. All rows of the input will be skipped until the genome ID
 with the next row after that. The standard output will not contain a header. Use this option to resume after a failure.
 If this option is specified, C<web> is prohibited.
 
+=item refTable
+
+Specifies a file containing the reference genome mapping. This is a tab-delimited file with two columns (0) a taxonomic grouping
+ID and (1) the corresponding reference genome. The groupings are usually genus or species. If no reference genome is specified
+and one can be computed from this file, it will be used. The default is C<ref.genomes.tbl> in the C<--checkDir> directory.
+
 =back
 
 =cut
@@ -94,6 +100,7 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
         ['resume=s', 'resume after error with specified genome'],
+        ['refTable=s', 'reference genome file']
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -132,6 +139,7 @@ if ($terse) {
     }
 }
 # Get access to PATRIC.
+print "Connecting to PATRIC.\n";
 my $p3 = P3DataAPI->new();
 # Open the input file.
 my $ih = P3Utils::ih($opt);
@@ -148,13 +156,31 @@ if (defined $refCol) {
     print STDERR "Reference genome IDs will be taken from column $refCol.\n";
     $refCol = P3Utils::find_column($refCol, $outHeaders);
 }
+my %refMap;
+my $refCount = 0;
 # Get the web options.
 my $web = $opt->web;
 my ($prefix, $suffix, $detailTT);
 if ($web) {
+    print STDERR "Building web page templates.\n";
     ($prefix, $suffix, $detailTT) = BinningReports::build_strings($opt);
     if ($opt->resume) {
         die "Cannot resume if web page output is desired.";
+    }
+    # Reference genomes are used by the web pages. Check for them.
+    my $refTable = $opt->reftable // ($opt->checkdir . '/ref.genomes.tbl');
+    print STDERR "Reference genome file is $refTable.\n";
+    if (-s $refTable) {
+        # Here we have a reference-genome table.
+        open(my $rh, "<$refTable") || die "Could not open reference genome table $refTable: $!";
+        while (! eof $rh) {
+            my $line = <$rh>;
+            if ($line =~ /^(\d+)\t(\d+\.\d+)/) {
+                $refMap{$1} = $2;
+            }
+        }
+        $refCount = scalar keys %refMap;
+        print STDERR "$refCount reference genomes read from $refTable.\n";
     }
 }
 # Create the consistency helper.
@@ -209,7 +235,7 @@ eval {
         # Start the predictor matrix for the consistency checker.
         $evalCon->OpenMatrix($workDir);
         # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
-        my (@gtoFiles, %pGenomes);
+        my (@gtoFiles, %pGenomes, @refsNeeded);
         for my $couplet (@$couplets) {
             my ($genome, $row) = @$couplet;
             $stats->Add(genomeIn => 1);
@@ -219,11 +245,41 @@ eval {
             } else {
                 $pGenomes{$genome} = 1;
             }
+            # Check for a reference genome.
             if (defined $refCol && $row->[$refCol]) {
                 my $rGenome = $row->[$refCol];
                 $pGenomes{$rGenome} = 1;
                 $refGenomes{$rGenome} = $genome;
+            } elsif ($refCount) {
+                # Here we have to search the taxon list for the reference genomes. Queue a request.
+                push @refsNeeded, $genome;
             }
+        }
+        # Look for reference genomes from the reference-genome table.
+        if (@refsNeeded) {
+            # Read the taxonomic lineage for each genome that needs a reference.
+            print STDERR "Searching for reference genomes.\n";
+            $start = time;
+            my $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'taxon_lineage_ids'], \@refsNeeded);
+            for my $taxResult (@$taxResults) {
+                # Get this genome's ID and lineage.
+                my ($genome, $lineage) = @$taxResult;
+                # Loop through the lineage until we find something.
+                my $refFound;
+                while (! $refFound && (my $tax = pop @$lineage)) {
+                    $refFound = $refMap{$tax};
+                }
+                if ($refFound && $refFound ne $genome) {
+                    $refGenomes{$refFound} = $genome;
+                    $pGenomes{$refFound} = 1;
+                    $stats->Add(refFoundInTable => 1);
+                } elsif ($refFound) {
+                    $stats->Add(refFoundSelf => 1);
+                } else {
+                    $stats->Add(refNotFound => 1);
+                }
+            }
+            $stats->Add(refSearchTime => Math::Round::round(time - $start));
         }
         # Get the data for the genomes.
         $start = time;
