@@ -43,7 +43,7 @@ while (! eof $ih) {
     # Pull out the key columns.
     my ($goodSeed, $coarse, $fine, $complete, $contam) = P3Utils::get_cols(\@fields, $cols);
     my $goodness = 1;
-    my @qualities = ([$goodSeed, 'goodPheS', 'badPheS'], [GEO::consistX($fine), 'consistent', 'inconsistent'], [GEO::completex($complete), 'complete', 'incomplete'],
+    my @qualities = ([$goodSeed, 'goodPheS', 'badPheS'], [GEO::consistX($fine), 'consistent', 'inconsistent'], [GEO::completeX($complete), 'complete', 'incomplete'],
             [GEO::contamX($contam), 'clean', 'contaminated']);
     for my $quality (@qualities) {
         my ($flag, $good, $bad) = @$quality;
