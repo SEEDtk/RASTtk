@@ -576,7 +576,8 @@ sub Detail {
     $gThing{ppr} = $pprs;
     # Now we need to create the contigs structure.
     my $contigCountH = $geo->contigReport;
-    for my $contigID (sort keys %$contigCountH) {
+    my @contigList = sort { $geo->contigLen($b) <=> $geo->contigLen($a) } keys %$contigCountH;
+    for my $contigID (@contigList) {
         my ($good, @fids) = @{$contigCountH->{$contigID}};
         my $nFids = scalar @fids;
         if ($nFids) {
