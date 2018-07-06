@@ -833,7 +833,7 @@ sub build_strings {
             $prefix .= <$th>;
         }
         close $th; undef $th;
-        $prefix .= "</style></head><body>\n";
+        $prefix .= "</style>\n";
         $suffix = "\n</body></html>\n";
     }
     return($prefix, $suffix, $detailTT);

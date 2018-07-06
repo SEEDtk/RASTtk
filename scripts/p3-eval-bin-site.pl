@@ -99,5 +99,5 @@ my $templateEngine = Template->new(ABSOLUTE => 1);
 my $middle = '';
 $templateEngine->process($opt->templates . "/master.tt", \%master, \$middle) || die "Error in HTML template: " . $templateEngine->error();
 open(my $oh, ">$webDir/index.html") || die "Could not create master index: $!";
-print $oh $prefix . $middle . $suffix;
+print $oh $prefix . "<title>Master Bin Job Index</title></head></body>" . $middle . $suffix;
 

@@ -202,7 +202,7 @@ for my $sample (@samples) {
                 # Create the detail page.
                 my $html = BinningReports::Detail(undef, $binHash, \$detailTT, $geo, $nMap);
                 open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
-                print $wh $prefix . $html . $suffix;
+                print $wh $prefix . "<title>$genome</title></head><body>\n" . $html . $suffix;
                 close $wh;
                 # Create the summary report line.
                 my $metrics = $geo->metrics;
@@ -222,7 +222,7 @@ for my $sample (@samples) {
             my %urlMap = map { $_->id => ($_->id . ".html") } @evalGeos;
             open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
             my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@evalGeos, \%urlMap);
-            print $oh $prefix . $html . $suffix;
+            print $oh $prefix . "<title>$sample</title></head><body>" . $html . $suffix;
             close $oh;
         }
     }

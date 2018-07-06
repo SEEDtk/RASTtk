@@ -317,7 +317,7 @@ eval {
                         # Create the detail page.
                         my $html = BinningReports::Detail(undef, undef, \$detailTT, $geo, $nMap);
                         open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
-                        print $wh $prefix . $html . $suffix;
+                        print $wh $prefix . "<title>$genome</title></head><body>\n" . $html . $suffix;
                         close $wh;
                         # Save this GEO for the summary page.
                         push @summary, $geo;
@@ -336,7 +336,7 @@ eval {
         my %urlMap = map { $_->id => ($_->id . ".html") } @summary;
         open(my $oh, ">$outDir/index.html") || die "Could not open summary web page: $!";
         my $html = BinningReports::Summary('', {}, undef, $summaryTFile, '', \@summary, \%urlMap);
-        print $oh $prefix . $html . $suffix;
+        print $oh $prefix . "<title>Genome Evaluations</title></head><body>\n" . $html . $suffix;
         close $oh;
     }
 };
