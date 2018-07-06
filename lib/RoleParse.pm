@@ -37,7 +37,7 @@ Pre-compiled pattern for matching EC numbers.
 
 =cut
 
-    our $EC_PATTERN = qr/\(\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-)\s*)\)/;
+    our $EC_PATTERN = qr/\(?\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-)\s*)?\)/;
 
 =head3 TC_PATTERN
 
@@ -47,7 +47,7 @@ Pre-compiled pattern for matchin TC numbers.
 
 =cut
 
-    our $TC_PATTERN = qr/\(\s*T\.?C\.?(?:\s+|:)(\d\.[A-Z]\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-)\s*)\)/;
+    our $TC_PATTERN = qr/\(?\s*T\.?C\.?(?:\s+|:)(\d\.[A-Z]\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-)\s*)?\)/;
 
 =head3 Parse
 

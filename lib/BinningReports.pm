@@ -332,9 +332,7 @@ sub Summary {
         my $refData = $refGmap->{$genomeName};
         if (! $refData) {
             # No reference data. We have to build it from the GEO.
-            my $refList = $bin->refList;
-            my @refDataRefList = map { { genome => $_->id, url => join('/', URL_BASE , uri_escape($_->id)) } } @$refList;
-            $refData = { refs => \@refDataRefList, coverage => 0 };
+            $refData = BuildRefData($bin);
         }
         # Connect the coverage and reference genome data.
         $gThing{refs} = $refData->{refs};
@@ -544,7 +542,12 @@ sub Detail {
     my $genomeName = $geo->name;
     my $genomeURL = join('/', URL_BASE, uri_escape($genomeID));
     my $pprRoleData = $geo->roleReport;
-    my $refData = $refGmap->{$genomeName} // {};
+    # Get the reference data.
+    my $refData = $refGmap->{$genomeID};
+    if (! $refData) {
+        # Here we have to compute the reference genomes.
+        $refData = BuildRefData($geo);
+    }
     # Problematic roles are stashed here.
     my @pprList;
     # The contig structures are stashed here.
@@ -694,6 +697,23 @@ sub parse_bins_json {
             }
         }
     }
+    return $retVal;
+}
+
+=head3 BuildRefData
+
+    my $refData = BuildRefData($geo);
+
+Build the reference-data structure from a L<GEO> when it is not available from a bins_json object. In this case, the coverage will be 0,
+and all the reference genomes attached to the GEO will be listed.
+
+=cut
+
+sub BuildRefData {
+    my ($geo) = @_;
+    my $refList = $geo->refList;
+    my @refDataRefList = map { { genome => $_->id, url => join('/', URL_BASE , uri_escape($_->id)) } } @$refList;
+    my $retVal = { refs => \@refDataRefList, coverage => 0 };
     return $retVal;
 }
 
