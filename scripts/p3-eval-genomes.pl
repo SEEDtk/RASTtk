@@ -44,6 +44,10 @@ If specified, the output directory is erased before any output is produced.
 If specified, web pages for all of the genome evaluations will be produced in the output directory. (This option is not
 yet implemented.)
 
+=item deep
+
+If specified, the web pages will include detailed protein analysis. Implies C<--web>.
+
 =item gtoCol
 
 If specified, the index (1-based) or name of an input column containing the names for pre-fetched L<GenomeTypeObject> files for the
@@ -96,6 +100,7 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
         ['clear', 'clear output directory before starting'],
         ['web', 'create web pages as well as output files for evaluations'],
+        ['deep', 'perform detailed analysis of missing and redundant proteins (implies web)'],
         ['terse', 'suppress individual genome role reports (incompatible with web)'],
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
@@ -139,7 +144,7 @@ if ($terse) {
     }
 }
 # Get access to PATRIC.
-print "Connecting to PATRIC.\n";
+print STDERR "Connecting to PATRIC.\n";
 my $p3 = P3DataAPI->new();
 # Open the input file.
 my $ih = P3Utils::ih($opt);
@@ -158,8 +163,9 @@ if (defined $refCol) {
 }
 my %refMap;
 my $refCount = 0;
-# Get the web options.
-my $web = $opt->web;
+# Get the web options and compute the detail level.
+my $web = $opt->web || $opt->deep;
+my $detailLevel = ($opt->deep ? 2 : ($web ? 1 : 0));
 my ($prefix, $suffix, $detailTT);
 if ($web) {
     print STDERR "Building web page templates.\n";
@@ -193,7 +199,7 @@ my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH
 my $timer = Math::Round::round(time - $start);
 $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
-my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, abridged => ! $web,
+my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, detail => $detailLevel,
         logH => \*STDERR);
 # Process the resume option.
 if ($opt->resume) {

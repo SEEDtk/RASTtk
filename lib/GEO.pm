@@ -82,6 +82,11 @@ The following optional fields may also be present.
 
 =over 4
 
+=item lineage
+
+Reference to a list of taxonomic grouping IDs, representing the complete lineage of the genome.
+This is only present if the genome was loaded directly from PATRIC.
+
 =item refGeo
 
 Reference to a list of L<GEO> objects for associated reference genomes believed to be close, but of better quality.
@@ -98,6 +103,10 @@ Reference to a hash that maps each contig ID to the contig length.
 
 If the quality results have been processed, a reference to a hash containing genome quality information,
 with the following keys.
+
+=item proteins
+
+Reference to a hash that maps each feature to its protein sequence.
 
 =over 8
 
@@ -208,9 +217,9 @@ Reference to a L<P3DataAPI> object for accessing PATRIC. If omitted, one will be
 
 Reference to a L<Stats> object for tracking statistical information. If omitted, the statistics will be discarded.
 
-=item abridged
+=item detail
 
-If specified, no contig information will be included in the object.
+Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, and proteins.
 
 =item logH
 
@@ -238,23 +247,26 @@ sub CreateFromPatric {
     # Process the options.
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
-    my $abridged = $options{abridged};
+    my $detail = $options{detail};
     # Compute the feature columns for the current mode.
     my @fCols = qw(patric_id product aa_length);
-    if (! $abridged) {
+    if ($detail) {
         push @fCols, qw(sequence_id start na_length strand);
+        if ($detail > 1) {
+            push @fCols, qw(aa_sequence);
+        }
     }
     # Now we have everything in place for loading. We start by getting the genome information.
     my $gCount = scalar @$genomes;
     $stats->Add(genomesIn => $gCount);
     _log($logH, "Requesting $gCount genomes from PATRIC.\n");
     my $genomeTuples = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'genome_name',
-            'kingdom', 'taxon_id'], $genomes);
+            'kingdom', 'taxon_id', 'taxon_lineage_ids'], $genomes);
     # Loop through the genomes found.
     for my $genomeTuple (@$genomeTuples) {
-        my ($genome, $name, $domain, $taxon) = @$genomeTuple;
+        my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon };
+            taxon => $taxon, lineage => $lineage };
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -264,16 +276,16 @@ sub CreateFromPatric {
         my $seedCount = 0;
         my $goodSeed = 1;
         # Now we need to get the roles. For each feature we need its product (function), ID, and protein length.
-        # If we are NOT in abridged mode, we also need the location data.
+        # Depending on the detail level, we also get location and the aa-sequence.
         _log($logH, "Reading features for $genome.\n");
         my $featureTuples = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome]],
                 \@fCols);
-        # Build the role and location hashes in here.
-        my (%roles, %locs);
+        # Build the role, protein, and location hashes in here.
+        my (%roles, %proteins, %locs);
         for my $featureTuple (@$featureTuples) {
             $stats->Add(featureFoundPatric => 1);
-            # Note only the first three will be present if we are abridged.
-            my ($fid, $function, $aaLen, $contig, $start, $len, $dir) = @$featureTuple;
+            # Note that some of these will be undef if we are at a low detail level.
+            my ($fid, $function, $aaLen, $contig, $start, $len, $dir, $prot) = @$featureTuple;
             # Only features with functions matter to us.
             if ($function) {
                 my @roles = SeedUtils::roles_of_function($function);
@@ -300,10 +312,14 @@ sub CreateFromPatric {
                         }
                     }
                 }
-                if (! $abridged && $mapped) {
-                    # If we are NOT abridged and this feature had an interesting role, we
+                if ($detail && $mapped) {
+                    # If we are saving details and this feature had an interesting role, we
                     # also need to save the location.
                     $locs{$fid} = BasicLocation->new([$contig, $start, $dir, $len]);
+                }
+                if ($prot) {
+                    # If we have a protein sequence, save that too.
+                    $proteins{$fid} = $prot;
                 }
             }
         }
@@ -319,7 +335,7 @@ sub CreateFromPatric {
         }
         $retVal{$genome}{good_seed} = $goodSeed;
         # Check for the optional stuff.
-        if (! $abridged) {
+        if ($detail) {
             # Here we also need to store the location map.
             $retVal{$genome}{fidLocs} = \%locs;
             # Finally, we need the contig lengths.
@@ -332,6 +348,7 @@ sub CreateFromPatric {
                 $contigs{$contigID} = $len;
             }
             $retVal{$genome}{contigs} = \%contigs;
+            $retVal{$genome}{proteins} = \%proteins;
         }
     }
     # Run through all the objects, blessing them.
@@ -373,9 +390,9 @@ Reference to a L<P3DataAPI> object for accessing PATRIC. If omitted, one will be
 
 Reference to a L<Stats> object for tracking statistical information. If omitted, the statistics will be discarded.
 
-=item abridged
+=item detail
 
-If specified, no contig information will be included in the object.
+Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, and proteins.
 
 =item logH
 
@@ -403,7 +420,7 @@ sub CreateFromGtoFiles {
     # Process the options.
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
-    my $abridged = $options{abridged};
+    my $detail = $options{detail};
     # Loop through the GTO files.
     for my $file (@$files) {
         $stats->Add(genomesIn => 1);
@@ -428,7 +445,7 @@ sub CreateFromGtoFiles {
             my $seedCount = 0;
             my $goodSeed = 1;
             # Create the role tables.
-            my (%roles, %locs);
+            my (%roles, %proteins, %locs);
             _log($logH, "Processing features for $genome.\n");
             for my $feature (@{$gto->{features}}) {
                 $stats->Add(featureFoundFile => 1);
@@ -461,7 +478,7 @@ sub CreateFromGtoFiles {
                             }
                         }
                     }
-                    if (! $abridged && $mapped) {
+                    if ($detail && $mapped) {
                         # If we are NOT abridged and this feature had an interesting role, we
                         # also need to save the location.
                         my $locs = $feature->{location};
@@ -471,6 +488,9 @@ sub CreateFromGtoFiles {
                             $loc->Combine(BasicLocation->new(@$region));
                         }
                         $locs{$fid} = $loc;
+                    }
+                    if ($detail > 1) {
+                        $proteins{$fid} = $feature->{protein_translation};
                     }
                 }
             }
@@ -486,7 +506,7 @@ sub CreateFromGtoFiles {
             }
             $retVal{$genome}{good_seed} = $goodSeed;
             # Check for the optional stuff.
-            if (! $abridged) {
+            if ($detail) {
                 # Here we also need to store the location map.
                 $retVal{$genome}{fidLocs} = \%locs;
                 # Finally, we need the contig lengths.
@@ -499,6 +519,7 @@ sub CreateFromGtoFiles {
                     $contigs{$contigID} = $len;
                 }
                 $retVal{$genome}{contigs} = \%contigs;
+                $retVal{$genome}{proteins} = \%proteins;
             }
         }
     }
@@ -628,6 +649,63 @@ sub qscoreX {
     return $retVal;
 }
 
+=head3 closest_protein
+
+    my ($id, $score) = GEO::closest_protein($target, \%others, $k);
+
+Use kmers to compute which of the specified other proteins is closest to the target. The ID of the closest protein will be returned, along with its score.
+
+=over 4
+
+=item target
+
+The target protein.
+
+=item others
+
+Reference to a hash mapping IDs to protein sequences.
+
+=item k
+
+The proposed kmer size. The default is C<8>.
+
+=item RETURN
+
+Returns the ID of the closest protein and its kmer similarity score. An undefined ID will be returned if no similarity exists.
+
+=back
+
+=cut
+
+sub closest_protein {
+    my ($target, $others, $k) = @_;
+    $k //= 8;
+    # Create a kmer hash for the target.
+    my %kHash;
+    my $n = length($target) - $k;
+    for (my $i = 0; $i <= $n; $i++) {
+        $kHash{substr($target, $i, $k)} = 1;
+    }
+    # These will be the return values.
+    my ($id, $score) = (undef, 0);
+    # Test all the other sequences.
+    for my $seqID (sort keys %$others) {
+        my $sequence = $others->{$seqID};
+        my $newScore = 0;
+        my $n = length($sequence) - $k;
+        for (my $i = 0; $i < $n; $i++) {
+            if ($kHash{substr($sequence, $i, $k)}) {
+                $newScore++;
+            }
+        }
+        if ($newScore > $score) {
+            $id = $seqID;
+            $score = $newScore;
+        }
+    }
+    return ($id, $score);
+}
+
 =head2 Query Methods
 
 =head3 id
@@ -641,6 +719,19 @@ Return the ID of this genome.
 sub id {
     my ($self) = @_;
     return $self->{id};
+}
+
+=head3 lineage
+
+    my $lineageL = $geo->lineage;
+
+Return a reference to a list of the IDs in the taxonomic lineage, or C<undef> if the lineage is not available.
+
+=cut
+
+sub lineage {
+    my ($self) = @_;
+    return $self->{lineage};
 }
 
 =head3 roleCounts
@@ -801,6 +892,32 @@ sub bestRef {
     }
     return $retVal;
 }
+
+=head3 protein
+
+    my $aaSequence = $geo->protein($fid);
+
+Return the protein sequence for the specified feature, or C<undef> if protein sequences are not available.
+
+=over 4
+
+=item fid
+
+The feature ID of the desired protein.
+
+=item RETURN
+
+Returns the protein sequence for the specified feature, or C<undef> if the protein sequence is not available.
+
+=back
+
+=cut
+
+sub protein {
+    my ($self, $fid) = @_;
+    return $self->{proteins}{$fid};
+}
+
 
 =head3 roleStats
 
@@ -1088,10 +1205,10 @@ sub AddQuality {
                     $under{$role} = 1;
                 }
             }
-            # The role is good if it is present and is predicted. If it is
-            # over-represented, then there are some bad copies, but at the
-            # current time we can't tell those apart.
-            if ($predicted >= 1 && $actual >= 1) {
+            # The role is good if it is present and is predicted to occur
+            # equal or more times. This is a very conservative measure, so
+            # it will miss necessary roles.
+            if ($predicted >= 1 && $actual >= 1 && $actual <= $predicted) {
                 $good{$role} = 1;
             }
         }
@@ -1141,6 +1258,9 @@ sub AddQuality {
         if ($comment) { push @roleComments, $comment; }
         # If there are existing features for the role, we make comments on each one.
         if ($actual >= 1) {
+            # We will accumulate proteins in here.
+            my %proteins;
+            # Process the list of features found.
             my $fids = $roleFids->{$role};
             for my $fid (@$fids) {
                 # We will accumulate our comments for each feature in here.
@@ -1178,26 +1298,63 @@ sub AddQuality {
                 # be more.
                 my $fcomment = _cr_link($fid) . ' ' . _format_comments(@comments);
                 push @roleComments, $fcomment;
+                # If this feature has a protein, save it.
+                my $prot = $self->protein($fid);
+                $proteins{$fid} = $prot;
                 # Finally, we must record this feature as a bad feature for the contig.
                 push @{$contigs{$contigID}}, $fid;
+            }
+            # Now, if we have too many of the feature and we have proteins, we can ask which feature
+            # is the best.
+            if ($actual > $predicted && $predicted >= 1 && scalar(keys %proteins) > 1) {
+                # Check for this role in each reference genome.
+                for my $refGeo (@$refGeoL) {
+                    my $rFids = $refGeo->{roleFids}{$role};
+                    # Loop through the reference genome features.
+                    for my $rFid (@$rFids) {
+                        my $rProtein = $refGeo->protein($rFid);
+                        if ($rProtein) {
+                            my ($bestFid, $score) = closest_protein($rProtein, \%proteins);
+                            if ($bestFid) {
+                                push @roleComments, _fid_link($rFid) . " performs this role in the reference genome, and " .
+                                    _cr_link($bestFid) . " is the closest to it, with $score matching kmers.";
+                            }
+                        }
+                    }
+                }
             }
         } elsif ($refGeoCount) {
             # The role is missing, but we have a reference genome. Get its instances
             # of the same role.
-            my @fids;
+            my %rProteins;
             for my $refGeo (@$refGeoL) {
                 my $fids = $refGeo->{roleFids}{$role};
-                if ($fids && scalar @$fids) {
-                    push @fids, @$fids;
+                if ($fids) {
+                    for my $rFid (@$fids) {
+                        my $rProtein = $refGeo->protein($rFid);
+                        $rProteins{$rFid} = $rProtein;
+                    }
                 }
             }
             my $genomeWord = ($refGeoCount == 1 ? 'genome' : 'genomes');
-            my $fidCount = scalar @fids;
+            my $fidCount = scalar keys %rProteins;
             if (! $fidCount) {
                 push @roleComments, "Role is not present in the reference $genomeWord.";
             } else {
                 my $verb = ($fidCount == 1 ? 'performs' : 'perform');
-                push @roleComments, _fid_link(@fids) . " $verb this role in the reference $genomeWord.";
+                push @roleComments, _fid_link(sort keys %rProteins) . " $verb this role in the reference $genomeWord.";
+                # Get the protein hash for this genome.
+                my $ourProteins = $self->{proteins};
+                # Find the closest feature for each reference genome protein.
+                for my $rFid (sort keys %rProteins) {
+                    my $rProtein = $rProteins{$rFid};
+                    if ($rProtein) {
+                        my ($fid, $score) = closest_protein($rProtein, $ourProteins);
+                        if ($fid) {
+                            push @roleComments, _cr_link($fid) . " is the closest protein to the reference feature " . _fid_link($rFid) . " with $score kmers in common.";
+                        }
+                    }
+                }
             }
         }
         # Form all the comments for this role.
@@ -1334,8 +1491,6 @@ sub _fid_link {
     }
     return $retVal;
 }
-
-
 
 =head3 _log
 

@@ -344,18 +344,29 @@ sub Check {
     my %roleData;
     # Get the role map. We use this to compute role IDs from role names.
     my $roleMap = $self->{roleMap};
+    # Get the hash of role lists.
+    my $roleLists = $self->{roleLists};
     # Compute the appropriate taxonomic group for this GTO and get its role list.
     my $taxon = $geo->taxon;
     my $groupID = $self->{taxonMap}{$taxon};
+    if (! defined $groupID && $geo->lineage) {
+        # Try for a lineage search.
+        my @taxons = @{$geo->lineage};
+        while (! $groupID && ($taxon = pop @taxons)) {
+            if ($roleLists->{$taxon}) {
+                $groupID = $taxon;
+            }
+        }
+    }
     if (! defined $groupID) {
-        # No group. We will return undef for the results.
+        # Still no group. We give up.
         $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
         # Get the group name.
         $taxGroup = $self->{taxNames}{$groupID};
         $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
         # Fill the roleData hash from the role list.
-        my $roleHash = $self->{roleLists}{$groupID};
+        my $roleHash = $roleLists->{$groupID};
         %roleData = map { $_ => 0 } keys %$roleHash;
         my $markers = scalar keys %roleData;
         my $size = $self->{taxSizes}{$groupID};
