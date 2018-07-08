@@ -270,10 +270,13 @@ eval {
             for my $taxResult (@$taxResults) {
                 # Get this genome's ID and lineage.
                 my ($genome, $lineage) = @$taxResult;
-                # Loop through the lineage until we find something.
+                # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
+                # as an empty string instead of a list so we need an extra IF.
                 my $refFound;
-                while (! $refFound && (my $tax = pop @$lineage)) {
-                    $refFound = $refMap{$tax};
+                if ($lineage) {
+                    while (! $refFound && (my $tax = pop @$lineage)) {
+                        $refFound = $refMap{$tax};
+                    }
                 }
                 if ($refFound && $refFound ne $genome) {
                     $refGenomes{$refFound} = $genome;

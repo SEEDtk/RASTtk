@@ -266,7 +266,7 @@ sub CreateFromPatric {
     for my $genomeTuple (@$genomeTuples) {
         my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon, lineage => $lineage };
+            taxon => $taxon, lineage => ($lineage || []) };
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
