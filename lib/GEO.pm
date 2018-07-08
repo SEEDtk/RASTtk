@@ -1468,7 +1468,7 @@ A list of feature IDs.
 
 =item RETURN
 
-Returns a hyperlink for viewing a single feature or a list of multiple features.
+Returns a hyperlink for viewing a single feature or a list of multiple features. For a single feature, the compare regions page will be pre-selected.
 
 =back
 
@@ -1480,7 +1480,7 @@ sub _fid_link {
     if (@fids == 1) {
         my $fid = $fids[0];
         my $fidInLink = uri_escape($fid);
-        $retVal = qq(<a href="https://www.patricbrc.org/view/Feature/$fidInLink" target="_blank">$fid</a>);
+        $retVal = qq(<a href="https://www.patricbrc.org/view/Feature/$fidInLink#view_tab=compareRegionViewer" target="_blank">$fid</a>);
     } elsif (@fids > 1) {
         my $list = join(",", map { uri_escape(qq("$_")) } @fids);
         my $link = "https://www.patricbrc.org/view/FeatureList/?in(patric_id,($list))";

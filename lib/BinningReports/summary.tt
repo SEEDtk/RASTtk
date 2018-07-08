@@ -59,6 +59,7 @@ The following bins did not meet the quality criteria:</p>
 
 [% BLOCK qual_headers %]
 <tr>
+<th>Score</th>
 <th>Genome ID</th>
 <th>Genome Name</th>
 <th>Reference Genome</th>
@@ -79,6 +80,7 @@ The following bins did not meet the quality criteria:</p>
 
 [% BLOCK qual_row %]
 <tr>
+<td><a href="[% g.report_url %]">[% g.qscore %]</a></td>
 <td><a target="_blank" href="[% g.genome_url %]">[% g.genome_id %]</a></td>
 <td>[% g.genome_name %]</td>
 <td>

@@ -157,12 +157,12 @@ sub new {
     my ($predictors, $rolesToUse, $roleFile) =  map { "$FIG_Config::global/$_"} qw(FunctionPredictors roles.to.use roles.in.subsystems);
     if ($options{predictors}) {
         $predictors = $options{predictors};
-        if (-s "$predictors/roles.in.subsystems") {
-            $roleFile = "$predictors/roles.in.subsystems";
-        }
-        if (-s "$predictors/roles.to.use") {
-            $rolesToUse = "$predictors/roles.to.use";
-        }
+    }
+    if (-s "$predictors/roles.in.subsystems") {
+        $roleFile = "$predictors/roles.in.subsystems";
+    }
+    if (-s "$predictors/roles.to.use") {
+        $rolesToUse = "$predictors/roles.to.use";
     }
     if ($options{roleFile}) {
         $roleFile = $options{roleFile};

@@ -279,6 +279,10 @@ C<Y> if the bin has a good PheS protein, else a hard space.
 
 A style tag for the good-seed cell, or a null string.
 
+=item qscore
+
+The quality score for the bin.
+
 =back
 
 =item bad
@@ -323,6 +327,8 @@ sub Summary {
     for my $bin (@bins) {
         # Copy the quality entry. This copy will be made into the main object used to describe bins in the output reports.
         my %gThing = copy_geo($bin);
+        # Compute the q-score.
+        $gThing{qscore} = int($bin->qscore * 10);
         # Get the matching ppr and refGmap entries.
         my $genomeID = $bin->id;
         $gThing{report_url} = $report_url_map->{$bin->id};
