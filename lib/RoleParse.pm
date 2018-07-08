@@ -37,7 +37,7 @@ Pre-compiled pattern for matching EC numbers.
 
 =cut
 
-    our $EC_PATTERN = qr/\(?\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-)\s*)?\)/;
+    our $EC_PATTERN = qr/\(?\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-)\s*)\)?/;
 
 =head3 TC_PATTERN
 
@@ -47,7 +47,7 @@ Pre-compiled pattern for matchin TC numbers.
 
 =cut
 
-    our $TC_PATTERN = qr/\(?\s*T\.?C\.?(?:\s+|:)(\d\.[A-Z]\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-)\s*)?\)/;
+    our $TC_PATTERN = qr/\(?\s*T\.?C\.?(?:\s+|:)(\d\.[A-Z]\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-)\s*)\)?/;
 
 =head3 Parse
 
@@ -77,6 +77,7 @@ sub Parse {
     shift if UNIVERSAL::isa($_[0], __PACKAGE__);
     # Get the parameters.
     my ($role) = @_;
+    $role //= '';
     # Extract the EC number.
     my ($ecNum, $tcNum) = ("", "");
     my $roleText = $role;
@@ -92,7 +93,7 @@ sub Parse {
     # Check for a hypothetical.
     my $hypo = SeedUtils::hypo($roleText);
     # If this is a hypothetical with a number, change it.
-    if ($roleText eq 'hypothetical protein' || ! $roleText) {
+    if (! $roleText || $roleText eq 'hypothetical protein') {
         if ($ecNum) {
             $roleText = "putative protein $ecNum";
         } elsif ($tcNum) {

@@ -90,8 +90,8 @@ Create a new GTO checker object.
 
 =item checkDir
 
-The name of a directory containing the main input files-- C<roles.tbl> from L<taxon_analysis.pl> and C<taxon_map.tbl>, which is
-created by L<compute_taxon_map.pl>.
+The name of a directory containing the main input files-- C<roles.tbl> from L<p3-taxon-analysis.pl> and L<group_marker_roles.pl>, and C<taxon_map.tbl> from
+L<compute_taxon_map.pl>.
 
 =item options
 

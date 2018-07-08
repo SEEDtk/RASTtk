@@ -172,19 +172,9 @@ sub new {
     }
     my $stats = $options{stats} // Stats->new();
     # Create the role definition hashes.
-    open(my $rh, "<$roleFile") || die "Could not open $roleFile: $!";
-    my (%nMap, %cMap);
-    while (! eof $rh) {
-        my $line = <$rh>;
-        chomp $line;
-        my ($id, $checksum, $name) = split /\t/, $line;
-        $nMap{$id} = $name;
-        $cMap{$checksum} = $id;
-        $stats->Add(subsysRole => 1);
-    }
-    close $rh; undef $rh;
+    my ($nMap, $cMap) = LoadRoleHashes($roleFile, $stats);
     # Create the roles-of-interest hash.
-    open($rh, "<$rolesToUse") || die "Could not open $rolesToUse: $!";
+    open(my $rh, "<$rolesToUse") || die "Could not open $rolesToUse: $!";
     my @roles;
     while (! eof $rh) {
         my $line = <$rh>;
@@ -195,7 +185,7 @@ sub new {
     }
     # Create the object and bless it.
     my $retVal = {
-        cMap => \%cMap, nMap => \%nMap, roles => \@roles, predictors => $predictors, stats => $stats
+        cMap => $cMap, nMap => $nMap, roles => \@roles, predictors => $predictors, stats => $stats
     };
     bless $retVal, $class;
     # Return it to the client.
@@ -223,6 +213,47 @@ sub new_from_script {
     return EvalCon::new($class, predictors => $opt->predictors, roleFile => $opt->rolefile, rolesToUse => $opt->rolestouse);
 }
 
+
+=head3 LoadRoleHashes
+
+    my ($nMap, $cMap) = EvalCon::LoadRoleHashes($roleFile, $stats);
+
+Load the role hashes from the C<roles.in.subsystems> file.
+
+=over 4
+
+=item roleFile
+
+The file containing the role IDs, names, and checksums. This file is tab-delimited, each line containing (0) a role ID, (1) a role checksum, and (2) a role name.
+
+=item stats (optional)
+
+A L<Stats> object for tracking statistics.
+
+=item RETURN
+
+Returns a two-element list containing (0) a reference to a hash from role IDs to role names, and (1) a reference to a hash from role checksums to role IDs.
+
+=back
+
+=cut
+
+sub LoadRoleHashes {
+    my ($roleFile, $stats) = @_;
+    $stats //= Stats->new();
+    open(my $rh, "<$roleFile") || die "Could not open $roleFile: $!";
+    my (%nMap, %cMap);
+    while (! eof $rh) {
+        my $line = <$rh>;
+        chomp $line;
+        my ($id, $checksum, $name) = split /\t/, $line;
+        $nMap{$id} = $name;
+        $cMap{$checksum} = $id;
+        $stats->Add(subsysRole => 1);
+    }
+    close $rh; undef $rh;
+    return (\%nMap, \%cMap);
+}
 
 =head2 Query Methods
 
