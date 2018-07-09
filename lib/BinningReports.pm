@@ -480,6 +480,10 @@ The contig length, in base pairs.
 
 The number of features containing problematic roles.
 
+=item list_url
+
+A hyperlink to list a contig's features.
+
 =item fid_url
 
 The URL to list the features.
@@ -592,7 +596,7 @@ sub Detail {
         if ($nFids) {
             my $url = fid_list_url(\@fids);
             my $contigDatum = { name => $contigID, len => $geo->contigLen($contigID),
-                                n_fids => $nFids, fid_url => $url, good => $good };
+                                n_fids => $nFids, fid_url => $url, good => $good, list_url => $geo->contig_link($contigID) };
             push @contigs, $contigDatum;
         }
     }

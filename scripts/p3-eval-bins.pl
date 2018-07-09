@@ -109,7 +109,7 @@ my ($nMap, $cMap) = $evalCon->roleHashes;
 my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
 my $detail = ($opt->deep ? 2 : 1);
-my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail);
+my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, binned => 1);
 # Loop through the samples.
 my $sampTot = scalar @samples;
 my $sampDone = 0;

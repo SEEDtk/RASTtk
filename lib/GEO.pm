@@ -109,6 +109,10 @@ with the following keys.
 
 Reference to a hash that maps each feature to its protein sequence.
 
+=item binContigs
+
+Reference to a hash that maps contig IDs to the relevant sequence IDs in PATRIC.
+
 =over 8
 
 =item fine_consis
@@ -267,7 +271,7 @@ sub CreateFromPatric {
     for my $genomeTuple (@$genomeTuples) {
         my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon, lineage => ($lineage || []) };
+            taxon => $taxon, lineage => ($lineage || []), binFlag => 0 };
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -399,6 +403,10 @@ Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, 
 
 Open file handle for status messages. If not specified, no messages will be written.
 
+=item binned
+
+If TRUE, then it will be presumed this genome comes from the binning process, and the contig names are node names rather than sequence IDs.
+
 =back
 
 =item RETURN
@@ -522,6 +530,23 @@ sub CreateFromGtoFiles {
                 }
                 $retVal{$genome}{contigs} = \%contigs;
                 $retVal{$genome}{proteins} = \%proteins;
+                # If we are binned, we must generate the contig map.
+                if ($options{binned}) {
+                    my @badContigIDs = grep { ! ($_ =~ /^\d+\.\d+\.con\.\d+$/) } keys %contigs;
+                    if (@badContigIDs) {
+                        _log($logH, "Processing contig mapping for binned GTO $genome.\n");
+                        my %binMap;
+                        my $realContigIDs = P3Utils::get_data($p3, contig => [['eq', 'genome_id', $genome]], ['sequence_id', 'description']);
+                        for my $idPair (@$realContigIDs) {
+                            my ($realID, $fakeID) = @$idPair;
+                            if ($contigs{$fakeID}) {
+                                $binMap{$fakeID} = $realID;
+                                $stats->Add(contigIdMapped => 1);
+                            }
+                        }
+                        $retVal{$genome}{binContigs} = \%binMap;
+                    }
+                }
             }
         }
     }
@@ -1087,6 +1112,41 @@ sub is_clean {
     return $retVal;
 }
 
+=head3 contig_link
+
+    my $html = $geo->contig_link($contigID);
+
+Return the PATRIC URL and label for the specified contig. This is complicated by the fact that the contig ID for a bin is not the sequence ID, so in
+that case we have to check the map of contig IDs to sequence IDs and modify the link accordingly.
+
+=over 4
+
+=item contigID
+
+The ID of the sequence of interest.
+
+=item RETURN
+
+Returns a hyperlink displaying the contig ID. When clicked, it will show all the proteins in the contig.
+
+=back
+
+=cut
+
+sub contig_link {
+    my ($self, $contigID) = @_;
+    my $retVal;
+    my $contigSequence = $contigID;
+    if ($self->{binContigs}) {
+        $contigSequence = $self->{binContigs}{$contigID};
+    }
+    if (! $contigSequence) {
+        $retVal = $contigID;
+    } else {
+        $retVal = qq(<a href ="https://www.patricbrc.org/view/FeatureList/?and(eq(annotation,PATRIC),eq(sequence_id,$contigSequence),eq(feature_type,CDS))" target="_blank">$contigID</a>);
+    }
+    return $retVal;
+}
 
 =head3 scores
 
@@ -1290,7 +1350,7 @@ sub AddQuality {
                     $position = 'is in contig ';
                 }
                 # Form the contig link.
-                $position .= _contig_link($contigID);
+                $position .= $self->contig_link($contigID);
                 # Add a qualifier.
                 if ($badContigs{$contigID}) {
                     $position .= ", which $badContigs{$contigID}";
@@ -1320,6 +1380,13 @@ sub AddQuality {
                             if ($bestFid) {
                                 push @roleComments, _fid_link($rFid) . " performs this role in the reference genome, and " .
                                     _cr_link($bestFid) . " is the closest to it, with $score matching kmers.";
+                                # Get the best match's location.
+                                my $loc = $self->{fidLocs}{$bestFid};
+                                if ($loc) {
+                                    # This counts as a good feature in this contig, so increment the counter.
+                                    my $contigID = $loc->Contig;
+                                    $contigs{$contigID}[0]++;
+                                }
                             }
                         }
                     }
@@ -1399,32 +1466,6 @@ sub _format_comments {
         $last = "and $last";
         $retVal = join(", ", @work, $last);
     }
-    return $retVal;
-}
-
-=head3 _contig_link
-
-    my $html = GTO::_contig_link($contigID);
-
-Return the PATRIC URL and label for the specified contig.
-
-=over 4
-
-=item contigID
-
-The ID of the sequence of interest.
-
-=item RETURN
-
-Returns a hyperlink displaying the contig ID. When clicked, it will show all the proteins in the contig.
-
-=back
-
-=cut
-
-sub _contig_link {
-    my ($contigID) = @_;
-    my $retVal = qq(<a href ="https://www.patricbrc.org/view/FeatureList/?and(eq(annotation,PATRIC),eq(sequence_id,$contigID),eq(feature_type,CDS))" target="_blank">$contigID</a>);
     return $retVal;
 }
 

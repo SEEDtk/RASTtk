@@ -93,7 +93,7 @@
 [% IF editform %]
 <input type="checkbox" name="delete_contig" value="[% d.name %]" />
 [% END -%]
-<a target="_blank" href="https://www.patricbrc.org/view/FeatureList/?and(eq(annotation,PATRIC),eq(sequence_id,[% d.name %]),eq(feature_type,CDS))">[% d.name %]</a></td>
+[% d.list_url %]</td>
 <td>[% d.len %]</td>
 <td>[% d.good %]</td>
 <td><a target="_blank" href="[% d.fid_url %]">[% d.n_fids %] feature[% IF d.n_fids > 1 %]s[% END %]</a></td>
