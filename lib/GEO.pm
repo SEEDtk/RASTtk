@@ -28,6 +28,7 @@ package GEO;
     use P3Utils;
     use SeedUtils;
     use URI::Escape;
+#    use Carp;
 
 =head1 Genome Evaluation Object
 
@@ -455,6 +456,7 @@ sub CreateFromGtoFiles {
                 if ($function) {
                     my @roles = SeedUtils::roles_of_function($function);
                     my $mapped = 0;
+                    my $prot = $feature->{protein_translation};
                     for my $role (@roles) {
                         my $checkSum = RoleParse::Checksum($role);
                         $stats->Add(roleFoundFile => 1);
@@ -467,7 +469,7 @@ sub CreateFromGtoFiles {
                             $mapped++;
                             if ($rID eq 'PhenTrnaSyntAlph') {
                                 $seedCount++;
-                                my $aaLen = length $feature->{protein_translation};
+                                my $aaLen = length $prot;
                                 if ($aaLen < $min) {
                                     $stats->Add(seedTooShort => 1);
                                     $goodSeed = 0;
@@ -489,7 +491,7 @@ sub CreateFromGtoFiles {
                         }
                         $locs{$fid} = $loc;
                     }
-                    if ($detail > 1) {
+                    if ($detail > 1 && $prot) {
                         $proteins{$fid} = $feature->{protein_translation};
                     }
                 }
