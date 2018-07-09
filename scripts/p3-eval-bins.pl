@@ -32,6 +32,10 @@ The command-line options include those in L<EvalCon/role_options> and L<BinningR
 
 =over 4
 
+=item deep
+
+Compare bin protein sequences to the reference genome.
+
 =item checkDir
 
 The directory containing the completeness-checker input files (see L<GenomeChecker> for details). The default is
@@ -65,7 +69,8 @@ $| = 1;
 my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), EvalCon::role_options(),
         ['recursive', 'process all samples in subdirectories'],
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
-        ['missing', 'skip processed samples']
+        ['missing', 'skip processed samples'],
+        ['deep', 'show full details']
         );
 # Get the parameters.
 my ($binDir) = @ARGV;
@@ -103,7 +108,8 @@ my $stats = $evalCon->stats;
 my ($nMap, $cMap) = $evalCon->roleHashes;
 my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
-my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT);
+my $detail = ($opt->deep ? 2 : 1);
+my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail);
 # Loop through the samples.
 for my $sample (@samples) {
     if ($opt->missing && -s "$sample/Eval/index.html") {
