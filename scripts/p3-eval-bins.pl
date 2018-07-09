@@ -111,6 +111,8 @@ my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH
 my $detail = ($opt->deep ? 2 : 1);
 my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail);
 # Loop through the samples.
+my $sampTot = scalar @samples;
+my $sampDone = 0;
 for my $sample (@samples) {
     if ($opt->missing && -s "$sample/Eval/index.html") {
         print "$sample already processed-- skipping.\n";
@@ -232,5 +234,7 @@ for my $sample (@samples) {
             close $oh;
         }
     }
+    $sampDone++;
+    print "$sampDone of $sampTot samples processed.\n";
 }
 print "All done.\n" . $stats->Show();
