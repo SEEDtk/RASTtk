@@ -3,9 +3,8 @@
     p3-rep-prots.pl [options] outDir
 
 This script processes a list of genome IDs to create a directory suitable for use by the L<RepresentativeGenomes> server.
-It will extract all the instances of the specified seed protein (Phenylanyl synthetase alpha chain) and only
-keep genomes with a single instance of reasonable length. The list of genome IDs and names will go in the output file
-C<complete.genomes> and a FASTA of the seed proteins in C<6.1.1.20.fasta>.
+It will extract all the instances of the specified seed protein (Phenylanyl synthetase alpha chain). The list of genome IDs and
+names will go in the output file C<complete.genomes> and a FASTA of the seed proteins in C<6.1.1.20.fasta>.
 
 =head2 Parameters
 
@@ -17,14 +16,6 @@ Additional command-line options are those given in L<P3Utils/col_options> plus t
 options.
 
 =over 4
-
-=item minlen
-
-The minimum acceptable length for the protein. The default is 209.
-
-=item maxlen
-
-The maximum acceptable length for the protein. The default is 485.
 
 =item clear
 
@@ -44,8 +35,6 @@ use RoleParse;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
-        ['minlen=i', 'minimum protein length', { default => 209 }],
-        ['maxlen=i', 'maximum protein length', { default => 485 }],
         ['clear', 'clear the output directory if it exists']
         );
 # Get the output directory name.
@@ -67,9 +56,6 @@ my @filter = (['eq', 'product', 'Phenylalanyl tRNA-synthetase alpha chain']);
 my $roleCheck = "WCzieTC/aZ6262l19bwqgw";
 # Create a list of the columns we want.
 my @cols = qw(genome_name patric_id aa_sequence product);
-# Get the length options.
-my $minlen = $opt->minlen;
-my $maxlen = $opt->maxlen;
 # Open the output files.
 print "Setting up files.\n";
 open(my $gh, '>', "$outDir/complete.genomes") || die "Could not open genome output file: $!";
@@ -115,19 +101,11 @@ while (! eof $ih) {
             # Skip if we have multiple proteins.
             $stats->Add(multiProt => 1);
         } else {
-            # Get the genome name and sequence, then check the length of the sequence.
+            # Get the genome name and sequence.
             my ($name, $seq) = @{$prots[0]};
-            my $len = length($seq);
-            if ($len < $minlen) {
-                $stats->Add(protTooShort => 1);
-            } elsif ($len > $maxlen) {
-                $stats->Add(protTooLong => 1);
-            } else {
-                # Here we have a good genome.
-                print $gh "$genome\t$name\n";
-                print $fh ">$genome\n$seq\n";
-                $stats->Add(genomeOut => 1);
-            }
+            print $gh "$genome\t$name\n";
+            print $fh ">$genome\n$seq\n";
+            $stats->Add(genomeOut => 1);
         }
     }
 }
