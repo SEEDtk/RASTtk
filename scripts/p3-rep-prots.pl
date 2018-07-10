@@ -69,13 +69,10 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Count the batches of input.
-my $batches = 0;
 my $start0 = time;
 my $gCount = 0;
 # Loop through the input.
 while (! eof $ih) {
-    $batches++;
-    print "Processing batch $batches.\n";
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Convert the couplets to contain only genome IDs.
     my @couples = map { [$_->[0], [$_->[0]]] } @$couplets;
@@ -83,6 +80,7 @@ while (! eof $ih) {
     # Get the features of interest for these genomes.
     my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
     $gCount += scalar @couples;
+    print scalar(@$protList) . " proteins found.\n";
     # Collate them by genome ID, discarding the nulls.
     my %proteins;
     for my $prot (@$protList) {
