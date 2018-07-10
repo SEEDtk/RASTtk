@@ -190,7 +190,7 @@ if ($web) {
     }
 }
 # Create the consistency helper.
-my $evalCon = EvalCon->new_from_script($opt);
+my $evalCon = EvalCon->new_from_script($opt, \*STDERR);
 # Get access to the statistics object.
 my $stats = $evalCon->stats;
 # Create the completeness helper.
@@ -264,7 +264,7 @@ eval {
         # Look for reference genomes from the reference-genome table.
         if (@refsNeeded) {
             # Read the taxonomic lineage for each genome that needs a reference.
-            print STDERR "Searching for reference genomes.\n";
+            print STDERR "Searching for reference genomes for " . scalar(@refsNeeded) . " genomes.\n";
             $start = time;
             my $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'taxon_lineage_ids'], \@refsNeeded);
             for my $taxResult (@$taxResults) {

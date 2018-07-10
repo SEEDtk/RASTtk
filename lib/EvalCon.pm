@@ -77,6 +77,10 @@ Open handle for the current C<X> file.
 
 Number of rows currently in the C<X> and X<row.h> files.
 
+=item logH
+
+Open file handle for log messages, or C<undef> if no logging is desired.
+
 =back
 
 =head2 Special Methods
@@ -145,6 +149,10 @@ If a C<roles.to.use> file and/or a C<roles.in.subsystems> file exists in this di
 
 A L<Stats> object containing statistics about the data processed. If not specified, one will be created for this object.
 
+=item logH
+
+An open file handle for a file to contain status messages.
+
 =back
 
 =back
@@ -153,6 +161,12 @@ A L<Stats> object containing statistics about the data processed. If not specifi
 
 sub new {
     my ($class, %options) = @_;
+    # Get the log file and the stats object.
+    my $logH = $options{logH};
+    my $stats = $options{stats} // Stats->new();
+    # Create the object and bless it.
+    my $retVal = { logH => $logH, stats => $stats };
+    bless $retVal, $class;
     # Analyze the options, starting with the predictors.
     my ($predictors, $rolesToUse, $roleFile) =  map { "$FIG_Config::global/$_"} qw(FunctionPredictors roles.to.use roles.in.subsystems);
     if ($options{predictors}) {
@@ -170,9 +184,12 @@ sub new {
     if ($options{rolesToUse}) {
         $rolesToUse = $options{rolesToUse};
     }
-    my $stats = $options{stats} // Stats->new();
+    $retVal->{predictors} = $predictors;
+    $retVal->_log("Predictors are in $predictors. Role files are $roleFile and $rolesToUse.\n");
     # Create the role definition hashes.
     my ($nMap, $cMap) = LoadRoleHashes($roleFile, $stats);
+    $retVal->{cMap} = $cMap;
+    $retVal->{nMap} = $nMap;
     # Create the roles-of-interest hash.
     open(my $rh, "<$rolesToUse") || die "Could not open $rolesToUse: $!";
     my @roles;
@@ -183,18 +200,15 @@ sub new {
             $stats->Add(usedRole => 1);
         }
     }
-    # Create the object and bless it.
-    my $retVal = {
-        cMap => $cMap, nMap => $nMap, roles => \@roles, predictors => $predictors, stats => $stats
-    };
-    bless $retVal, $class;
+    $retVal->{roles} = \@roles;
+    $retVal->_log(scalar(keys %$nMap) . " roles of interest. " . scalar(@roles) . " used.\n");
     # Return it to the client.
     return $retVal;
 }
 
 =head3 new_from_script
 
-    my $eval = EvalCon->new_for_script($opt);
+    my $eval = EvalCon->new_for_script($opt, $logH);
 
 Create a new quality analysis object using command-line options for a script.
 
@@ -204,13 +218,17 @@ Create a new quality analysis object using command-line options for a script.
 
 A L<Getopt::Long::Descriptive::Opts> object containing the options from L</role_options>.
 
+=item logH (optional)
+
+Open file handle for log messages.
+
 =back
 
 =cut
 
 sub new_from_script {
-    my ($class, $opt) = @_;
-    return EvalCon::new($class, predictors => $opt->predictors, roleFile => $opt->rolefile, rolesToUse => $opt->rolestouse);
+    my ($class, $opt, $logH) = @_;
+    return EvalCon::new($class, predictors => $opt->predictors, roleFile => $opt->rolefile, rolesToUse => $opt->rolestouse, logH => $logH);
 }
 
 
@@ -598,6 +616,30 @@ sub CloseMatrix {
 
 
 =head2 Internal Utilities
+
+=head3 _log
+
+    $eval->_log($message);
+
+Write a message to the log stream, if it exists.
+
+=over 4
+
+=item message
+
+Message string to write.
+
+=back
+
+=cut
+
+sub _log {
+    my ($self, $message) = @_;
+    my $logH = $self->{logH};
+    if ($logH) {
+        print $logH $message;
+    }
+}
 
 =head3 _MatrixAdd
 
