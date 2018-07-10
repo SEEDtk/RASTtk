@@ -1281,9 +1281,9 @@ sub AddQuality {
             $pred{$role} = 1;
             if ($predicted != $actual) {
                 $roles{$role} = [$predicted, $actual, $comment];
-                if ($predicted > $actual) {
+                if ($predicted < $actual) {
                     $over{$role} = 1;
-                } elsif ($predicted < $actual) {
+                } elsif ($predicted > $actual) {
                     $under{$role} = 1;
                 }
             }
