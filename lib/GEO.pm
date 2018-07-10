@@ -1382,7 +1382,9 @@ sub AddQuality {
                 push @roleComments, $fcomment;
                 # If this feature has a protein, save it.
                 my $prot = $self->protein($fid);
-                $proteins{$fid} = $prot;
+                if ($prot) {
+                    $proteins{$fid} = $prot;
+                }
                 # Finally, we must record this feature as a bad feature for the contig.
                 push @{$contigs{$contigID}}, $fid;
             }
