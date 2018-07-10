@@ -358,8 +358,11 @@ sub Check {
             }
         }
     }
-    if (! defined $groupID) {
-        # Still no group. We give up.
+    if (! $taxon) {
+        # No taxonomic data at all.
+        $self->Log("No taxonomic information available for " . $geo->id . "\n");
+    } elsif (! defined $groupID) {
+        # Taxonomic data, but no group. We give up.
         $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
         # Get the group name.
