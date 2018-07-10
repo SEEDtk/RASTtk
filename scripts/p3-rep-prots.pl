@@ -31,6 +31,8 @@ use P3Utils;
 use Stats;
 use File::Copy::Recursive;
 use RoleParse;
+use Time::HiRes;
+use Math::Round;
 
 $| = 1;
 # Get the command-line options.
@@ -68,6 +70,8 @@ my $ih = P3Utils::ih($opt);
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Count the batches of input.
 my $batches = 0;
+my $start0 = time;
+my $gCount = 0;
 # Loop through the input.
 while (! eof $ih) {
     $batches++;
@@ -78,6 +82,7 @@ while (! eof $ih) {
     $stats->Add(genomeRead => scalar @couples);
     # Get the features of interest for these genomes.
     my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
+    $gCount += scalar @couples;
     # Collate them by genome ID, discarding the nulls.
     my %proteins;
     for my $prot (@$protList) {
@@ -108,5 +113,6 @@ while (! eof $ih) {
             $stats->Add(genomeOut => 1);
         }
     }
+    print "$gCount genomes processed at " . Math::Round::nearest(0.01, (time - $start0) / $gCount) . " seconds/genome.\n";
 }
 print "All done.\n" . $stats->Show();
