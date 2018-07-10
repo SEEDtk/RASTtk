@@ -50,6 +50,10 @@ If specified, the input directory is considered a directory of samples, rather t
 If specified, the evaluation will not be performed if it has already been performed. The existence of an C<Eval/index.html> file will be considered evidence
 of an evaluation already performed.
 
+=item editURL
+
+If specified, a URL to use for contig editing.
+
 =back
 
 =cut
@@ -70,7 +74,8 @@ my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), Eva
         ['recursive', 'process all samples in subdirectories'],
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
         ['missing', 'skip processed samples'],
-        ['deep', 'show full details']
+        ['deep', 'show full details'],
+        ['editURL=s', 'URL to use for editing contigs']
         );
 # Get the parameters.
 my ($binDir) = @ARGV;
@@ -110,6 +115,8 @@ my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH
 # Set up the options for creating the GEOs.
 my $detail = ($opt->deep ? 2 : 1);
 my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, binned => 1);
+# Check for an editor URL.
+my $editURL = $opt->editurl;
 # Loop through the samples.
 my $sampTot = scalar @samples;
 my $sampDone = 0;
@@ -208,7 +215,11 @@ for my $sample (@samples) {
                 print "Processing output for $genome.\n";
                 $geo->AddQuality("$outDir/$genome.out");
                 # Create the detail page.
-                my $html = BinningReports::Detail(undef, $binHash, \$detailTT, $geo, $nMap);
+                my $editHash;
+                if ($editURL) {
+                    $editHash = { gto => $geo->gtoFile, editScript => $editURL};
+                }
+                my $html = BinningReports::Detail(undef, $binHash, \$detailTT, $geo, $nMap, $editHash);
                 open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
                 print $wh $prefix . "<title>$genome</title></head><body>\n" . $html . $suffix;
                 close $wh;

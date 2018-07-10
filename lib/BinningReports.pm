@@ -405,7 +405,7 @@ sub Summary {
 
 =head3 Detail
 
-    my $detail = BinningReports::Detail($params, $bins_json, $detail_tt, $geo, $roleMap, $editFlag);
+    my $detail = BinningReports::Detail($params, $bins_json, $detail_tt, $geo, $roleMap, $editHash);
 
 Produce the detail report for a single bin.
 
@@ -605,7 +605,7 @@ sub Detail {
     if ($editHash) {
         $editFlag = 1;
         $gtoFile = $editHash->{gto};
-        $editScript = $editHash->{script};
+        $editScript = $editHash->{editScript};
     }
     # Create the template engine.
     my $templateEngine = Template->new(ABSOLUTE => 1);

@@ -28,6 +28,7 @@ package GEO;
     use P3Utils;
     use SeedUtils;
     use URI::Escape;
+    use File::Spec;
 #    use Carp;
 
 =head1 Genome Evaluation Object
@@ -112,6 +113,10 @@ Reference to a hash that maps each feature to its protein sequence.
 =item binContigs
 
 Reference to a hash that maps contig IDs to the relevant sequence IDs in PATRIC.
+
+=item gtoFile
+
+The absolute file name of the GTO file from which this object was created.
 
 =over 8
 
@@ -439,13 +444,15 @@ sub CreateFromGtoFiles {
             _log($logH, "No genome found in $file.\n");
         } else {
             $stats->Add(genomeFoundFile => 1);
+            # Get the absolute file name.
+            my $absFileName = File::Spec->rel2abs($file);
             # Get the basic genome information.
             my $genome = $gto->{id};
             my $name = $gto->{scientific_name};
             my $domain = $gto->{domain};
             my $taxon = $gto->{ncbi_taxonomy_id};
             $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-                taxon => $taxon };
+                taxon => $taxon, gtoFile => $absFileName };
             # Compute the aa-len limits for the seed protein.
             my ($min, $max) = (209, 405);
             if ($domain eq 'Archaea') {
@@ -1110,6 +1117,19 @@ sub is_clean {
         $retVal = contamX($qData->{contam});
     }
     return $retVal;
+}
+
+=head3 gtoFile
+
+    my $fileName = $geo->gtoFile;
+
+Return the name of the GTO file that created this object, if any.
+
+=cut
+
+sub gtoFile {
+    my ($self) = @_;
+    return $self->{gtoFile};
 }
 
 =head3 contig_link

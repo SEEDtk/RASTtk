@@ -91,7 +91,11 @@
 <tr>
 <td style=''>
 [% IF editform %]
-<input type="checkbox" name="delete_contig" value="[% d.name %]" />
+<input type="checkbox" name="delete_contig" value="[% d.name %]"
+[% UNLESS d.good %]
+checked
+[% END -%]
+/>
 [% END -%]
 [% d.list_url %]</td>
 <td>[% d.len %]</td>
