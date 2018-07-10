@@ -80,7 +80,6 @@ while (! eof $ih) {
     # Get the features of interest for these genomes.
     my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
     $gCount += scalar @couples;
-    print scalar(@$protList) . " proteins found.\n";
     # Collate them by genome ID, discarding the nulls.
     my %proteins;
     for my $prot (@$protList) {
