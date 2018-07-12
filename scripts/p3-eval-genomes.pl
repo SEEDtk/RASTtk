@@ -279,7 +279,7 @@ eval {
                     }
                 }
                 if ($refFound && $refFound ne $genome) {
-                    $refGenomes{$refFound} = $genome;
+                    push @{$refGenomes{$refFound}}, $genome;
                     $pGenomes{$refFound} = 1;
                     $stats->Add(refFoundInTable => 1);
                 } elsif ($refFound) {
@@ -317,11 +317,13 @@ eval {
             for my $genome (keys %refGenomes) {
                 my $refGeo = $gHash->{$genome};
                 if ($refGeo) {
-                    my $target = $refGenomes{$genome};
-                    my $geo = $geoMap{$target};
-                    if ($geo) {
-                        $geo->AddRefGenome($refGeo);
-                        print STDERR "$genome stored as reference for $target.\n";
+                    my @targets = $refGenomes{$genome};
+                    for my $target (@targets) {
+                        my $geo = $geoMap{$target};
+                        if ($geo) {
+                            $geo->AddRefGenome($refGeo);
+                            print STDERR "$genome stored as reference for $target.\n";
+                        }
                     }
                 }
             }
