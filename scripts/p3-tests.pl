@@ -137,7 +137,7 @@ my @genomeIDs = map { $_->[0] } @rowCopy;
          '--attr', 'genome_id,genome_name', '--attr', 'genome_length', '--input', $inFile, '--col', 'id',
          '--delim', 'semi');
 $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::ih_options(), P3Utils::col_options());
-my ($selectList, $newHeaders) = P3Utils::select_clause(genome => $opt);
+my ($selectList, $newHeaders) = P3Utils::select_clause($p3, genome => $opt);
 is(scalar @$newHeaders, 3, 'select clause length test');
 is($newHeaders->[0], 'genome.genome_id', 'select clause field 1 test');
 is($newHeaders->[1], 'genome.genome_name', 'select clause field 2 test');
@@ -166,7 +166,7 @@ my $outFile = "$workDir/out.tbl";
 open(my $oh, '>', $outFile) || die "Could not open test output file.\n";
 @ARGV = ('--col', 'id', '--input', $inFile, '--delim', 'semi', '--attr', 'taxon_lineage_names');
 $opt = P3Utils::script_opts('', P3Utils::col_options(), P3Utils::ih_options(), P3Utils::data_options());
-($selectList, $newHeaders) = P3Utils::select_clause(genome => $opt);
+($selectList, $newHeaders) = P3Utils::select_clause($p3, genome => $opt);
 $filterList = P3Utils::form_filter($opt);
 $ih = P3Utils::ih($opt);
 ($headers, $keyCol) = P3Utils::process_headers($ih, $opt);

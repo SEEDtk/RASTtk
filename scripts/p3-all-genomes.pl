@@ -75,7 +75,7 @@ if ($opt->fields) {
     print join("\n", @$fieldList, "");
 } else {
     # Compute the output columns. Note we configure this as an ID-centric method.
-    my ($selectList, $newHeaders) = P3Utils::select_clause(genome => $opt, 1);
+    my ($selectList, $newHeaders) = P3Utils::select_clause($p3, genome => $opt, 1);
     # Compute the filter.
     my $filterList = P3Utils::form_filter($opt);
     # Check for public-only and private-only.

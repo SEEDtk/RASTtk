@@ -51,7 +51,7 @@ if ($fields) {
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Compute the output columns.
-my ($selectList, $newHeaders) = P3Utils::select_clause(genome_drug => $opt);
+my ($selectList, $newHeaders) = P3Utils::select_clause($p3, genome_drug => $opt);
 # Compute the filter.
 my $filterList = P3Utils::form_filter($opt);
 # Add the special filters.

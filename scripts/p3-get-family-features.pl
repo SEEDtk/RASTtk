@@ -60,7 +60,7 @@ if ($opt->fields) {
     print join("\n", @$fieldList, "");
 } else {
     # Compute the output columns.
-    my ($selectList, $newHeaders) = P3Utils::select_clause(feature => $opt);
+    my ($selectList, $newHeaders) = P3Utils::select_clause($p3, feature => $opt);
     # Compute the filter.
     my $filterList = P3Utils::form_filter($opt);
     # Open the input file.

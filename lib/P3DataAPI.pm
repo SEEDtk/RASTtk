@@ -193,6 +193,7 @@ sub query
     my ( $self, $core, @query ) = @_;
 
     my $qstr;
+    my $started;
 
     my @q;
     for my $ent (@query) {
@@ -222,7 +223,7 @@ sub query
         #			     Content => $q);
         my $end;
         $start = gettimeofday if $self->{benchmark};
-        # print STDERR "$url?$q\n";
+        $self->_log("$url?$q\n");
         my $resp = $ua->get( "$url?$q", Accept => "application/json" , $self->auth_header);
         # print STDERR Dumper($resp);
         $end = gettimeofday if $self->{benchmark};
@@ -238,15 +239,17 @@ sub query
         my $data = decode_json( $resp->content );
         push @result, @$data;
 
-        #        print STDERR scalar(@$data) . " results found.\n";
+        # print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
-        #	print "r=$r\n";
         if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
             my $this_start = $1;
             my $next       = $2;
             my $count      = $3;
-
+            if (! $started) {
+                $self->_log("$count results expected.\n");
+                $started = 1;
+            }
             last if ( $next >= $count );
             $start = $next;
         }
@@ -387,13 +390,11 @@ sub query_cb {
         }
 
         my $r = $resp->header('content-range');
-
         if ($r =~ m,items\s+(\d+)-(\d+)/(\d+),)
         {
             my $this_start = $1;
             my $next       = $2;
             my $count      = $3;
-
             my $last_call = $next >= $count;
 
             my $continue = $cb_add->($data,
@@ -2251,4 +2252,42 @@ sub fill_reference_gene_cache
     $self->reference_genome_cache($cache);
     return $cache;
 }
+
+=head3 debug_on
+
+    $p3->debug_on($logH);
+
+Turn on debugging to the specified log file.
+
+=over 4
+
+=item logH
+
+Open file handle for debug messages.
+
+=back
+
+=cut
+
+sub debug_on {
+    my ($self, $logH) = @_;
+    $self->{logH} = $logH;
+}
+
+=head3 _log
+
+    $p3->_log($message);
+
+Write the specified message to the log file (if any). If there has been no prior call to L<debug_on> nothing will happen.
+
+=cut
+
+sub _log {
+    my ($self, $message) = @_;
+    my $lh = $self->{logH};
+    if ($lh) {
+        print $lh $message;
+    }
+}
+
 1;

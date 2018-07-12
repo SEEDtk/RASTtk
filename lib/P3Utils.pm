@@ -48,7 +48,10 @@ use constant OBJECTS => {   genome => 'genome',
                             genome_drug => 'genome_amr',
                             contig =>  'genome_sequence',
                             drug => 'antibiotics',
-                            taxonomy => 'taxonomy' };
+                            taxonomy => 'taxonomy',
+                            experiment => 'transcriptomics_experiment',
+                            expression => 'transcriptomics_gene',
+                            sample => 'transcriptomics_sample' };
 
 =head3 FIELDS
 
@@ -61,7 +64,10 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
                             contig => ['genome_id', 'accession', 'length', 'gc_content', 'sequence_type', 'topology'],
-                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'], };
+                            drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'],
+                            experiment => ['eid', 'title', 'genes', 'pmid', 'organism', 'strain', 'mutant', 'timeseries', 'release_date'],
+                            sample => ['eid', 'expid', 'genes', 'sig_log_ratio', 'sig_z_score', 'pmid', 'organism', 'strain', 'mutant', 'condition', 'timepoint', 'release_date'],
+                            expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'] };
 
 =head3 IDCOL
 
@@ -74,7 +80,10 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             family => 'family_id',
                             genome_drug => 'id',
                             contig => 'sequence_id',
-                            drug => 'antibiotic_name' };
+                            drug => 'antibiotic_name',
+                            experiment => 'eid',
+                            sample => 'expid',
+                            expression => 'id' };
 
 =head3 DERIVED
 
@@ -96,6 +105,12 @@ use constant DERIVED => {
                         },
             drug =>     {
                         },
+            experiment => {
+                        },
+            sample =>   {
+                        },
+            expression => {
+                        }
 };
 =head2  Methods
 
@@ -145,6 +160,10 @@ fields may be specified by coding the option multiple times.
 Specifies a keyword or phrase (in quotes) that should be included in any field of the output. This performs a
 text search against entire records.
 
+=item debug
+
+Display debugging information on STDERR.
+
 =back
 
 =cut
@@ -161,6 +180,7 @@ sub data_options {
             ['in=s@', 'any-value search constraint(s) in the form field_name,value1,value2,...,valueN'],
             ['keyword=s', 'if specified, a keyword or phrase that shoould be in at least one field of every record'],
             ['required|r=s@', 'field(s) required to have values'],
+            ['debug', 'display debugging on STDERR'],
             delim_options());
 }
 
@@ -549,12 +569,16 @@ sub form_filter {
 
 =head3 select_clause
 
-    my ($selectList, $newHeaders) = P3Utils::select_clause($object, $opt, $idFlag);
+    my ($selectList, $newHeaders) = P3Utils::select_clause($p3, $object, $opt, $idFlag);
 
 Determine the list of fields to be returned for the current query. If an C<--attr> option is present, its
 listed fields are used. Otherwise, a default list is used.
 
 =over 4
+
+=item p3
+
+The L<P3DataAPI> object used to access PATRIC.
 
 =item object
 
@@ -580,7 +604,7 @@ count, the first element will be undefined, and the second will be a singleton l
 =cut
 
 sub select_clause {
-    my ($object, $opt, $idFlag) = @_;
+    my ($p3, $object, $opt, $idFlag) = @_;
     # Validate the object.
     my $realName = OBJECTS->{$object};
     die "Invalid object $object." if (! $realName);
@@ -616,6 +640,10 @@ sub select_clause {
     # Clear the attribute list if we are counting.
     if ($opt->count) {
         undef $attrList;
+    }
+    # Check for the debug option.
+    if ($opt->debug) {
+        $p3->debug_on(\*STDERR);
     }
     # Return the results.
     return ($attrList, \@headers);
