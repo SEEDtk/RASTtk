@@ -1331,6 +1331,8 @@ sub AddQuality {
             }
         }
     }
+    # Get the protein hash for this genome.
+    my $ourProteins = $self->{proteins};
     # Now we must analyze the features for each problematic role and update the
     # comments.
     for my $role (keys %roles) {
@@ -1340,12 +1342,58 @@ sub AddQuality {
         if ($comment) { push @roleComments, $comment; }
         # If there are existing features for the role, we make comments on each one.
         if ($actual >= 1) {
-            # We will accumulate proteins in here.
-            my %proteins;
-            # Process the list of features found.
+            # Get the list of features found, and save their proteins.
             my $fids = $roleFids->{$role};
+            my %proteins;
             for my $fid (@$fids) {
-                # We will accumulate our comments for each feature in here.
+                # If this feature has a protein, save it.
+                my $prot = $self->protein($fid);
+                if ($prot) {
+                    $proteins{$fid} = $prot;
+                }
+            }
+            # We accumulate reference-genome comments for each feature in this hash.
+            my %fComments;
+            # If we have actual features and we have proteins, we can ask which feature
+            # is the best.
+            if ($actual > 0 && scalar(keys %proteins) > 1) {
+                # Check for this role in each reference genome.
+                for my $refGeo (@$refGeoL) {
+                    my $rFids = $refGeo->{roleFids}{$role};
+                    # Loop through the reference genome features.
+                    for my $rFid (@$rFids) {
+                        my $rProtein = $refGeo->protein($rFid);
+                        if ($rProtein) {
+                            my ($bestFid, $score) = closest_protein($rProtein, \%proteins);
+                            if ($bestFid) {
+                                # Here one of our features matches the reference genome's implementation of this role.
+                                $fComments{$bestFid} = "is closest to " . _fid_link($rFid) . ", which performs this role in the reference genome ($score matching kmers)";
+                                # Get the best match's location.
+                                my $loc = $self->{fidLocs}{$bestFid};
+                                if ($loc) {
+                                    # This counts as a good feature in this contig, so increment the counter.
+                                    my $contigID = $loc->Contig;
+                                    $contigs{$contigID}[0]++;
+                                }
+                            } else {
+                                # This reference genome feature is not associated with any feature in this genome possessing this role.
+                                my $comment = _fid_link($rFid) . " performs this role in the reference genome";
+                                # Look for a match in this genome that does not have this role.
+                                my ($pFid, $score) = closest_protein($rProtein, $ourProteins);
+                                if ($pFid) {
+                                    $comment .= " and " . _fid_link($pFid) . " is the feature in this genome closest to it ($score matching kmers).";
+                                } else {
+                                    $comment .= " but has no close features in this genome."
+                                }
+                                push @roleComments, $comment
+                            }
+                        }
+                    }
+                }
+            }
+            # Process the list of features found.
+            for my $fid (@$fids) {
+                # We will build our comments for this feature in here.
                 my @comments;
                 # Analyze the location.
                 my $loc = $fidLocs->{$fid};
@@ -1376,43 +1424,16 @@ sub AddQuality {
                     $position .= ", which $badContigs{$contigID}";
                 }
                 push @comments, $position;
+                # Add the closest-role comment, if any.
+                if ($fComments{$fid}) {
+                    push @comments, $fComments{$fid};
+                }
                 # Now build the feature comment. There will be at least one, but may
                 # be more.
                 my $fcomment = _cr_link($fid) . ' ' . _format_comments(@comments);
                 push @roleComments, $fcomment;
-                # If this feature has a protein, save it.
-                my $prot = $self->protein($fid);
-                if ($prot) {
-                    $proteins{$fid} = $prot;
-                }
                 # Finally, we must record this feature as a bad feature for the contig.
                 push @{$contigs{$contigID}}, $fid;
-            }
-            # Now, if we have too many of the feature and we have proteins, we can ask which feature
-            # is the best.
-            if ($actual > $predicted && $predicted >= 1 && scalar(keys %proteins) > 1) {
-                # Check for this role in each reference genome.
-                for my $refGeo (@$refGeoL) {
-                    my $rFids = $refGeo->{roleFids}{$role};
-                    # Loop through the reference genome features.
-                    for my $rFid (@$rFids) {
-                        my $rProtein = $refGeo->protein($rFid);
-                        if ($rProtein) {
-                            my ($bestFid, $score) = closest_protein($rProtein, \%proteins);
-                            if ($bestFid) {
-                                push @roleComments, _fid_link($rFid) . " performs this role in the reference genome, and " .
-                                    _cr_link($bestFid) . " is the closest to it, with $score matching kmers.";
-                                # Get the best match's location.
-                                my $loc = $self->{fidLocs}{$bestFid};
-                                if ($loc) {
-                                    # This counts as a good feature in this contig, so increment the counter.
-                                    my $contigID = $loc->Contig;
-                                    $contigs{$contigID}[0]++;
-                                }
-                            }
-                        }
-                    }
-                }
             }
         } elsif ($refGeoCount) {
             # The role is missing, but we have a reference genome. Get its instances
@@ -1434,8 +1455,6 @@ sub AddQuality {
             } else {
                 my $verb = ($fidCount == 1 ? 'performs' : 'perform');
                 push @roleComments, _fid_link(sort keys %rProteins) . " $verb this role in the reference $genomeWord.";
-                # Get the protein hash for this genome.
-                my $ourProteins = $self->{proteins};
                 # Find the closest feature for each reference genome protein.
                 for my $rFid (sort keys %rProteins) {
                     my $rProtein = $rProteins{$rFid};

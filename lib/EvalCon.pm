@@ -185,7 +185,7 @@ sub new {
         $rolesToUse = $options{rolesToUse};
     }
     $retVal->{predictors} = $predictors;
-    $retVal->_log("Predictors are in $predictors. Role files are $roleFile and $rolesToUse.\n");
+    $retVal->_log("Predictors are in $predictors.\nRole files are $roleFile and $rolesToUse.\n");
     # Create the role definition hashes.
     my ($nMap, $cMap) = LoadRoleHashes($roleFile, $stats);
     $retVal->{cMap} = $cMap;

@@ -317,8 +317,8 @@ eval {
             for my $genome (keys %refGenomes) {
                 my $refGeo = $gHash->{$genome};
                 if ($refGeo) {
-                    my @targets = $refGenomes{$genome};
-                    for my $target (@targets) {
+                    my $targets = $refGenomes{$genome};
+                    for my $target (@$targets) {
                         my $geo = $geoMap{$target};
                         if ($geo) {
                             $geo->AddRefGenome($refGeo);
