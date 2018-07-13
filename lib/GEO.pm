@@ -1421,7 +1421,7 @@ sub AddQuality {
                 $position .= $self->contig_link($contigID);
                 # Add a qualifier.
                 if ($badContigs{$contigID}) {
-                    $position .= ", which $badContigs{$contigID}";
+                    $position .= " (which $badContigs{$contigID})";
                 }
                 push @comments, $position;
                 # Add the closest-role comment, if any.
