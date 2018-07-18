@@ -202,20 +202,20 @@ $stats->Add(timeLoading => $timer);
 my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, detail => $detailLevel,
         logH => \*STDERR);
 # Process the resume option.
+my $skipped = 0;
 if ($opt->resume) {
     my $found;
-    my $count = 0;
     my $lastGenome = $opt->resume;
     print STDERR "Searching for $lastGenome.\n";
     while (! eof $ih && ! $found) {
         my $line = <$ih>;
         my @fields = P3Utils::get_fields($line);
-        $count++;
+        $skipped++;
         if ($fields[$keyCol] eq $lastGenome) {
             $found = 1;
         }
     }
-    print STDERR "$count lines skipped.\n";
+    print STDERR "$skipped lines skipped.\n";
 } elsif (! $opt->nohead) {
     # Not resuming. Form the full header set and write it out.
     push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
@@ -394,7 +394,8 @@ eval {
                 $count0++;
                 $lastGenome = $genome;
             }
-            print STDERR "$count0 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . " seconds/genome.\n";
+            my $count1 = $count0 + $skipped;
+            print STDERR "$count1 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . " seconds/genome.\n";
         }
     }
     # Here we have processed all the genomes. If we are doing a summary page, we do it now.

@@ -1,0 +1,52 @@
+<html><head>
+<style type="text/css">
+body {
+        font-family: Arial, sans-serif;
+        color: #333333;
+        font-weight: 200;
+        font-size: small;
+        background: #FCFCFC;
+}
+table.p3basic, table.p3basic th,
+table.p3basic td, table.p3basic tr {
+        border-style: inset;
+        border-collapse: collapse;
+        vertical-align: top;
+        padding: 3px;
+}
+table.p3basic th {
+        text-align: left;
+        background: #EEEEEE;
+}</style>
+<title>Representative Genomes</title></head><body>
+
+<h1>Representative Genome List</h1>
+
+<p>Representation based on a kmer size of [% kSize %] and a minimum similarity score of [% score %] produced [% reps %]
+total representatives covering [% mTotal %] represented genomes.</p>
+
+<table class='p3basic'>
+
+<tr>
+<th>Members</th>
+<th>Genome ID</th>
+<th>Genome Name</th>
+<th>Contig count</th>
+<th>DNA size (bp)</th>
+<th>Domain</th>
+<th>Seed Feature</th>
+</tr>
+
+[% FOR g IN genomes %]
+<tr>
+<td>[% g.membership %]</td>
+<td><a target="_blank" href="https://www.patricbrc.org/view/Genome/[% g.id %]">[% g.id %]</a></td>
+<td>[% g.name %]</td>
+<td>[% g.contigs %]</td>
+<td>[% g.dna_bp %]</td>
+<td>[% g.kingdom %]</td>
+<td>[% g.seed %]</td>
+</tr>
+[% END %]
+</table>
+</body></html>
