@@ -25,7 +25,18 @@ table.p3basic th {
 <p>Representation based on a kmer size of [% kSize %] and a minimum similarity score of [% score %] produced [% reps %]
 total representatives covering [% mTotal %] represented genomes.</p>
 
-<table class='p3basic'>
+<form method="get" action="neighbors.cgi" target="_blank">
+<table class="p3basic">
+<tr><td colspan="2"><center><b>Find Neighbors</b></center></td></tr>
+<tr><th>Genome ID</th><td><input type="text" name="genome" placeholder="genome ID" /></td></tr>
+<tr><th>Target Size</th><td><input type="text" name="size" value="100" /></td></tr>
+<tr><th>Slice Size</th><td><input type="text" name="sliceSize" value="35" /></td></tr>
+<tr><td colspan="2"><center><input type="hidden" name="repDir" value="[% rep_dir %]" /><input type="submit" /></center></td></tr>
+</table>
+<p><b>Target Size</b> is the number of neighbors desired. This will be approximate. Increase the <b>Slice Size</b> to get more neighbors close to the original genome. Decrease it to get
+more genomes further away.</p>
+
+<table class="p3basic">
 
 <tr>
 <th>Members</th>
