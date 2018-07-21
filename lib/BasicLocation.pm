@@ -161,6 +161,7 @@ sub new {
     } elsif (ref $p[0] eq 'ARRAY') {
         # Here we have a database location tuple.
         ($contigID, $beg, $dir, $len) = @{$p[0]};
+        $len ||= 0;
         # Adjust the beginning if this is on the - strand.
         if ($dir eq '-') {
             $beg = $beg + $len - 1;

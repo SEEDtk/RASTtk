@@ -17,8 +17,9 @@ from sklearn.externals import joblib
 ## completeness data in them. There are other versions of this script that can be called standalone.
 ## This one is usually invoked from L<p3-eval-genomes.pl>.
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+def eprint(qflag, *args, **kwargs):
+    if (not qflag):
+        print(*args, file=sys.stderr, **kwargs)
 
 
 def run_predictor(n_col):
@@ -59,11 +60,13 @@ parser.add_argument("outDir", help="output directory (0 for no output)",
 parser.add_argument("-c", "--classifier", dest="clfType", default="RandomForestClassifier", help="Type of sklearn classifier to use")
 parser.add_argument("--LDA", action="store_true",
                   help="Use Linear Discriminant Analysis")
+parser.add_argument("-q", "--quiet", action="store_true", help="suppress status output")
 args = parser.parse_args()
+q = args.quiet;
 if __name__ == '__main__':
-    eprint("Using predictors from " + args.trainDir + ".")
+    eprint(q, "Using predictors from " + args.trainDir + ".")
     if (args.outDir != '0'):
-        eprint("Output will be in " + args.outDir + ".")
+        eprint(q, "Output will be in " + args.outDir + ".")
     if not os.path.isdir(args.testDir):
         sys.stderr.write("not a valid testDir: %s\n" % (args.testDir))
         sys.exit(-1)
@@ -122,4 +125,4 @@ if __name__ == '__main__':
             sfh.close()
 
     np.savetxt(args.testDir + "/summary.out", all_summary, fmt="%s", delimiter ="\t")
-    eprint("Finished %d evaluations with %d roles in %0.2f seconds." % (predictions.shape[0], predictions.shape[1], time.time()-stime))
+    eprint(q, "Finished %d evaluations with %d roles in %0.2f seconds." % (predictions.shape[0], predictions.shape[1], time.time()-stime))

@@ -442,7 +442,7 @@ sub process_headers {
 
 =head3 find_column
 
-    my $keyCol = P3Utils::find_column($col, \@headers);
+    my $keyCol = P3Utils::find_column($col, \@headers, $optional);
 
 Determine the correct (0-based) index of the key column in a file from a column specifier and the headers.
 The column specifier can be a 1-based index or the name of a header.
@@ -457,16 +457,20 @@ Incoming column specifier.
 
 Reference to a list of column header names.
 
+=item optional (optional)
+
+If TRUE, then failure to find the header is not an error.
+
 =item RETURN
 
-Returns the 0-based index of the key column.
+Returns the 0-based index of the key column or C<undef> if the header was not found.
 
 =back
 
 =cut
 
 sub find_column {
-    my ($col, $headers) = @_;
+    my ($col, $headers, $optional) = @_;
     my $retVal;
     if ($col =~ /^\-?\d+$/) {
         # Here we have a column number.
@@ -483,7 +487,7 @@ sub find_column {
                     $retVal = $i;
                 }
             }
-            if (! defined $retVal) {
+            if (! defined $retVal && ! $optional) {
                 die "\"$col\" not found in headers.";
             }
         }
