@@ -42,6 +42,11 @@ omitted, the single column header C<id> is assumed.
 
 If this option is specified, then no column headers are output. The value is the number of columns desired.
 
+=item data
+
+Specifies a file name. The records in the file will be added to the end of the output. Use this option to put headers
+onto a headerless file.
+
 =back
 
 =cut
@@ -52,7 +57,8 @@ use P3Utils;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('value1 value2 ... valueN',
         ['title|header|hdr|t=s@', 'header value(s) to use in first output record', { default => ['id'] }],
-        ['nohead=i', 'file has no header and the specified number of columns']);
+        ['nohead=i', 'file has no header and the specified number of columns'],
+        ['data=s', 'input data file']);
 # Get the titles.
 my $cols;
 if ($opt->nohead) {
@@ -80,4 +86,12 @@ if (scalar @line) {
         push @line, '';
     }
     P3Utils::print_cols(\@line);
+}
+if ($opt->data) {
+    # Here the user wants data lines from an input file.
+    open(my $ih, '<', $opt->data) || die "Could not open data file: $!";
+    while (! eof $ih) {
+        my $line = <$ih>;
+        print $line;
+    }
 }
