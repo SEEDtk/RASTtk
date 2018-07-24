@@ -1,6 +1,6 @@
 =head1 Evaluate PATRIC Genomes
 
-    p3-eval-genomes.pl [options] workDir outDir
+    p3x-eval-genomes.pl [options] workDir outDir
 
 This script evaluates one or more PATRIC genomes. Normally, it takes an input file containing genome IDs and produces
 an output directory containing evaluation information for each genome. Optionally, web page output can be specified.

@@ -1,6 +1,6 @@
 =head1 Evaluate the Bins from a Binning Job
 
-    p3-eval-bins.pl [options] binDir
+    p3x-eval-bins.pl [options] binDir
 
 This script will evaluate the bins resulting from a binning job run through L<bins_sample_pipeline.pl>. In each such directory, it expects
 the following files.

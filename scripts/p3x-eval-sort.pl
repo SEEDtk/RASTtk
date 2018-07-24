@@ -1,8 +1,8 @@
 =head1 Sort Evaluation Results by Quality
 
-    p3-eval-sort.pl [options] <inFile >sortedFile
+    p3x-eval-sort.pl [options] <inFile >sortedFile
 
-This script sorts the output from L<p3-eval-genomes.pl> to put the best genomes at the top. All good genomes sort before the bad ones, and
+This script sorts the output from L<p3x-eval-genomes.pl> to put the best genomes at the top. All good genomes sort before the bad ones, and
 in each section they are sorted by the qscore.
 
 =head2 Parameters

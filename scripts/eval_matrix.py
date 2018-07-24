@@ -15,7 +15,7 @@ from sklearn.externals import joblib
 ## XXXXX.out files will be written to outDir, where XXXXXX is the ID of a genome.
 ## Output files will be appended, not created, because it is expected that there will already be
 ## completeness data in them. There are other versions of this script that can be called standalone.
-## This one is usually invoked from L<p3-eval-genomes.pl>.
+## This one is usually invoked from L<p3x-eval-genomes.pl>.
 
 def eprint(qflag, *args, **kwargs):
     if (not qflag):

@@ -1224,7 +1224,7 @@ This method fills in the C<quality> member described above.
 
 =item summaryFile
 
-The name of the genome summary file produced by L<p3-eval-genomes.pl> for this genome. This contains the role
+The name of the genome summary file produced by L<p3x-eval-genomes.pl> for this genome. This contains the role
 information and the quality metrics.
 
 =back
