@@ -97,7 +97,8 @@ while (! eof $ih) {
                 my $loc2 = $catH->{$cat2};
                 $total{$pairID}++;
                 $stats->Add(pairCat => 1);
-                if ($loc1->Distance($loc2) <= $gap) {
+                my $dist = $loc1->Distance($loc2);
+                if (defined $dist && $dist <= $gap) {
                     $stats->Add(closeCat => 1);
                     $close{$pairID}++;
                 }
