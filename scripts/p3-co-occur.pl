@@ -55,7 +55,7 @@ my $gap = $opt->gap;
 my $type = $opt->type;
 my $nohead = $opt->nohead;
 my $debug = $opt->verbose;
-print STDERR "Using gap $gap for category $type.\n";
+print STDERR "Using gap $gap for category $type.\n" if $debug;
 # Check the category file.
 my ($catFile) = @ARGV;
 if (! $catFile) {
