@@ -8,6 +8,7 @@ possible to specify protein families.
 =head2 Parameters
 
 The positional parameter is the name of the file containing the category names. The file should be tab-delimited with the names in the first column.
+If no file is specified, all recognizable category values will be counted. This can be problematic if the categories are roles.
 
 The standard input can be overridden using the options in L<P3Utils/ih_options>. The standard input will contain the genome IDs. The options in
 L<P3Utils/col_options> can be used to configure headers and the column containing the genome IDs. In addition, the following options are
@@ -21,7 +22,7 @@ The maximum gap distance for two proteins to be considered physically close. The
 
 =item type
 
-The type of category-- currently C<role> or C<family>. The default is C<role>.
+The type of category-- currently C<role>, C<ecnum>, or C<family>. The default is C<role>.
 
 =item verbose
 
@@ -39,6 +40,7 @@ use Stats;
 use Math::Round;
 use Category::Role;
 use Category::Family;
+use Category::EC;
 
 $| = 1;
 my $stats = Stats->new();
@@ -59,12 +61,13 @@ print STDERR "Using gap $gap for category $type.\n" if $debug;
 # Check the category file.
 my ($catFile) = @ARGV;
 if (! $catFile) {
-    die "No category file specified.";
+    $catFile = '*';
+    print STDERR "All categories will be counted.\n" if $debug;
 } elsif (! -s $catFile) {
     die "Category file $catFile is missing or empty.";
 }
 # Create the category object.
-print STDERR "Reading category file.\n" if $debug;
+print STDERR "Initializing category definitions.\n" if $debug;
 my $catHelper = Category->new($p3, $type, $catFile, $nohead);
 # Open the input file.
 my $ih = P3Utils::ih($opt);

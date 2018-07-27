@@ -57,6 +57,10 @@ Reference to a hash that maps each category ID to its display name.
 
 The L<P3DataAPI> object for accessing the PATRIC database.
 
+=item allMode
+
+If specified, all categories are accepted, rather than just the ones in a list.
+
 =back
 
 =head2 Special Methods
@@ -79,7 +83,7 @@ The type of category.
 
 =item catFile
 
-The input file containing the desired category names in the first column.
+The input file containing the desired category names in the first column, or C<*>, indicating that all categories are to be counted.
 
 =item nohead
 
@@ -89,7 +93,7 @@ TRUE if the input file lacks headers, else FALSE.
 
 =cut
 
-use constant CLASSES => { role => 'Category::Role', family => 'Category::Family' };
+use constant CLASSES => { role => 'Category::Role', family => 'Category::Family', ecnum => 'Category::EC' };
 
 sub new {
     my ($class, $p3, $type, $catFile, $nohead) = @_;
@@ -102,21 +106,27 @@ sub new {
     my %catH;
     my $retVal = { p3 => $p3, catH => \%catH };
     bless $retVal, $class;
-    # Open the input file and skip the header.
-    open(my $ih, "<$catFile") || die "Could not open category file: $!";
-    my $line;
-    if (! $nohead) {
-        $line = <$ih>;
+    # Are we in all-mode?
+    if ($catFile eq '*') {
+        $retVal->{allMode} = 1;
+    } else {
+        $retVal->{allMode} = 0;
+        # Open the input file and skip the header.
+        open(my $ih, "<$catFile") || die "Could not open category file: $!";
+        my $line;
+        if (! $nohead) {
+            $line = <$ih>;
+        }
+        # Loop through the categories.
+        while (! eof $ih) {
+            my $line = <$ih>;
+            chomp $line;
+            my ($catName) = split /\t/, $line;
+            my $catID = $retVal->name_to_id($catName);
+            $catH{$catID} = $catName;
+        }
+        close $ih;
     }
-    # Loop through the categories.
-    while (! eof $ih) {
-        my $line = <$ih>;
-        chomp $line;
-        my ($catName) = split /\t/, $line;
-        my $catID = $retVal->name_to_id($catName);
-        $catH{$catID} = $catName;
-    }
-    close $ih;
     # All done. Return the object.
     return $retVal;
 }
@@ -210,7 +220,7 @@ Returns the name of the category with the specified ID.
 
 sub id_to_name {
     my ($self, $catID) = @_;
-    return $self->{catH}{$catID};
+    return $self->{catH}{$catID} // $catID;
 }
 
 
@@ -240,8 +250,9 @@ sub get_cats {
     my ($self, $genome) = @_;
     # Get the P3DataAPI object.
     my $p3 = $self->{p3};
-    # Get the category ID hash.
+    # Get the category ID hash and the all-mode switch.
     my $catH = $self->{catH};
+    my $allMode = $self->{allMode};
     # Read all the genome features.
     my $catField = $self->field_name();
     my $results = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome]], [$catField, 'sequence_id', 'start', 'strand', 'end']);
@@ -259,7 +270,7 @@ sub get_cats {
         # Get the category IDs.
         my @cats = $self->all_cats($catName);
         for my $cat (@cats) {
-            if ($catH->{$cat}) {
+            if ($allMode || $catH->{$cat}) {
                 # Here the category is of interest.
                 $count{$cat}++;
                 $retVal{$cat} = $loc;

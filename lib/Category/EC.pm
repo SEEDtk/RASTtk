@@ -16,23 +16,23 @@
 #
 
 
-package Category::Role;
+package Category::EC;
 
     use strict;
     use warnings;
     use base qw(Category);
-    use RoleParse;
-    use SeedUtils;
 
-=head1 Role Category Object
+=head1 Category Object for EC Numbers
 
-This is a subclass of L<Category> for the situation where a feature's categories are determined by its roles.
+This is a subclass of L<Category> that is used to categorize features by EC Number.
+
+=head2 Virtual Methods
 
 =head3 name_to_id
 
     my $catID = $catHelper->name_to_id($catName);
 
-Return the ID for a category given its name string. The ID is its checksum.
+Return the ID for a category given its name string. The ID is the actual EC number.
 
 =over 4
 
@@ -50,19 +50,31 @@ Returns the internal ID for the category.
 
 sub name_to_id {
     my ($self, $catName) = @_;
-    my $retVal = RoleParse::Checksum($catName);
+    my ($retVal, $name)  = split /\|/, $catName;
     if ($self->{allMode}) {
-        $self->{catH}{$retVal} = $catName;
+        $self->{catH}{$retVal} = "$name (EC $retVal)" // $retVal;
     }
     return $retVal;
 }
 
 
+=head3 field_name
+
+    my $field_name = $catHelper->field_name();
+
+Return the name of the feature field used to extract the category name.
+
+=cut
+
+sub field_name {
+    return 'ec';
+}
+
 =head3 all_cats
 
     my @cats = $catHelper->all_cats($dbString);
 
-Return a list of all the categories in which a feature belongs. The functional assignment may contain multiple roles.
+Return a list of all the categories in which a feature belongs. The database may return a list of EC numbers for a single feature.
 
 =over 4
 
@@ -80,24 +92,17 @@ Returns a list of category IDs.
 
 sub all_cats {
     my ($self, $dbString) = @_;
-    my @roles = SeedUtils::roles_of_function($dbString);
     my @retVal;
-    for my $role (@roles) {
-        push @retVal, $self->name_to_id($role);
+    if ($dbString) {
+        my @names;
+        if (ref $dbString eq 'ARRAY') {
+            @names = @$dbString;
+        } else {
+            @names = ($dbString);
+        }
+        @retVal = map { $self->name_to_id($_) } @names;
     }
     return @retVal;
-}
-
-=head3 field_name
-
-    my $field_name = $catHelper->field_name();
-
-Return the name of the feature field used to extract the category name.
-
-=cut
-
-sub field_name {
-    return 'product';
 }
 
 
