@@ -1170,7 +1170,7 @@ sub contig_link {
 
 =head3 scores
 
-    my ($coarse, $fine, $complete, $contam, $group) = $gto->scores;
+    my ($coarse, $fine, $complete, $contam, $group) = $geo->scores;
 
 Return the quality scores for this genome in the form of a list.
 
@@ -1186,6 +1186,39 @@ sub scores {
         @retVal = ($qData->{coarse_consis}, $qData->{fine_consis}, $qData->{complete}, $qData->{contam}, $qData->{taxon});
     }
     return @retVal;
+}
+
+=head3 role_similarity
+
+    my $score = $geo->role_similarity($geo2);
+
+Return the number of roles in common between two genomes.
+
+=over 4
+
+=item geo2
+
+The L<GEO> of the genome to which this one is to be compared.
+
+=item RETURN
+
+Returns a count of the roles the two genomes have in common.
+
+=back
+
+=cut
+
+sub role_similarity {
+    my ($self, $geo2) = @_;
+    my $rHash = $self->{roleFids};
+    my $rHash2 = $geo2->{roleFids};
+    my $retVal = 0;
+    for my $role (keys %$rHash) {
+        if ($rHash2->{$role}) {
+            $retVal++;
+        }
+    }
+    return $retVal;
 }
 
 
