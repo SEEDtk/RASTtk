@@ -67,7 +67,8 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             drug => ['cas_id', 'antibiotic_name', 'canonical_smiles'],
                             experiment => ['eid', 'title', 'genes', 'pmid', 'organism', 'strain', 'mutant', 'timeseries', 'release_date'],
                             sample => ['eid', 'expid', 'genes', 'sig_log_ratio', 'sig_z_score', 'pmid', 'organism', 'strain', 'mutant', 'condition', 'timepoint', 'release_date'],
-                            expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'] };
+                            expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'],
+                            taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank', 'genome_count', 'genome_length_mean'] };
 
 =head3 IDCOL
 
@@ -83,7 +84,8 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             drug => 'antibiotic_name',
                             experiment => 'eid',
                             sample => 'expid',
-                            expression => 'id' };
+                            expression => 'id',
+                            taxonomy => 'taxon_id' };
 
 =head3 DERIVED
 

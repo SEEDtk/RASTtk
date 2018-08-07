@@ -240,17 +240,14 @@ eval {
         my %mainGenomes;
         # Start the predictor matrix for the consistency checker.
         $evalCon->OpenMatrix($workDir);
-        # Loop through the couplets. We will accumulate GTO file names and PATRIC genome IDs in separate lists.
-        my (@gtoFiles, %pGenomes, @refsNeeded);
+        # Loop through the couplets. We will accumulate reference genome requirements and PATRIC genome IDs in separate lists.
+        # GTOs will be processed individually.
+        my (@gtoFiles, %pGenomes, @refsNeeded, %gRefsNeeded);
         for my $couplet (@$couplets) {
             my ($genome, $row) = @$couplet;
             $stats->Add(genomeIn => 1);
             $mainGenomes{$genome} = 1;
-            if (defined $gtoCol && $row->[$gtoCol]) {
-                push @gtoFiles, $row->[$gtoCol];
-            } else {
-                $pGenomes{$genome} = 1;
-            }
+            my $refNeeded;
             # Check for a reference genome.
             if (defined $refCol && $row->[$refCol]) {
                 my $rGenome = $row->[$refCol];
@@ -258,51 +255,64 @@ eval {
                 $refGenomes{$rGenome} = $genome;
             } elsif ($refCount) {
                 # Here we have to search the taxon list for the reference genomes. Queue a request.
-                push @refsNeeded, $genome;
+                $refNeeded = 1;
             }
-        }
-        # Look for reference genomes from the reference-genome table.
-        if (@refsNeeded) {
-            # Read the taxonomic lineage for each genome that needs a reference.
-            print STDERR "Searching for reference genomes for " . scalar(@refsNeeded) . " genomes.\n";
-            $start = time;
-            my $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'taxon_lineage_ids'], \@refsNeeded);
-            for my $taxResult (@$taxResults) {
-                # Get this genome's ID and lineage.
-                my ($genome, $lineage) = @$taxResult;
-                # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
-                # as an empty string instead of a list so we need an extra IF.
-                my $refFound;
-                if ($lineage) {
-                    while (! $refFound && (my $tax = pop @$lineage)) {
-                        $refFound = $refMap{$tax};
+            # Read in the genome if this is a GTO; otherwise, queue it.
+            if (defined $gtoCol && $row->[$gtoCol]) {
+                # GTO is provided. Load it in.
+                my $gtoName = $row->[$gtoCol];
+                my $gHash = GEO->CreateFromGtoFiles([$gtoName], %geoOptions);
+                if (! $gHash->{$genome}) {
+                    die "$gtoName is missing or does not have genome ID $genome.\n";
+                } else {
+                    $geoMap{$genome} = $gHash->{$genome};
+                    print STDERR "Target genome $genome queued for evaluation.\n";
+                    # For a GTO, we need to get the reference genome from the taxonomic ID.
+                    if ($refNeeded) {
+                        my $taxon = $gHash->{$genome}->taxon;
+                        push @{$gRefsNeeded{$taxon}}, $genome;
                     }
                 }
-                if ($refFound && $refFound ne $genome) {
-                    push @{$refGenomes{$refFound}}, $genome;
-                    $pGenomes{$refFound} = 1;
-                    $stats->Add(refFoundInTable => 1);
-                } elsif ($refFound) {
-                    $stats->Add(refFoundSelf => 1);
-                } else {
-                    $stats->Add(refNotFound => 1);
+            } else {
+                $pGenomes{$genome} = 1;
+                if ($refNeeded) {
+                    push @refsNeeded, $genome;
+                }
+            }
+        }
+        # Look for reference genomes for the GTOs.
+        if (keys %gRefsNeeded) {
+            my @taxons = keys %gRefsNeeded;
+            print STDERR "Searching for reference genomes for " . scalar(@taxons) . " GTOs.\n";
+            $start = time;
+            my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], \@taxons);
+            # This is a bit tricky. We find the reference for each taxon ID, then associate it back to the original genome ID.
+            my %taxRefs;
+            ProcessTaxResults($taxResults, \%pGenomes, \%taxRefs);
+            for my $refGenome (keys %taxRefs) {
+                my $taxons = $taxRefs{$refGenome};
+                for my $taxon (@$taxons) {
+                    my $genomes = $gRefsNeeded{$taxon};
+                    push @{$refGenomes{$refGenome}}, @$genomes;
                 }
             }
             $stats->Add(refSearchTime => Math::Round::round(time - $start));
         }
-        # Get the data for the genomes.
-        $start = time;
-        my $gHash;
-        if (@gtoFiles) {
-            $gHash = GEO->CreateFromGtoFiles(\@gtoFiles, %geoOptions);
-            for my $genome (keys %$gHash) {
-                $geoMap{$genome} = $gHash->{$genome};
-                print STDERR "Target genome $genome queued for evaluation.\n";
-            }
+        # Look for reference genomes for the PATRIC genomes.
+        if (@refsNeeded) {
+            # Read the taxonomic lineage for each genome that needs a reference.
+            print STDERR "Searching for reference genomes for " . scalar(@refsNeeded) . " genomes.\n";
+            $start = time;
+            # This is simpler. We get the taxonomy data for each genome ID and compute the reference.
+            my $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'taxon_lineage_ids'], \@refsNeeded);
+            ProcessTaxResults($taxResults, \%pGenomes, \%refGenomes);
+            $stats->Add(refSearchTime => Math::Round::round(time - $start));
         }
+        # Get the data for the PATRIC genomes (which includes any reference genomes).
+        $start = time;
         my @pGenomes = sort keys %pGenomes;
         if (scalar @pGenomes) {
-            $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
+            my $gHash = GEO->CreateFromPatric(\@pGenomes, %geoOptions);
             for my $genome (keys %$gHash) {
                 if ($mainGenomes{$genome}) {
                     my $geo = $gHash->{$genome};
@@ -421,3 +431,29 @@ if ($@) {
 # All done. Dump the stats.
 print STDERR "All done.\n" . $stats->Show();
 exit($exitCode);
+
+# Find the reference genomes given the results of a taxonomic lineage ID query.
+sub ProcessTaxResults {
+    my ($taxResults, $pGenomes, $refGenomes) = @_;
+    my $count = 0;
+    for my $taxResult (@$taxResults) {
+        # Get this genome's ID and lineage.
+        my ($genome, $lineage) = @$taxResult;
+        # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
+        # as an empty string instead of a list so we need an extra IF.
+        my $refFound;
+        if ($lineage) {
+            while (! $refFound && (my $tax = pop @$lineage)) {
+                $refFound = $refMap{$tax};
+            }
+        }
+        if ($refFound) {
+            push @{$refGenomes->{$refFound}}, $genome;
+            $pGenomes->{$refFound} = 1;
+            $count++;
+        } else {
+            $stats->Add(refNotFound => 1);
+        }
+    }
+    print STDERR "$count reference genomes found.\n";
+}
