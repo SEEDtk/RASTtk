@@ -62,8 +62,7 @@ The PATRIC ID of a reference genome to use for comparison. If specified, the C<d
 =item deep
 
 Compares the genome to a reference genome in order to provide more details on problematic roles. If this
-option is specified, C<ref> is not specified, and the input is a genome ID (instead of a GTO) a
-reference genome will be computed.
+option is specified, C<ref> is not specified, a reference genome will be computed.
 
 =item checkDir
 
@@ -83,6 +82,11 @@ A L<P3DataAPI> object for accessing the PATRIC database. If omitted, one will be
 
 The name of the template file. The default is C<RASTtk/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
 
+=item outDir
+
+The name of an optional output directory. If specified, the C<.out> and C<.html> files will be placed in here. This directory must
+exist. It will not be cleared or created.
+
 =back
 
 =item RETURN
@@ -100,6 +104,10 @@ sub Process {
     # Create the work directory.
     my $tmpObject = File::Temp->newdir();
     my $workDir = $tmpObject->dirname;
+    # Get the output directory (if needed).
+    my $outDir = $options{outDir};
+    # This holds the name to give eval-matrix for the output directory. If we are not keeping the output we use the work directory.
+    my $outputDir = $outDir // $workDir;
     # Create the consistency helper.
     my $evalCon = EvalCon->new(predictors => $options{predictors});
     # Get access to the statistics object.
@@ -114,16 +122,32 @@ sub Process {
     my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, detail => $detailLevel);
     # Start the predictor matrix for the consistency checker.
     $evalCon->OpenMatrix($workDir);
-    # Find out what kind of genome we have.
+    # This will be the two GEOs and actual genome ID (which is different if we have a GTO).
+    my ($mainGeo, $refGeo, $genomeID);
+    # Find out what kind of genome we have. If we have a GTO, we load it here. We wait on the PATRIC
+    # load in case we need a reference genome ID.
+    my @genomes;
     my $patricIn = 0;
     if ($genome =~ /^\d+\.\d+$/) {
         $patricIn = 1;
+        $genomeID = $genome;
+        push @genomes, $genomeID;
+    } else {
+        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions);
+        # A little fancy dancing is required because we don't know the genome ID, and it's the key to the hash we got
+        # back. Thankfully, the hash is at most a singleton.
+        ($genomeID) = keys %$gHash;
+        if ($genomeID) {
+            $mainGeo = $gHash->{$genomeID};
+        } else {
+            die "Could not load genome from $genome.";
+        }
     }
     # Do we have a reference genome ID?
     my $refID = $options{ref};
-    if (! $refID && $patricIn) {
-        # Here we must compute it.
-        my %refMap;
+    my %refMap;
+    if (! $refID && $options{deep}) {
+        # Here we must compute it, so we need to load the reference map.
         open(my $rh, "<$checkDir/ref.genomes.tbl") || die "Could not open reference genome table: $!";
         while (! eof $rh) {
             my $line = <$rh>;
@@ -131,52 +155,31 @@ sub Process {
                 $refMap{$1} = $2;
             }
         }
-        my $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['taxon_lineage_ids'], [$genome]);
-        if ($taxResults && @$taxResults) {
-            my $lineage = $taxResults->[0][0];
-            # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
-            # as an empty string instead of a list so we need an extra IF.
-            my $refFound;
-            if ($lineage) {
-                while (! $refFound && (my $tax = pop @$lineage)) {
-                    $refFound = $refMap{$tax};
-                }
-            }
-            if ($refFound && $refFound ne $genome) {
-                $refID = $refFound;
-            }
+        # Get the lineage ID list from PATRIC.
+        my $taxResults;
+        if ($mainGeo) {
+            $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['lineage_ids'], [$mainGeo->taxon]);
+        } else {
+            $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['taxon_lineage_ids'], [$genome]);
         }
-    }
-    my ($mainGeo, $refGeo, $genomeID);
-    if (! $patricIn) {
-        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions);
-        # A little fancy dancing is required because we don't know the genome ID, and it's the key to the hash we got
-        # back. Thankfully, the hash is at most a singleton.
-        ($genomeID) = keys %$gHash;
-        if ($genomeID) {
-            $mainGeo = $gHash->{$genomeID};
-            # The reference genome is provided via ID, so it's easier.
-            if ($refID) {
-                $gHash = GEO->CreateFromPatric([$refID], %geoOptions);
-                $refGeo = $gHash->{$refID};
-            }
-        }
-    } else {
-        # Here we have a PATRIC genome coming in.
-        $genomeID = $genome;
-        my @genomes = ($genome);
+        $refID = _FindRef($taxResults, \%refMap, $genomeID);
         if ($refID) {
             push @genomes, $refID;
         }
+    }
+    # Do we have PATRIC genomes to read?
+    if (@genomes) {
         my $gHash = GEO->CreateFromPatric(\@genomes, %geoOptions);
-        $mainGeo = $gHash->{$genome};
+        if (! $mainGeo) {
+            $mainGeo = $gHash->{$genome};
+        }
         if ($refID) {
             $refGeo = $gHash->{$refID};
         }
     }
     # Now we have the two GEOs. Attach the ref to the main.
     if (! $mainGeo) {
-        die "Could not read $genome.";
+        die "Could not read $genome from PATRIC.";
     } elsif ($refGeo) {
         $mainGeo->AddRefGenome($refGeo);
     }
@@ -191,19 +194,76 @@ sub Process {
     $evalCon->AddGeoToMatrix($mainGeo);
     $evalCon->CloseMatrix();
     # Evaluate the consistency.
-    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $workDir);
+    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $outputDir);
     if ($rc) {
         die "EvalCon returned error code $rc.";
     }
     # Store the quality metrics in the GTO.
-    $mainGeo->AddQuality("$workDir/$genomeID.out");
+    $mainGeo->AddQuality("$outputDir/$genomeID.out");
     # Create the detail page.
     my $detailFile = $options{template} // "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt";
     my $retVal = BinningReports::Detail(undef, undef, $detailFile, $mainGeo, $nMap);
+    # If we are keeping output files, store the page here.
+    if ($outDir) {
+        open(my $oh, ">$outDir/$genomeID.html") || die "Could not open HTML output file: $!";
+        print $oh $retVal;
+    }
     # Return the result.
     return $retVal;
 }
 
+=head2 Internal Utilities
+
+=head3 _FindRef
+
+    my $refID = EvalHelper::_FindRef($taxResults, $refMap, $genome);
+
+Compute the reference genome ID from the results of a taxonomy lineage ID search.
+
+=over 4
+
+=item taxResults
+
+The results of a query for the taxonomic lineage IDs of the current genome.
+
+=item refMap
+
+A reference to a hash mapping taxonomic IDs to reference genomes.
+
+=item genome
+
+The ID of the genome whose reference is desired.
+
+=item RETURN
+
+Returns the ID of the reference genome, or C<undef> if none could be found or the genome is its own reference.
+
+=back
+
+=cut
+
+sub _FindRef {
+    my ($taxResults, $refMap, $genome) = @_;
+    # This will be the return value.
+    my $retVal;
+    # Insure we have a result.
+    if ($taxResults && @$taxResults) {
+        my $lineage = $taxResults->[0][0];
+        # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
+        # as an empty string instead of a list so we need an extra IF.
+        my $refFound;
+        if ($lineage) {
+            while (! $refFound && (my $tax = pop @$lineage)) {
+                $refFound = $refMap->{$tax};
+            }
+        }
+        # If we found something and it's not the genome of interest, run with it.
+        if ($refFound && $refFound ne $genome) {
+            $retVal = $refFound;
+        }
+    }
+    return $retVal;
+}
 
 
 1;
