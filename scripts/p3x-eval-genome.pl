@@ -5,6 +5,9 @@
 This is an alternative to L<p3x-eval-genomes.pl> for the case where a single genome is being evaluated.
 The input can be a PATRIC genome ID or a GTO.
 
+The output is tab-delimited, containing the main scores in the order (0) coarse consistency, (1) fine
+consistency, (2) completeness, (3) contamination, and (4) scoring group name.
+
 =head2 Parameters
 
 The positional parameters are the genome ID or the name of a L<GenomeTypeObject> file containing the genome,
@@ -68,6 +71,7 @@ if (! $genome) {
     File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
 }
 # Call the main processor.
-EvalHelper::Process($genome, 'ref' => $opt->ref, deep => $opt->deep, checkDir => $opt->checkdir, predictors => $opt->predictors,
+my $geo = EvalHelper::Process($genome, 'ref' => $opt->ref, deep => $opt->deep, checkDir => $opt->checkdir, predictors => $opt->predictors,
     p3 => $p3, outDir => $outDir, template => $opt->template);
-
+# Print the results.
+print join("\t", $geo->scores) . "\n";

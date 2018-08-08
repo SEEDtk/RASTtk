@@ -41,7 +41,7 @@ reference genome ID and produces an output web page.
 
     my $html = EvalHelper::Process($genome, %options);
 
-Create a web page describing the evaluation of a genome.
+Evaluate a single genome.
 
 =over 4
 
@@ -62,7 +62,7 @@ The PATRIC ID of a reference genome to use for comparison. If specified, the C<d
 =item deep
 
 Compares the genome to a reference genome in order to provide more details on problematic roles. If this
-option is specified, C<ref> is not specified, a reference genome will be computed.
+option is specified and C<ref> is B<not> specified, a reference genome will be computed.
 
 =item checkDir
 
@@ -84,14 +84,14 @@ The name of the template file. The default is C<RASTtk/lib/BinningReports/webdet
 
 =item outDir
 
-The name of an optional output directory. If specified, the C<.out> and C<.html> files will be placed in here. This directory must
+The name of an optional output directory. If specified, C<.out> and C<.html> files will be placed in here. This directory must
 exist. It will not be cleared or created.
 
 =back
 
 =item RETURN
 
-Returns an HTML string for a self-contained web page describing the quality results.
+Returns a L<GEO> for the genome in question with embedded quality data.
 
 =back
 
@@ -123,7 +123,7 @@ sub Process {
     # Start the predictor matrix for the consistency checker.
     $evalCon->OpenMatrix($workDir);
     # This will be the two GEOs and actual genome ID (which is different if we have a GTO).
-    my ($mainGeo, $refGeo, $genomeID);
+    my ($retVal, $refGeo, $genomeID);
     # Find out what kind of genome we have. If we have a GTO, we load it here. We wait on the PATRIC
     # load in case we need a reference genome ID.
     my @genomes;
@@ -138,7 +138,7 @@ sub Process {
         # back. Thankfully, the hash is at most a singleton.
         ($genomeID) = keys %$gHash;
         if ($genomeID) {
-            $mainGeo = $gHash->{$genomeID};
+            $retVal = $gHash->{$genomeID};
         } else {
             die "Could not load genome from $genome.";
         }
@@ -157,8 +157,8 @@ sub Process {
         }
         # Get the lineage ID list from PATRIC.
         my $taxResults;
-        if ($mainGeo) {
-            $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['lineage_ids'], [$mainGeo->taxon]);
+        if ($retVal) {
+            $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['lineage_ids'], [$retVal->taxon]);
         } else {
             $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['taxon_lineage_ids'], [$genome]);
         }
@@ -170,28 +170,28 @@ sub Process {
     # Do we have PATRIC genomes to read?
     if (@genomes) {
         my $gHash = GEO->CreateFromPatric(\@genomes, %geoOptions);
-        if (! $mainGeo) {
-            $mainGeo = $gHash->{$genome};
+        if (! $retVal) {
+            $retVal = $gHash->{$genome};
         }
         if ($refID) {
             $refGeo = $gHash->{$refID};
         }
     }
     # Now we have the two GEOs. Attach the ref to the main.
-    if (! $mainGeo) {
+    if (! $retVal) {
         die "Could not read $genome from PATRIC.";
     } elsif ($refGeo) {
-        $mainGeo->AddRefGenome($refGeo);
+        $retVal->AddRefGenome($refGeo);
     }
     # Open the output file for the quality data.
-    my $outFile = "$workDir/$genomeID.out";
+    my $outFile = "$outputDir/$genomeID.out";
     open(my $oh, '>', $outFile) || die "Could not open work file: $!";
     # Output the completeness data.
-    $evalG->Check2($mainGeo, $oh);
+    $evalG->Check2($retVal, $oh);
     close $oh;
     # Create the eval matrix for the consistency checker.
     $evalCon->OpenMatrix($workDir);
-    $evalCon->AddGeoToMatrix($mainGeo);
+    $evalCon->AddGeoToMatrix($retVal);
     $evalCon->CloseMatrix();
     # Evaluate the consistency.
     my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $outputDir);
@@ -199,12 +199,11 @@ sub Process {
         die "EvalCon returned error code $rc.";
     }
     # Store the quality metrics in the GTO.
-    $mainGeo->AddQuality("$outputDir/$genomeID.out");
-    # Create the detail page.
-    my $detailFile = $options{template} // "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt";
-    my $retVal = BinningReports::Detail(undef, undef, $detailFile, $mainGeo, $nMap);
-    # If we are keeping output files, store the page here.
+    $retVal->AddQuality("$outputDir/$genomeID.out");
+    # If there is an output directory, we create the detail page.
     if ($outDir) {
+        my $detailFile = $options{template} // "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt";
+        my $retVal = BinningReports::Detail(undef, undef, $detailFile, $retVal, $nMap);
         open(my $oh, ">$outDir/$genomeID.html") || die "Could not open HTML output file: $!";
         print $oh $retVal;
     }
