@@ -87,6 +87,10 @@ The name of the template file. The default is C<RASTtk/lib/BinningReports/webdet
 The name of an optional output directory. If specified, C<.out> and C<.html> files will be placed in here. This directory must
 exist. It will not be cleared or created.
 
+=item external
+
+If TRUE, the incoming genome is presumed to be external, and no contig links will be generated on the web page.
+
 =back
 
 =item RETURN
@@ -133,7 +137,7 @@ sub Process {
         $genomeID = $genome;
         push @genomes, $genomeID;
     } else {
-        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions);
+        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions, external => $options{external});
         # A little fancy dancing is required because we don't know the genome ID, and it's the key to the hash we got
         # back. Thankfully, the hash is at most a singleton.
         ($genomeID) = keys %$gHash;

@@ -41,6 +41,10 @@ checking. The default is C<FunctionPredictors> in the SEEDtk global data directo
 
 The name of the template file. The default is C<RASTtk/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
 
+=item external
+
+If specifed, the incoming genome is presumed to be external, and no contig links will be generated on the web page.
+
 =back
 
 =cut
@@ -58,6 +62,7 @@ my $opt = P3Utils::script_opts('genome outDir',
         ['checkDir=s', 'completeness data directory', { default => "$FIG_Config::global/CheckG" }],
         ['predictors=s', 'function predictors directory', { default => "$FIG_Config::global/FunctionPredictors" }],
         ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt" }],
+        ['external', 'the genome is not currently installed in PATRIC']
         );
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
@@ -72,6 +77,6 @@ if (! $genome) {
 }
 # Call the main processor.
 my $geo = EvalHelper::Process($genome, 'ref' => $opt->ref, deep => $opt->deep, checkDir => $opt->checkdir, predictors => $opt->predictors,
-    p3 => $p3, outDir => $outDir, template => $opt->template);
+    p3 => $p3, outDir => $outDir, template => $opt->template, external => $opt->external);
 # Print the results.
 print join("\t", $geo->scores) . "\n";

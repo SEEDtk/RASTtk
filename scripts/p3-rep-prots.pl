@@ -3,7 +3,7 @@
     p3-rep-prots.pl [options] outDir
 
 This script processes a list of genome IDs to create a directory suitable for use by the L<RepresentativeGenomes> server.
-It will extract all the instances of the specified seed protein (Phenylanyl synthetase alpha chain). The list of genome IDs and
+It will extract all the instances of the specified seed protein (default is Phenylanyl synthetase alpha chain). The list of genome IDs and
 names will go in the output file C<complete.genomes> and a FASTA of the seed proteins in C<6.1.1.20.fasta>.
 
 =head2 Parameters
@@ -21,6 +21,10 @@ options.
 
 Clear the output directory if it already exists. The default is to leave existing files in place.
 
+=item prot
+
+Role name of the protein to use. The default is C<Phenylalanyl tRNA-synthetase alpha chain>.
+
 =back
 
 =cut
@@ -37,7 +41,8 @@ use Math::Round;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
-        ['clear', 'clear the output directory if it exists']
+        ['clear', 'clear the output directory if it exists'],
+        ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl tRNA-synthetase alpha chain' }],
         );
 # Get the output directory name.
 my ($outDir) = @ARGV;
@@ -53,9 +58,10 @@ if (! $outDir) {
 # Create the statistics object.
 my $stats = Stats->new();
 # Create a filter from the protein name.
-my @filter = (['eq', 'product', 'Phenylalanyl tRNA-synthetase alpha chain']);
+my $protName = $opt->prot;
+my @filter = (['eq', 'product', $protName]);
 # Save the checksum for the seed role.
-my $roleCheck = "WCzieTC/aZ6262l19bwqgw";
+my $roleCheck = RoleParse::Checksum($protName);
 # Create a list of the columns we want.
 my @cols = qw(genome_name patric_id aa_sequence product);
 # Open the output files.

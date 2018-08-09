@@ -412,6 +412,10 @@ Open file handle for status messages. If not specified, no messages will be writ
 
 If TRUE, then it will be presumed this genome comes from the binning process, and the contig names are node names rather than sequence IDs.
 
+=item external
+
+If TRUE, then it will be presumed this genome's contig IDs are not found in PATRIC, and no contig links will be generated.
+
 =back
 
 =item RETURN
@@ -553,6 +557,9 @@ sub CreateFromGtoFiles {
                         }
                         $retVal{$genome}{binContigs} = \%binMap;
                     }
+                } elsif ($options{external}) {
+                    # Here we generate an empty contig map. The genome is external, so we don't want any contig links.
+                    $retVal{$genome}{binContigs} = {};
                 }
             }
         }
