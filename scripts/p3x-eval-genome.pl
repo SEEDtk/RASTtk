@@ -1,6 +1,6 @@
 =head1 Evaluate a Single Genome
 
-    p3x-eval-genome.pl [options] genome outDir
+    p3x-eval-genome.pl [options] genome outFile outHtml
 
 This is an alternative to L<p3x-eval-genomes.pl> for the case where a single genome is being evaluated.
 The input can be a PATRIC genome ID or a GTO.
@@ -11,8 +11,7 @@ consistency, (2) completeness, (3) contamination, and (4) scoring group name.
 =head2 Parameters
 
 The positional parameters are the genome ID or the name of a L<GenomeTypeObject> file containing the genome,
-and the name of the output directory. The output directory will contain a C<.out> file with the results of
-the evaluation and optional C<.html> file containing a web page with an analysis of the results.
+the name of the output file for the evaluation tools, and the name of the output web page.
 
 Additional command-line options are as follows:
 
@@ -45,6 +44,11 @@ The name of the template file. The default is C<RASTtk/lib/BinningReports/webdet
 
 If specifed, the incoming genome is presumed to be external, and no contig links will be generated on the web page.
 
+=item binned
+
+If specified, the incoming genome is presumed to have external contig IDs which are stored in the description fields of
+the sequences in PATRIC.
+
 =back
 
 =cut
@@ -56,27 +60,28 @@ use EvalHelper;
 use File::Copy::Recursive;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('genome outDir',
+my $opt = P3Utils::script_opts('genome outFile outHtml',
         ['ref|r=s', 'reference genome ID (implies deep)'],
         ['deep', 'if specified, the genome is compared to a reference genome for more detailed analysis'],
         ['checkDir=s', 'completeness data directory', { default => "$FIG_Config::global/CheckG" }],
         ['predictors=s', 'function predictors directory', { default => "$FIG_Config::global/FunctionPredictors" }],
         ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt" }],
-        ['external', 'the genome is not currently installed in PATRIC']
+        ['external', 'the genome is not currently installed in PATRIC'],
+        ['binned', 'the genome contig IDs are user-suppled, not PATRIC-generated'],
         );
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Get the input parameters.
-my ($genome, $outDir) = @ARGV;
+my ($genome, $outFile, $outHtml) = @ARGV;
 if (! $genome) {
     die "No input genome specified.";
-} elsif (! $outDir) {
-    die "No output directory specified.";
-} elsif (! -d $outDir) {
-    File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
+} elsif (! $outFile) {
+    die "No output data file specified.";
+} elsif (($opt->ref || $opt->deep) && ! $outHtml) {
+    die "No output web page file specified.";
 }
 # Call the main processor.
 my $geo = EvalHelper::Process($genome, 'ref' => $opt->ref, deep => $opt->deep, checkDir => $opt->checkdir, predictors => $opt->predictors,
-    p3 => $p3, outDir => $outDir, template => $opt->template, external => $opt->external);
+    p3 => $p3, outFile => $outFile, outHtml => $outHtml, template => $opt->template, external => $opt->external, binned => $opt->binned);
 # Print the results.
 print join("\t", $geo->scores) . "\n";

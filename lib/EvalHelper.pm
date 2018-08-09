@@ -27,6 +27,7 @@ package EvalHelper;
     use BinningReports;
     use GEO;
     use File::Temp;
+    use File::Copy::Recursive;
 
 =head1 Genome Evaluation Helper
 
@@ -82,14 +83,22 @@ A L<P3DataAPI> object for accessing the PATRIC database. If omitted, one will be
 
 The name of the template file. The default is C<RASTtk/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
 
-=item outDir
+=item outFile
 
-The name of an optional output directory. If specified, C<.out> and C<.html> files will be placed in here. This directory must
-exist. It will not be cleared or created.
+The name of an optional output file. If specified, will contain the evaluation tool output.
+
+=item outHtml
+
+The name of an optional web page file. If specified, will contain the HTML output.
 
 =item external
 
 If TRUE, the incoming genome is presumed to be external, and no contig links will be generated on the web page.
+
+=item binned
+
+If TRUE, the incoming genome is presumed to have user-specified contig IDs, which are stored as descriptions in the PATRIC genome_sequence records.
+This overrides C<external>.
 
 =back
 
@@ -108,10 +117,6 @@ sub Process {
     # Create the work directory.
     my $tmpObject = File::Temp->newdir();
     my $workDir = $tmpObject->dirname;
-    # Get the output directory (if needed).
-    my $outDir = $options{outDir};
-    # This holds the name to give eval-matrix for the output directory. If we are not keeping the output we use the work directory.
-    my $outputDir = $outDir // $workDir;
     # Create the consistency helper.
     my $evalCon = EvalCon->new(predictors => $options{predictors});
     # Get access to the statistics object.
@@ -137,7 +142,7 @@ sub Process {
         $genomeID = $genome;
         push @genomes, $genomeID;
     } else {
-        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions, external => $options{external});
+        my $gHash = GEO->CreateFromGtoFiles([$genome], %geoOptions, external => $options{external}, binned => $options{binned});
         # A little fancy dancing is required because we don't know the genome ID, and it's the key to the hash we got
         # back. Thankfully, the hash is at most a singleton.
         ($genomeID) = keys %$gHash;
@@ -188,8 +193,8 @@ sub Process {
         $retVal->AddRefGenome($refGeo);
     }
     # Open the output file for the quality data.
-    my $outFile = "$outputDir/$genomeID.out";
-    open(my $oh, '>', $outFile) || die "Could not open work file: $!";
+    my $qFile = "$workDir/$genomeID.out";
+    open(my $oh, '>', $qFile) || die "Could not open work file: $!";
     # Output the completeness data.
     $evalG->Check2($retVal, $oh);
     close $oh;
@@ -198,17 +203,21 @@ sub Process {
     $evalCon->AddGeoToMatrix($retVal);
     $evalCon->CloseMatrix();
     # Evaluate the consistency.
-    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $outputDir);
+    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $workDir);
     if ($rc) {
         die "EvalCon returned error code $rc.";
     }
     # Store the quality metrics in the GTO.
-    $retVal->AddQuality("$outputDir/$genomeID.out");
-    # If there is an output directory, we create the detail page.
-    if ($outDir) {
+    $retVal->AddQuality($qFile);
+    # If there is an output file, copy into it.
+    if ($options{outFile}) {
+        File::Copy::Recursive::fcopy($qFile, $options{outFile}) || die "Could not copy output file: $!";
+    }
+    # If there is an output web page file, we create the detail page.
+    if ($options{outHtml}) {
         my $detailFile = $options{template} // "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt";
         my $retVal = BinningReports::Detail(undef, undef, $detailFile, $retVal, $nMap);
-        open(my $oh, ">$outDir/$genomeID.html") || die "Could not open HTML output file: $!";
+        open(my $oh, '>', $options{outHtml}) || die "Could not open HTML output file: $!";
         print $oh $retVal;
     }
     # Return the result.
