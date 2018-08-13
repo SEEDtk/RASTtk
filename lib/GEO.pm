@@ -564,9 +564,22 @@ sub CreateFromGtoFiles {
             }
         }
     }
-    # Run through all the objects, blessing them.
+    # Run through all the objects, blessing them and extracting the taxonomic IDs..
+    my %taxons;
     for my $genome (keys %retVal) {
-        bless $retVal{$genome}, $class;
+        my $geo = $retVal{$genome};
+        bless $geo, $class;
+        push @{$taxons{$geo->taxon}}, $geo
+    }
+    # Get the lineage for each GEO.
+    my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [keys %taxons]);
+    for my $taxResult (@$taxResults) {
+        my ($taxon, $lineage) = @$taxResult;
+        $lineage ||= [$taxon];
+        my $geos = $taxons{$taxon} // [];
+        for my $geo (@$geos) {
+            $geo->{lineage} = $lineage;
+        }
     }
     # Return the hash of objects.
     return \%retVal;

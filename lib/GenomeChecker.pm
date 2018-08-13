@@ -41,10 +41,6 @@ This object contains the following fields.
 
 =over 4
 
-=item taxonMap
-
-A hash mapping taxonomic IDs to the ID of the taxonomic group that should be used to judge its completeness.
-
 =item taxNames
 
 A hash mapping taxonomic group IDs to names.
@@ -90,8 +86,7 @@ Create a new GTO checker object.
 
 =item checkDir
 
-The name of a directory containing the main input files-- C<roles.tbl> from L<p3-taxon-analysis.pl> and L<group_marker_roles.pl>, and C<taxon_map.tbl> from
-L<compute_taxon_map.pl>.
+The name of a directory containing the main input file-- C<weighted.tbl> from L<p3-taxon-analysis.pl> and L<group_marker_roles.pl>.
 
 =item options
 
@@ -152,7 +147,7 @@ sub new {
     # This will map taxon IDs to group IDs.
     my %taxonMap;
     # Create and bless the object.
-    my $retVal = { taxonMap => \%taxonMap, taxNames => \%taxNames, roleMap => $roleMap,
+    my $retVal = { taxNames => \%taxNames, roleMap => $roleMap,
             nameMap => $nameMap, taxSizes => \%taxSizes, stats => $stats,
             roleLists => \%roleLists, logH => $logH };
     bless $retVal, $class;
@@ -219,18 +214,6 @@ sub new {
             die "$notFound roles missing from pre-loaded role hashes.";
         }
     }
-    # All that is left is to read in the taxonomic ID mapping.
-    $retVal->Log("Processing taxon_map.tbl.\n");
-    open(my $th, "<$checkDir/taxon_map.tbl") || die "Could not open taxon_map.tbl in $checkDir: $!";
-    # Discared the header.
-    my $line = <$th>;
-    # Loop through the taxonomic IDs.
-    while (! eof $th) {
-        my ($taxonID, $groupID) = ScriptUtils::get_line($th);
-        $taxonMap{$taxonID} = $groupID;
-        $stats->Add(taxonIn => 1);
-    }
-    $retVal->Log("Taxonomic groups loaded.\n");
     # Return the object created.
     return $retVal;
 }
@@ -347,15 +330,12 @@ sub Check {
     # Get the hash of role lists.
     my $roleLists = $self->{roleLists};
     # Compute the appropriate taxonomic group for this GTO and get its role list.
+    my @taxons = @{$geo->lineage};
+    my $groupID;
     my $taxon = $geo->taxon;
-    my $groupID = $self->{taxonMap}{$taxon};
-    if (! defined $groupID && $geo->lineage) {
-        # Try for a lineage search.
-        my @taxons = @{$geo->lineage};
-        while (! $groupID && ($taxon = pop @taxons)) {
-            if ($roleLists->{$taxon}) {
-                $groupID = $taxon;
-            }
+    while (! $groupID && ($taxon = pop @taxons)) {
+        if ($roleLists->{$taxon}) {
+            $groupID = $taxon;
         }
     }
     if (! $taxon) {

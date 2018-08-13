@@ -269,8 +269,7 @@ eval {
                     print STDERR "Target genome $genome queued for evaluation.\n";
                     # For a GTO, we need to get the reference genome from the taxonomic ID.
                     if ($refNeeded) {
-                        my $taxon = $gHash->{$genome}->taxon;
-                        push @{$gRefsNeeded{$taxon}}, $genome;
+                        $gRefsNeeded{$genome} = 1;
                     }
                 }
             } else {
@@ -282,21 +281,13 @@ eval {
         }
         # Look for reference genomes for the GTOs.
         if (keys %gRefsNeeded) {
-            my @taxons = keys %gRefsNeeded;
-            print STDERR "Searching for reference genomes for " . scalar(@taxons) . " GTOs.\n";
-            $start = time;
-            my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], \@taxons);
-            # This is a bit tricky. We find the reference for each taxon ID, then associate it back to the original genome ID.
-            my %taxRefs;
-            ProcessTaxResults($taxResults, \%pGenomes, \%taxRefs);
-            for my $refGenome (keys %taxRefs) {
-                my $taxons = $taxRefs{$refGenome};
-                for my $taxon (@$taxons) {
-                    my $genomes = $gRefsNeeded{$taxon};
-                    push @{$refGenomes{$refGenome}}, @$genomes;
-                }
+            print STDERR "Searching for reference genomes for " . scalar(keys %gRefsNeeded) . " GTOs.\n";
+            my @taxResults;
+            for my $genome (keys %gRefsNeeded) {
+                my $lineage = $geoMap{$genome}->lineage;
+                push @taxResults, [$genome, $lineage];
             }
-            $stats->Add(refSearchTime => Math::Round::round(time - $start));
+            ProcessTaxResults(\@taxResults, \%pGenomes, \%refGenomes);
         }
         # Look for reference genomes for the PATRIC genomes.
         if (@refsNeeded) {
