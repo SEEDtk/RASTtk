@@ -330,12 +330,13 @@ sub Check {
     # Get the hash of role lists.
     my $roleLists = $self->{roleLists};
     # Compute the appropriate taxonomic group for this GTO and get its role list.
-    my @taxons = @{$geo->lineage};
+    my $lineage = $geo->lineage || [];
+    my @taxons = @$lineage;
     my $groupID;
     my $taxon = $geo->taxon;
-    while (! $groupID && ($taxon = pop @taxons)) {
-        if ($roleLists->{$taxon}) {
-            $groupID = $taxon;
+    while (! $groupID && (my $taxon1 = pop @taxons)) {
+        if ($roleLists->{$taxon1}) {
+            $groupID = $taxon1;
         }
     }
     if (! $taxon) {
