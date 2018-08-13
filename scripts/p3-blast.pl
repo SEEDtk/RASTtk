@@ -168,6 +168,9 @@ for my $match (@$matches) {
         if ($outForm eq 'tbl') {
             # Must convert from HSP to table.
             my $hsp = $match;
+            if (ref $hsp eq 'ARRAY') {
+                $hsp = Hsp->new($match);
+            }
             $match = [$hsp->qid(), $hsp->qdef(), $hsp->sid(), $hsp->sdef(), $hsp->pct(), $hsp->e_val()];
         }
         P3Utils::print_cols($match);

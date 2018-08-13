@@ -86,6 +86,8 @@ Returns an HSP object that allows the values to be accessed by name.
 
 =cut
 
+use Data::Dumper;
+
 sub new {
     my $class = shift;
     my $self  = [ $_[0] && ref $_[0] eq 'ARRAY' ? @{$_[0]} : @_ ];
@@ -269,7 +271,11 @@ Return the percent identity.
 
 sub pct {
     my ($self) = @_;
-    return ($self->[11] * 100 / $self->[10]);
+    my $retVal = 0;
+    if ($self->[10] > 0) {
+        $retVal = ($self->[11] * 100 / $self->[10]);
+    }
+    return $retVal;
 }
 
 =head3 n_pos
