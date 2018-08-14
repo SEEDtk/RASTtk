@@ -164,10 +164,10 @@ sub Process {
                 $refMap{$1} = $2;
             }
         }
-        # Get the lineage ID list from PATRIC.
+        # Get the lineage ID list.
         my $taxResults;
         if ($retVal) {
-            $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['lineage_ids'], [$retVal->taxon]);
+            $taxResults = [[$retVal->id, $retVal->lineage || []]];
         } else {
             $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['taxon_lineage_ids'], [$genome]);
         }

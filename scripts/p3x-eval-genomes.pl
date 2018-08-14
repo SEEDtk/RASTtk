@@ -438,10 +438,12 @@ sub ProcessTaxResults {
                 $refFound = $refMap{$tax};
             }
         }
-        if ($refFound) {
+        if ($refFound && $genome ne $refFound) {
             push @{$refGenomes->{$refFound}}, $genome;
             $pGenomes->{$refFound} = 1;
             $count++;
+        } elsif ($refFound) {
+            $stats->Add(refSelfFound => 1);
         } else {
             $stats->Add(refNotFound => 1);
         }
