@@ -260,7 +260,7 @@ sub _FindRef {
     my $retVal;
     # Insure we have a result.
     if ($taxResults && @$taxResults) {
-        my $lineage = $taxResults->[0][0];
+        my $lineage = $taxResults->[0][1];
         # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
         # as an empty string instead of a list so we need an extra IF.
         my $refFound;
