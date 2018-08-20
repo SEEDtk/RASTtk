@@ -24,7 +24,7 @@ package GenomeChecker;
     use ScriptUtils;
     use Stats;
     use FIG_Config;
-    use SeedUtils;
+    use SeedUtils qw();
     use Math::Round;
 
 =head1 Data Structures to Check Genomes for Completeness
@@ -80,7 +80,7 @@ A hash mapping each taxonomic group ID to its total role weight.
 
     my $checker = GenomeChecker->new($checkDir, %options);
 
-Create a new GTO checker object.
+Create a new genome-checker object.
 
 =over 4
 
@@ -270,13 +270,89 @@ sub role_name {
     return $self->{nameMap}{$role} // $role;
 }
 
+=head3 roles_of_function
+
+    my @roles = $checker->roles_of_function($function);
+
+Return the IDs of the roles found in the specified function. This may be an empty list.
+
+=over 4
+
+=item function
+
+A functional assignment description.
+
+=item RETURN
+
+Returns a list of the IDs for the roles found in the function.
+
+=back
+
+=cut
+
+sub roles_of_function {
+    my ($self, $function) = @_;
+    # Get the role map.
+    my $roleMap = $self->{roleMap};
+    # Divide the function into roles.
+    my @roles = SeedUtils::roles_of_function($function // '');
+    # Convert each role into an ID.
+    my @retVal;
+    for my $role (@roles) {
+        my $check = RoleParse::Checksum($role);
+        my $id = $roleMap->{$check};
+        if ($id) {
+            push @retVal, $id;
+        }
+    }
+    # Return the roles found.
+    return @retVal;
+}
+
+
+=head3 taxon_data
+
+    my ($name, $roleHash) = $checker->taxon_data($taxonID);
+
+Return the name and the hash of universal roles for a taxonomic group.
+
+=over 4
+
+=item taxonID
+
+The taxonomic ID of the group whose data is desired.
+
+=item RETURN
+
+Returns a two-element list containing the name of the taxonomic group and a reference to a hash mapping each universal role to its weight. If the taxonomic group
+is not in this object, undefined values will be returned.
+
+=back
+
+=cut
+
+sub taxon_data {
+    my ($self, $taxonID) = @_;
+    # These will be the return values.
+    my ($name, $roleHash);
+    # Look for the group name.
+    $name = $self->{taxNames}{$taxonID};
+    if ($name) {
+        # We found it, so get the role hash, too.
+        $roleHash = $self->{roleLists}{$taxonID};
+    }
+    # Return the results.
+    return ($name, $roleHash);
+}
+
+
 =head2 Public Manipulation Methods
 
 =head3 Check
 
     my $dataH = $checker->Check($geo);
 
-Check a L<GenomeEvalObject> for completeness and contamination. A hash of the problematic roles will be returned as well.
+Check a L<GEO> for completeness and contamination. A hash of the problematic roles will be returned as well.
 
 =over 4
 
@@ -346,11 +422,10 @@ sub Check {
         # Taxonomic data, but no group. We give up.
         $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
-        # Get the group name.
-        $taxGroup = $self->{taxNames}{$groupID};
+        # Get the group data.
+        my ($taxGroup, $roleHash) = $self->taxon_data($groupID);
         $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
         # Fill the roleData hash from the role list.
-        my $roleHash = $roleLists->{$groupID};
         %roleData = map { $_ => 0 } keys %$roleHash;
         my $markers = scalar keys %roleData;
         my $size = $self->{taxSizes}{$groupID};
@@ -390,7 +465,7 @@ provided, it will also write the results to the output file.
 
 =item geo
 
-The L<GenomeEvalObject> to be checked.
+The L<GEO> to be checked.
 
 =item oh (optional)
 

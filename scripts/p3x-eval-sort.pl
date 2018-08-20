@@ -11,9 +11,15 @@ There are no positional parameters. The standard input is sorted into the standa
 
 The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
+The following additional options are supported.
+
+=over 4
+
 =item stats
 
 If specified, statistics about the genomes will be written to the standard error output.
+
+=back
 
 =cut
 
