@@ -226,7 +226,7 @@ Open file handle for log messages.
 
 =cut
 
-sub new_from_script {
+sub new_for_script {
     my ($class, $opt, $logH) = @_;
     return EvalCon::new($class, predictors => $opt->predictors, roleFile => $opt->rolefile, rolesToUse => $opt->rolestouse, logH => $logH);
 }

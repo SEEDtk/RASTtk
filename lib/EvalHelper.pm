@@ -28,6 +28,7 @@ package EvalHelper;
     use GEO;
     use File::Temp;
     use File::Copy::Recursive;
+    use GenomeTypeObject;
 
 =head1 Genome Evaluation Helper
 
@@ -207,7 +208,7 @@ sub Process {
     if ($rc) {
         die "EvalCon returned error code $rc.";
     }
-    # Store the quality metrics in the GTO.
+    # Store the quality metrics in the GEO.
     $retVal->AddQuality($qFile);
     # If there is an output file, copy into it.
     if ($options{outFile}) {

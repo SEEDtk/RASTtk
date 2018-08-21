@@ -475,6 +475,10 @@ sub CreateFromGtoFiles {
             my $taxon = $gto->{ncbi_taxonomy_id};
             $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
                 taxon => $taxon, gtoFile => $absFileName };
+            # Check for quality data.
+            if ($gto->{quality}) {
+                $retVal{$genome}{quality} = $gto->{quality};
+            }
             # Compute the aa-len limits for the seed protein.
             my ($min, $max) = (209, 405);
             if ($domain eq 'Archaea') {

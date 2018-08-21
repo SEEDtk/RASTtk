@@ -106,7 +106,7 @@ my ($prefix, $suffix, $detailTT) = BinningReports::build_strings($opt);
 my $summaryTFile = $opt->templates . "/summary.tt";
 # Create the consistency helper.
 print "Loading EvalCon data.\n";
-my $evalCon = EvalCon->new_from_script($opt);
+my $evalCon = EvalCon->new_for_script($opt);
 # Get access to the statistics object.
 my $stats = $evalCon->stats;
 # Create the completeness helper.

@@ -190,7 +190,7 @@ if ($web) {
     }
 }
 # Create the consistency helper.
-my $evalCon = EvalCon->new_from_script($opt, \*STDERR);
+my $evalCon = EvalCon->new_for_script($opt, \*STDERR);
 # Get access to the statistics object.
 my $stats = $evalCon->stats;
 # Create the completeness helper.
