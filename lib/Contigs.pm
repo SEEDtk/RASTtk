@@ -14,6 +14,10 @@
 # Genomes at veronika@thefig.info or download a copy from
 # http://www.theseed.org/LICENSE.TXT.
 #
+#
+## This is a SAS component.
+#
+
 
 
 package Contigs;

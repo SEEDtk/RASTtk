@@ -2390,13 +2390,17 @@ sub compute_metrics {
     # We accumulate the contig length as we go through the sorted list until we break a
     # threshold.
     my $cumul = 0;
-    for my $len (@lens) {
+    for my $i (0..$#lens)
+    {
+        my $len = $lens[$i];
         $cumul += $len;
         for my $type (keys %thresh) {
             if ($cumul >= $thresh{$type}) {
                 # We have the desired metric. Save it in the return array.
                 $retVal{$type} = $len;
-                # Insure we don't test for it again.
+                (my $ltype = $type) =~ s/^N/L/;
+                $retVal{$ltype} = $i;
+                # Ensure we don't test for it again.
                 delete $thresh{$type};
             }
         }
@@ -2762,6 +2766,7 @@ Options:
 
      condensed => $bool   #  If true, do not invoke 'pretty'
      pretty    => $bool   #  If explicitly false, do not invoke 'pretty'
+     canonical => $bool   #  If true, emit canonical form. Can be expensive on large objects.
 
 =cut
 
@@ -2819,6 +2824,11 @@ sub write_encoded_object
                :                                                      1;
 
     my $json = JSON::XS->new->ascii->pretty( $pretty );
+
+    if ($opts->{canonical})
+    {
+        $json->canonical($1);
+    }
 
     #  Once we are this far, let print supply the return value
 

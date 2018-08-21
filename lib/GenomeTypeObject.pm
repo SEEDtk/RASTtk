@@ -798,6 +798,7 @@ sub add_feature
     my ($self, $parms) = @_;
     my $genomeTO = $self;
     print STDERR (Dumper($parms), qq(\n\n)) if $ENV{DEBUG};
+    # warn Dumper($parms);
 
     #  Check for fatal erros:
 
@@ -1015,7 +1016,7 @@ sub extract_protein_sequences_to_temp_file
             }
             else
             {
-                print STDERR "skippinging $feature->{id} $feature->{function}\n";
+                print STDERR "skipping $feature->{id} $feature->{function}\n";
                 next;
             }
         }
@@ -1054,14 +1055,14 @@ sub compute_contigs_gc
         my $this_gc = ($ctg->{dna} =~ tr/gcGC//);
         my $this_at = ($ctg->{dna} =~ tr/atAT//);
         my $div = $this_gc + $this_at;
-        $gc{$ctg->{id}} = 100 * $this_gc / $div if $div;
+        $gc{$ctg->{id}} = 100 * $this_gc / $div if $div && wantarray;
         $gc += $this_gc;
         $at += $this_at;
     }
 
     my $div = $gc + $at;
     my $all_gc = 100 * $gc / $div if $div;
-    return($all_gc, \%gc);
+    return wantarray ? ($all_gc, \%gc) : $all_gc;
 }
 
 sub write_temp_seed_dir
@@ -1096,12 +1097,21 @@ sub write_seed_dir
                     };
     $write_md->("GENETIC_CODE", $self->{genetic_code});
     $write_md->("GENOME", $self->{scientific_name});
-    $write_md->("TAXONOMY", $self->{taxonomy}) if $self->{taxonomy};
+    if (ref($self->{taxonomy}))
+    {
+	my @t = @{$self->{taxonomy}};
+	shift @t if $t[0] =~ /^cellular/;
+
+	print Dumper(\@t);
+	$write_md->("TAXONOMY", join("; ", @t));
+    }
+    $write_md->("TAXONOMY_ID", $self->{ncbi_taxonomy_id}) if $self->{ncbi_taxonomy_id};
 
     my $features = $self->{features};
     my %types = map { $_->{type} => 1 } @$features;
 
     my %typemap;
+    
     if ($options->{map_CDS_to_peg})
     {
         delete $types{CDS};
@@ -1109,7 +1119,12 @@ sub write_seed_dir
     }
     my @types = keys %types;
     $typemap{$_} = $_ foreach @types;
+    if (ref(my $tm = $options->{typemap}))
+    {
+	$typemap{$_} = $tm->{$_} foreach keys %$tm;
+    }
     $typemap{CDS} = 'peg' if $options->{map_CDS_to_peg};
+    @types = grep { $_ } values %typemap;
     print Dumper(\@types, \%typemap);
 
     #
@@ -1170,32 +1185,49 @@ sub write_seed_dir
         {
             $fid = "fig|$fid";
         }
-        if ($type eq 'CDS' && $options->{map_CDS_to_peg})
-        {
-            $type = 'peg';
-            $fid =~ s/\.CDS\./.peg./;
+
+	if (exists($typemap{$type}))
+	{
+	    my $ntype = $typemap{$type};
+	    next if !$ntype;
+
+            $fid =~ s/\.$type\./.$ntype./;
+	    $type = $ntype;
         }
         my $function = $feature->{function} || "hypothetical protein";
         print $func_fh "$fid\t$function\n";
 
         my $loc = $feature->{location};
 
+#print Dumper($feature);
         my @bloc;
         for my $loc_part (@$loc)
         {
+	    if (!ref($loc_part))
+	    {
+		die Dumper($feature);
+	    }
             my($ctg, $start, $strand, $len) = @$loc_part;
             my $bl = BasicLocation->new($ctg, $start, $strand, $len);
             push(@bloc, $bl);
         }
         my $sloc = join(",", map { $_->SeedString() } @bloc);
 
+	@aliases = @{$feature->{aliases}} if ref($feature->{aliases});
         print { $tbl_fh{$type} } join("\t", $fid, $sloc, @aliases), "\n";
 
         if ($feature->{protein_translation})
         {
             write_fasta($fasta_fh{$type}, [$fid, undef, $feature->{protein_translation}]);
         }
-        else
+        elsif ($type eq 'peg' || $type eq 'CDS')
+        {
+	    my $dna = $self->get_feature_dna($feature->{id});
+	    my $code = SeedUtils::genetic_code($self->{genetic_code});
+	    my $aa = SeedUtils::translate($dna, $code, 1);
+            write_fasta($fasta_fh{$type}, [$fid, undef, $aa]);
+        }
+	else
         {
             write_fasta($fasta_fh{$type}, [$fid, undef, $self->get_feature_dna($feature->{id})]);
         }
@@ -1864,7 +1896,7 @@ sub flattened_feature_aliases
     return @aliases;
 }
 
-=head2 metrics
+=head3 metrics
 
     my $metricHash = $gto->metrics();
 
@@ -1923,7 +1955,7 @@ sub metrics {
 }
 
 
-=head2 n_metric
+=head3 n_metric
 
     my $length = $gto->n_metric($thresh);
 
