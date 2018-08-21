@@ -42,7 +42,7 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
         ['clear', 'clear the output directory if it exists'],
-        ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl tRNA-synthetase alpha chain' }],
+        ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl-tRNA synthetase alpha chain' }],
         );
 # Get the output directory name.
 my ($outDir) = @ARGV;
