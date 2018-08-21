@@ -206,7 +206,7 @@ sub new {
     return $retVal;
 }
 
-=head3 new_from_script
+=head3 new_for_script
 
     my $eval = EvalCon->new_for_script($opt, $logH);
 
@@ -357,6 +357,19 @@ sub roles {
     }
     # Return the roles found.
     return @retVal;
+}
+
+=head3 rolesToUse
+
+    my $rolesL = $eval->rolesToUse
+
+Return a reference to a list of the roles in the roles-to-use list.
+
+=cut
+
+sub rolesToUse {
+    my ($self) = @_;
+    return $self->{roles};
 }
 
 

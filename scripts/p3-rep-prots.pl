@@ -23,7 +23,7 @@ Clear the output directory if it already exists. The default is to leave existin
 
 =item prot
 
-Role name of the protein to use. The default is C<Phenylalanyl tRNA-synthetase alpha chain>.
+Role name of the protein to use. The default is C<Phenylalanyl-tRNA synthetase alpha chain>.
 
 =back
 

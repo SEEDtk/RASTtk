@@ -118,6 +118,10 @@ Reference to a hash that maps contig IDs to the relevant sequence IDs in PATRIC.
 
 The absolute file name of the GTO file from which this object was created.
 
+=item quality
+
+Reference to a hash containing the following fields relating to the genome's evaluation.
+
 =over 8
 
 =item fine_consis
@@ -235,6 +239,10 @@ Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, 
 
 Open file handle for status messages. If not specified, no messages will be written.
 
+=item rolesToUse
+
+If specified, a hash of role IDs. Only roles in the hash will be kept in the role maps.
+
 =back
 
 =item RETURN
@@ -258,6 +266,7 @@ sub CreateFromPatric {
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
     my $detail = $options{detail};
+    my $rToUseH = $options{rolesToUse};
     # Compute the feature columns for the current mode.
     my @fCols = qw(patric_id product aa_length);
     if ($detail) {
@@ -308,16 +317,20 @@ sub CreateFromPatric {
                         $stats->Add(roleNotMapped => 1);
                     } else {
                         $stats->Add(roleMapped => 1);
-                        push @{$roles{$rID}}, $fid;
-                        $mapped++;
-                        if ($rID eq 'PhenTrnaSyntAlph') {
-                            $seedCount++;
-                            if ($aaLen < $min) {
-                                $stats->Add(seedTooShort => 1);
-                                $goodSeed = 0;
-                            } elsif ($aaLen > $max) {
-                                $stats->Add(seedTooLong => 1);
-                                $goodSeed = 0;
+                        if ($rToUseH && ! $rToUseH->{$rID}) {
+                            $stats->Add(roleSkipped => 1);
+                        } else {
+                            push @{$roles{$rID}}, $fid;
+                            $mapped++;
+                            if ($rID eq 'PhenTrnaSyntAlph') {
+                                $seedCount++;
+                                if ($aaLen < $min) {
+                                    $stats->Add(seedTooShort => 1);
+                                    $goodSeed = 0;
+                                } elsif ($aaLen > $max) {
+                                    $stats->Add(seedTooLong => 1);
+                                    $goodSeed = 0;
+                                }
                             }
                         }
                     }
@@ -416,6 +429,10 @@ If TRUE, then it will be presumed this genome comes from the binning process, an
 
 If TRUE, then it will be presumed this genome's contig IDs are not found in PATRIC, and no contig links will be generated.
 
+=item rolesToUse
+
+If specified, a hash of role IDs. Only roles in the hash will be kept in the role maps.
+
 =back
 
 =item RETURN
@@ -439,6 +456,7 @@ sub CreateFromGtoFiles {
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
     my $detail = $options{detail};
+    my $rToUseH = $options{rolesToUse};
     # Loop through the GTO files.
     for my $file (@$files) {
         $stats->Add(genomesIn => 1);
@@ -484,17 +502,21 @@ sub CreateFromGtoFiles {
                             $stats->Add(roleNotMapped => 1);
                         } else {
                             $stats->Add(roleMapped => 1);
-                            push @{$roles{$rID}}, $fid;
-                            $mapped++;
-                            if ($rID eq 'PhenTrnaSyntAlph') {
-                                $seedCount++;
-                                my $aaLen = length $prot;
-                                if ($aaLen < $min) {
-                                    $stats->Add(seedTooShort => 1);
-                                    $goodSeed = 0;
-                                } elsif ($aaLen > $max) {
-                                    $stats->Add(seedTooLong => 1);
-                                    $goodSeed = 0;
+                            if ($rToUseH && ! $rToUseH->{$rID}) {
+                                $stats->Add(roleSkipped => 1);
+                            } else {
+                                push @{$roles{$rID}}, $fid;
+                                $mapped++;
+                                if ($rID eq 'PhenTrnaSyntAlph') {
+                                    $seedCount++;
+                                    my $aaLen = length $prot;
+                                    if ($aaLen < $min) {
+                                        $stats->Add(seedTooShort => 1);
+                                        $goodSeed = 0;
+                                    } elsif ($aaLen > $max) {
+                                        $stats->Add(seedTooLong => 1);
+                                        $goodSeed = 0;
+                                    }
                                 }
                             }
                         }
@@ -1212,7 +1234,7 @@ sub scores {
 
     my $score = $geo->role_similarity($geo2);
 
-Return the number of roles in common between two genomes.
+Return the percent of roles in common between two genomes.
 
 =over 4
 
@@ -1222,7 +1244,7 @@ The L<GEO> of the genome to which this one is to be compared.
 
 =item RETURN
 
-Returns a count of the roles the two genomes have in common.
+Returns the percent of roles the two genomes have in common.
 
 =back
 
@@ -1233,10 +1255,16 @@ sub role_similarity {
     my $rHash = $self->{roleFids};
     my $rHash2 = $geo2->{roleFids};
     my $retVal = 0;
+    my $union = scalar keys %$rHash2;
     for my $role (keys %$rHash) {
         if ($rHash2->{$role}) {
             $retVal++;
+        } else {
+            $union++;
         }
+    }
+    if ($union) {
+        $retVal = $retVal * 100 / $union;
     }
     return $retVal;
 }
