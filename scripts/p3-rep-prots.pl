@@ -25,6 +25,11 @@ Clear the output directory if it already exists. The default is to leave existin
 
 Role name of the protein to use. The default is C<Phenylalanyl-tRNA synthetase alpha chain>.
 
+=item resume
+
+Resume an interrupted run. The current files will be read into memory and written back out, then
+only new genomes will be added. Mutually exclusive with C<--clear>.
+
 =back
 
 =cut
@@ -37,13 +42,20 @@ use File::Copy::Recursive;
 use RoleParse;
 use Time::HiRes;
 use Math::Round;
+use FastA;
 
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
         ['clear', 'clear the output directory if it exists'],
         ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl-tRNA synthetase alpha chain' }],
+        ['resume', 'finish an interrupted run']
         );
+# Verify the mutually exclusive options.
+my $resume = $opt->resume;
+if ($opt->clear && $resume) {
+    die "Cannot clear when resuming.";
+}
 # Get the output directory name.
 my ($outDir) = @ARGV;
 if (! $outDir) {
@@ -57,6 +69,28 @@ if (! $outDir) {
 }
 # Create the statistics object.
 my $stats = Stats->new();
+# Check for resume mode and create a hash of the genomes already in the files.
+my %previous;
+if ($resume) {
+    open(my $gh, "<$outDir/complete.genomes") || die "Could not re-open complete.genomes: $!";
+    my %pNames;
+    while (! eof $gh) {
+        my $line = <$gh>;
+        if ($line =~ /^(\d+\.\d+)\t(.+)/) {
+            $pNames{$1} = $2;
+            $stats->Add(previousName => 1);
+        }
+    }
+    my $fh = FastA->new("$outDir/6.1.1.20.fasta");
+    while ($fh->next) {
+        my $id = $fh->id;
+        $stats->Add(previousProt => 1);
+        if ($pNames{$id}) {
+            $previous{$id} = [$pNames{$id}, $fh->left];
+            $stats->Add(previousStored => 1);
+        }
+    }
+}
 # Create a filter from the protein name.
 my $protName = $opt->prot;
 my @filter = (['eq', 'product', $protName]);
@@ -80,24 +114,37 @@ my $gCount = 0;
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
-    # Convert the couplets to contain only genome IDs.
-    my @couples = map { [$_->[0], [$_->[0]]] } @$couplets;
-    $stats->Add(genomeRead => scalar @couples);
-    # Get the features of interest for these genomes.
-    my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
-    $gCount += scalar @couples;
-    # Collate them by genome ID, discarding the nulls.
+    # Filter out the genomes we already have. We will store ID-only couplets in here.
+    my @couples;
+    # This will store the stuff we're keeping.
     my %proteins;
-    for my $prot (@$protList) {
-        my ($genome, $name, $fid, $sequence, $product) = @$prot;
-        if ($fid) {
-            # We have a real feature, check the function.
-            my $check = RoleParse::Checksum($product // '');
-            if ($check ne $roleCheck) {
-                $stats->Add(funnyProt => 1);
-            } else {
-                push @{$proteins{$genome}}, [$name, $sequence];
-                $stats->Add(protFound => 1);
+    # Initial couplet loop for filtering.
+    for my $couplet (@$couplets) {
+        my $genome = $couplet->[0];
+        if ($previous{$genome}) {
+            $proteins{$genome} = [$previous{$genome}];
+            $stats->Add(genomePreviousUsed => 1);
+        } else {
+            push @couples, [$genome, [$genome]];
+            $stats->Add(genomeNew => 1);
+        }
+    }
+    if (@couples) {
+        # Get the features of interest for the new genomes.
+        my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
+        $gCount += scalar @couples;
+        # Collate them by genome ID, discarding the nulls.
+        for my $prot (@$protList) {
+            my ($genome, $name, $fid, $sequence, $product) = @$prot;
+            if ($fid) {
+                # We have a real feature, check the function.
+                my $check = RoleParse::Checksum($product // '');
+                if ($check ne $roleCheck) {
+                    $stats->Add(funnyProt => 1);
+                } else {
+                    push @{$proteins{$genome}}, [$name, $sequence];
+                    $stats->Add(protFound => 1);
+                }
             }
         }
     }
