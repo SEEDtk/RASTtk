@@ -29,6 +29,7 @@ package GEO;
     use SeedUtils;
     use URI::Escape;
     use File::Spec;
+    use Data::Dumper;
 #    use Carp;
 
 =head1 Genome Evaluation Object
@@ -382,6 +383,92 @@ sub CreateFromPatric {
     return \%retVal;
 }
 
+=head3 CreateFromGto
+
+    my $geo = GEO->CreateFromGto($gto, %options);
+
+Create a genome evaluation object from an in-memory L<GenomeTypeObject>.
+
+=over 4
+
+=item gto
+
+A L<GenomeTypeObject> from which the GEO is to be created.
+
+=item options
+
+A hash containing zero or more of the following keys.
+
+=over 8
+
+=item roleHashes
+
+Reference to a 2-tuple containing reference to role-mapping hashes-- (0) a map of role IDs to names, and (1) a map of role checksums
+to IDs. If omitted, the role hashes will be loaded from the global roles.in.subsystems file.
+
+=item p3
+
+Reference to a L<P3DataAPI> object for accessing PATRIC. If omitted, one will be created.
+
+=item stats
+
+Reference to a L<Stats> object for tracking statistical information. If omitted, the statistics will be discarded.
+
+=item detail
+
+Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, and proteins.
+
+=item logH
+
+Open file handle for status messages. If not specified, no messages will be written.
+
+=item binned
+
+If TRUE, then it will be presumed this genome comes from the binning process, and the contig names are node names rather than sequence IDs.
+
+=item external
+
+If TRUE, then it will be presumed this genome's contig IDs are not found in PATRIC, and no contig links will be generated.
+
+=item rolesToUse
+
+If specified, a hash of role IDs. Only roles in the hash will be kept in the role maps.
+
+=back
+
+=item RETURN
+
+Returns a GEO built from the specified L<GenomeTypeObject>.
+
+=back
+
+=cut
+
+sub CreateFromGto {
+    my ($class, $gto, %options) = @_;
+    # Get the stats object.
+    my $stats = $options{stats} // Stats->new();
+    # Process the options.
+    my $logH = $options{logH};
+    my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
+    my $p3 = $options{p3} // P3DataAPI->new();
+    # Create the GEO and bless it.
+    my $retVal = _BuildGeo($gto, $p3, $nMap, $cMap, $stats, \%options);
+    bless $retVal, $class;
+    # Compute the taxonomic lineage.
+    my $taxon = $retVal->taxon;
+    my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [$taxon]);
+    # Default to just the input taxon ID.
+    my $lineage = [$taxon];
+    # Update if we got something. Note we can get a null string even if a result did come back.
+    if (@$taxResults) {
+        $lineage = $taxResults->[0][1] || [$taxon];
+    }
+    $retVal->{lineage} = $lineage;
+    # Return the result.
+    return $retVal;
+}
+
 =head3 CreateFromGtoFiles
 
     my $gHash = GEO->CreateFromGtoFiles(\@files, %options);
@@ -455,8 +542,6 @@ sub CreateFromGtoFiles {
     # Process the options.
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
-    my $detail = $options{detail};
-    my $rToUseH = $options{rolesToUse};
     # Loop through the GTO files.
     for my $file (@$files) {
         $stats->Add(genomesIn => 1);
@@ -466,128 +551,12 @@ sub CreateFromGtoFiles {
             _log($logH, "No genome found in $file.\n");
         } else {
             $stats->Add(genomeFoundFile => 1);
+            # Build the GEO.
+            my $geo = _BuildGeo($gto, $p3, $nMap, $cMap, $stats, \%options);
             # Get the absolute file name.
-            my $absFileName = File::Spec->rel2abs($file);
-            # Get the basic genome information.
-            my $genome = $gto->{id};
-            my $name = $gto->{scientific_name};
-            my $domain = $gto->{domain};
-            my $taxon = $gto->{ncbi_taxonomy_id};
-            $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-                taxon => $taxon, gtoFile => $absFileName };
-            # Check for quality data.
-            if ($gto->{quality}) {
-                $retVal{$genome}{quality} = $gto->{quality};
-            }
-            # Compute the aa-len limits for the seed protein.
-            my ($min, $max) = (209, 405);
-            if ($domain eq 'Archaea') {
-                ($min, $max) = (293, 652);
-            }
-            my $seedCount = 0;
-            my $goodSeed = 1;
-            # Create the role tables.
-            my (%roles, %proteins, %locs);
-            _log($logH, "Processing features for $genome.\n");
-            for my $feature (@{$gto->{features}}) {
-                $stats->Add(featureFoundFile => 1);
-                my $fid = $feature->{id};
-                my $function = $feature->{function};
-                # Only features with functions matter to us.
-                if ($function) {
-                    my @roles = SeedUtils::roles_of_function($function);
-                    my $mapped = 0;
-                    my $prot = $feature->{protein_translation};
-                    for my $role (@roles) {
-                        my $checkSum = RoleParse::Checksum($role);
-                        $stats->Add(roleFoundFile => 1);
-                        my $rID = $cMap->{$checkSum};
-                        if (! $rID) {
-                            $stats->Add(roleNotMapped => 1);
-                        } else {
-                            $stats->Add(roleMapped => 1);
-                            if ($rToUseH && ! $rToUseH->{$rID}) {
-                                $stats->Add(roleSkipped => 1);
-                            } else {
-                                push @{$roles{$rID}}, $fid;
-                                $mapped++;
-                                if ($rID eq 'PhenTrnaSyntAlph') {
-                                    $seedCount++;
-                                    my $aaLen = length $prot;
-                                    if ($aaLen < $min) {
-                                        $stats->Add(seedTooShort => 1);
-                                        $goodSeed = 0;
-                                    } elsif ($aaLen > $max) {
-                                        $stats->Add(seedTooLong => 1);
-                                        $goodSeed = 0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if ($detail && $mapped) {
-                        # If we are NOT abridged and this feature had an interesting role, we
-                        # also need to save the location.
-                        my $locs = $feature->{location};
-                        my $region = shift @$locs;
-                        my $loc = BasicLocation->new(@$region);
-                        for $region (@$locs) {
-                            $loc->Combine(BasicLocation->new(@$region));
-                        }
-                        $locs{$fid} = $loc;
-                    }
-                    if ($detail > 1 && $prot) {
-                        $proteins{$fid} = $feature->{protein_translation};
-                    }
-                }
-            }
-            # Store the role map.
-            $retVal{$genome}{roleFids} = \%roles;
-            # Compute the good-seed flag.
-            if (! $seedCount) {
-                $stats->Add(seedNotFound => 1);
-                $goodSeed = 0;
-            } elsif ($seedCount > 1) {
-                $stats->Add(seedTooMany => 1);
-                $goodSeed = 0;
-            }
-            $retVal{$genome}{good_seed} = $goodSeed;
-            # Check for the optional stuff.
-            if ($detail) {
-                # Here we also need to store the location map.
-                $retVal{$genome}{fidLocs} = \%locs;
-                # Finally, we need the contig lengths.
-                _log($logH, "Reading contigs for $genome.\n");
-                my %contigs;
-                for my $contig (@{$gto->{contigs}}) {
-                    $stats->Add(contigFoundFile => 1);
-                    my $contigID = $contig->{id};
-                    my $len = length($contig->{dna});
-                    $contigs{$contigID} = $len;
-                }
-                $retVal{$genome}{contigs} = \%contigs;
-                $retVal{$genome}{proteins} = \%proteins;
-                # If we are binned, we must generate the contig map.
-                if ($options{binned}) {
-                    my @badContigIDs = grep { ! ($_ =~ /^\d+\.\d+\.con\.\d+$/) } keys %contigs;
-                    if (@badContigIDs) {
-                        _log($logH, "Processing contig mapping for binned GTO $genome.\n");
-                        my %binMap;
-                        my $realContigIDs = P3Utils::get_data($p3, contig => [['eq', 'genome_id', $genome]], ['sequence_id', 'description']);
-                        for my $idPair (@$realContigIDs) {
-                            my ($realID, $fakeID) = @$idPair;
-                            if ($contigs{$fakeID}) {
-                                $binMap{$fakeID} = $realID;
-                                $stats->Add(contigIdMapped => 1);
-                            }
-                        }
-                        $retVal{$genome}{binContigs} = \%binMap;
-                    }
-                } elsif ($options{external}) {
-                    # Here we generate an empty contig map. The genome is external, so we don't want any contig links.
-                    $retVal{$genome}{binContigs} = {};
-                }
-            }
+            $geo->{gtoFile} = File::Spec->rel2abs($file);
+            # Store the GEO.
+            $retVal{$geo->{id}} = $geo;
         }
     }
     # Run through all the objects, blessing them and extracting the taxonomic IDs..
@@ -1740,5 +1709,203 @@ sub _RoleMaps {
     return ($nMap, $cMap);
 }
 
+
+=head3 _BuildGeo
+
+    my $geo = _BuildGeo($gto, $p3, $nMap, $cMap, $stats, $options);
+
+Build most of a GEO from an in-memory L<GenomeTypeObject>. The missing piece will be the taxonomic lineage, which is handled differently depending on
+how many GEOs we are building simultaneously.
+
+=over 4
+
+=item gto
+
+The L<GenomeTypeObject> from which the GEO is to be built.
+
+=item p3
+
+The L<P3DataAPI> object for accessing the PATRIC database.
+
+=item nMap
+
+Reference to a hash mapping role IDs to role names.
+
+=item cMap
+
+Reference to a hash mapping role checksums to role IDs.
+
+=item stats
+
+A L<Stats> object for tracking runtime statistics.
+
+=item options
+
+Reference to a hash containing zero or more of the following options.
+
+=item options
+
+A hash containing zero or more of the following keys.
+
+=over 8
+
+=item detail
+
+Level of detail-- C<0> roles only, C<1> roles and contigs, C<2> roles, contigs, and proteins. The default is C<0>.
+
+=item logH
+
+Open file handle for status messages. If not specified, no messages will be written.
+
+=item binned
+
+If TRUE, then it will be presumed this genome comes from the binning process, and the contig names are node names rather than sequence IDs.
+
+=item external
+
+If TRUE, then it will be presumed this genome's contig IDs are not found in PATRIC, and no contig links will be generated.
+
+=item rolesToUse
+
+If specified, a hash of role IDs. Only roles in the hash will be kept in the role maps.
+
+=back
+
+=item RETURN
+
+Returns the GEO built from the GTO, but without the taxonomic ID lineage.
+
+=back
+
+=cut
+
+sub _BuildGeo {
+    my ($gto, $p3, $nMap, $cMap, $stats, $options) = @_;
+    # Get the basic genome information.
+    my $genome = $gto->{id};
+    my $name = $gto->{scientific_name};
+    my $domain = $gto->{domain};
+    my $taxon = $gto->{ncbi_taxonomy_id};
+    my $retVal = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
+        taxon => $taxon };
+    # Get the options.
+    my $rToUseH = $options->{rolesToUse};
+    my $detail = $options->{detail} // 0;
+    my $logH = $options->{logH};
+    # Check for quality data in the GTO.
+    if ($gto->{genome_quality_metrics}) {
+        $retVal->{quality} = $gto->{genome_quality_metrics};
+    }
+    # Compute the aa-len limits for the seed protein.
+    my ($min, $max) = (209, 405);
+    if ($domain eq 'Archaea') {
+        ($min, $max) = (293, 652);
+    }
+    my $seedCount = 0;
+    my $goodSeed = 1;
+    # Create the role tables.
+    my (%roles, %proteins, %locs);
+    _log($logH, "Processing features for $genome.\n");
+    for my $feature (@{$gto->{features}}) {
+        $stats->Add(featureFoundFile => 1);
+        my $fid = $feature->{id};
+        my $function = $feature->{function};
+        # Only features with functions matter to us.
+        if ($function) {
+            my @roles = SeedUtils::roles_of_function($function);
+            my $mapped = 0;
+            my $prot = $feature->{protein_translation};
+            for my $role (@roles) {
+                my $checkSum = RoleParse::Checksum($role);
+                $stats->Add(roleFoundFile => 1);
+                my $rID = $cMap->{$checkSum};
+                if (! $rID) {
+                    $stats->Add(roleNotMapped => 1);
+                } else {
+                    $stats->Add(roleMapped => 1);
+                    if ($rToUseH && ! $rToUseH->{$rID}) {
+                        $stats->Add(roleSkipped => 1);
+                    } else {
+                        push @{$roles{$rID}}, $fid;
+                        $mapped++;
+                        if ($rID eq 'PhenTrnaSyntAlph') {
+                            $seedCount++;
+                            my $aaLen = length $prot;
+                            if ($aaLen < $min) {
+                                $stats->Add(seedTooShort => 1);
+                                $goodSeed = 0;
+                            } elsif ($aaLen > $max) {
+                                $stats->Add(seedTooLong => 1);
+                                $goodSeed = 0;
+                            }
+                        }
+                    }
+                }
+            }
+            if ($detail && $mapped) {
+                # If we are NOT abridged and this feature had an interesting role, we
+                # also need to save the location.
+                my $locs = $feature->{location};
+                my ($region, @locList) = @$locs;
+                my $loc = BasicLocation->new(@$region);
+                for $region (@locList) {
+                    $loc->Combine(BasicLocation->new(@$region));
+                }
+                $locs{$fid} = $loc;
+            }
+            if ($detail > 1 && $prot) {
+                $proteins{$fid} = $feature->{protein_translation};
+            }
+        }
+    }
+    # Store the role map.
+    $retVal->{roleFids} = \%roles;
+    # Compute the good-seed flag.
+    if (! $seedCount) {
+        $stats->Add(seedNotFound => 1);
+        $goodSeed = 0;
+    } elsif ($seedCount > 1) {
+        $stats->Add(seedTooMany => 1);
+        $goodSeed = 0;
+    }
+    $retVal->{good_seed} = $goodSeed;
+    # Check for the optional stuff.
+    if ($detail) {
+        # Here we also need to store the location map.
+        $retVal->{fidLocs} = \%locs;
+        # Finally, we need the contig lengths.
+        _log($logH, "Reading contigs for $genome.\n");
+        my %contigs;
+        for my $contig (@{$gto->{contigs}}) {
+            $stats->Add(contigFoundFile => 1);
+            my $contigID = $contig->{id};
+            my $len = length($contig->{dna});
+            $contigs{$contigID} = $len;
+        }
+        $retVal->{contigs} = \%contigs;
+        $retVal->{proteins} = \%proteins;
+        # If we are binned, we must generate the contig map.
+        if ($options->{binned}) {
+            my @badContigIDs = grep { ! ($_ =~ /^\d+\.\d+\.con\.\d+$/) } keys %contigs;
+            if (@badContigIDs) {
+                _log($logH, "Processing contig mapping for binned GTO $genome.\n");
+                my %binMap;
+                my $realContigIDs = P3Utils::get_data($p3, contig => [['eq', 'genome_id', $genome]], ['sequence_id', 'description']);
+                for my $idPair (@$realContigIDs) {
+                    my ($realID, $fakeID) = @$idPair;
+                    if ($contigs{$fakeID}) {
+                        $binMap{$fakeID} = $realID;
+                        $stats->Add(contigIdMapped => 1);
+                    }
+                }
+                $retVal->{binContigs} = \%binMap;
+            }
+        } elsif ($options->{external}) {
+            # Here we generate an empty contig map. The genome is external, so we don't want any contig links.
+            $retVal->{binContigs} = {};
+        }
+    }
+    return $retVal;
+}
 
 1;

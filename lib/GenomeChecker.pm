@@ -423,7 +423,8 @@ sub Check {
         $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
         # Get the group data.
-        my ($taxGroup, $roleHash) = $self->taxon_data($groupID);
+        my $roleHash;
+        ($taxGroup, $roleHash) = $self->taxon_data($groupID);
         $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
         # Fill the roleData hash from the role list.
         %roleData = map { $_ => 0 } keys %$roleHash;

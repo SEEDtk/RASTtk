@@ -39,9 +39,161 @@ reference genome ID and produces an output web page.
 
 =head2 Special Methods
 
+=head3 ProcessGto
+
+    EvalHelper::ProcessGto($gto, %options);
+
+Evaluate a L<GenomeTypeObject> in memory. The C<quality> member of the GTO will be updated with the results of the operation.
+
+=over 4
+
+=item gto
+
+A L<GenomeTypeObject> representing a genome to be evaluated.
+
+=item options
+
+A hash containing zero or more of the following options.
+
+=over 8
+
+=item ref
+
+The PATRIC ID of a reference genome to use for comparison. If specified, the C<deep> option is implied.
+
+=item deep
+
+Compares the genome to a reference genome in order to provide more details on problematic roles. If this
+option is specified and C<ref> is B<not> specified, a reference genome will be computed.
+
+=item checkDir
+
+The name of the directory containing the reference genome table and the completeness data files. The default
+is C<CheckG> in the SEEDtk global data directory.
+
+=item predictors
+
+The name of the directory containing the role definition files and the function predictors for the consistency
+checking. The default is C<FunctionPredictors> in the SEEDtk global data directory.
+
+=item p3
+
+A L<P3DataAPI> object for accessing the PATRIC database. If omitted, one will be created internally.
+
+=item template
+
+The name of the template file. The default is C<RASTtk/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
+
+=item outFile
+
+The name of an optional output file. If specified, will contain the evaluation tool output.
+
+=item outHtml
+
+The name of an optional web page file. If specified, will contain the HTML output.
+
+=item external
+
+If TRUE, the incoming genome is presumed to be external, and no contig links will be generated on the web page.
+
+=item binned
+
+If TRUE, the incoming genome is presumed to have user-specified contig IDs, which are stored as descriptions in the PATRIC genome_sequence records.
+This overrides C<external>.
+
+=back
+
+=back
+
+=cut
+
+sub ProcessGto {
+    my ($gto, %options) = @_;
+    # Connect to PATRIC.
+    my $p3 = $options{p3} // P3DataAPI->new();
+    # Create the work directory.
+    my $tmpObject = File::Temp->newdir();
+    my $workDir = $tmpObject->dirname;
+    # Create the consistency helper.
+    my $evalCon = EvalCon->new(predictors => $options{predictors});
+    # Get access to the statistics object.
+    my $stats = $evalCon->stats;
+    # Create the completeness helper.
+    my $checkDir = $options{checkDir} // "$FIG_Config::global/CheckG";
+    my ($nMap, $cMap) = $evalCon->roleHashes;
+    my $evalG = GenomeChecker->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
+    # Compute the detail level.
+    my $detailLevel = (($options{deep} || $options{ref}) ? 2 : 1);
+    # Set up the options for creating the GEOs.
+    my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, detail => $detailLevel);
+    # Start the predictor matrix for the consistency checker.
+    $evalCon->OpenMatrix($workDir);
+    my $geo = GEO->CreateFromGto($gto, %geoOptions, external => $options{external}, binned => $options{binned});
+    my $genomeID = $geo->id;
+    # Do we have a reference genome ID?
+    my $refID = $options{ref};
+    my %refMap;
+    if (! $refID && $options{deep}) {
+        # Here we must compute it, so we need to load the reference map.
+        open(my $rh, "<$checkDir/ref.genomes.tbl") || die "Could not open reference genome table: $!";
+        while (! eof $rh) {
+            my $line = <$rh>;
+            if ($line =~ /^(\d+)\t(\d+\.\d+)/) {
+                $refMap{$1} = $2;
+            }
+        }
+        # Get the lineage ID list.
+        my $taxResults = [[$genomeID, $geo->lineage || []]];
+        $refID = _FindRef($taxResults, \%refMap, $genomeID);
+        if ($refID) {
+            my $gHash = GEO->CreateFromPatric([$refID], %geoOptions);
+            my $refGeo = $gHash->{$refID};
+            if ($refGeo) {
+                $geo->AddRefGenome($refGeo);
+            }
+        }
+    }
+    # Open the output file for the quality data.
+    my $qFile = "$workDir/$genomeID.out";
+    open(my $oh, '>', $qFile) || die "Could not open work file: $!";
+    # Output the completeness data.
+    $evalG->Check2($geo, $oh);
+    close $oh;
+    # Create the eval matrix for the consistency checker.
+    $evalCon->OpenMatrix($workDir);
+    $evalCon->AddGeoToMatrix($geo);
+    $evalCon->CloseMatrix();
+    # Evaluate the consistency.
+    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $workDir);
+    if ($rc) {
+        die "EvalCon returned error code $rc.";
+    }
+    # Store the quality metrics in the GEO.
+    $geo->AddQuality($qFile);
+    # If there is an output file, copy into it.
+    if ($options{outFile}) {
+        File::Copy::Recursive::fcopy($qFile, $options{outFile}) || die "Could not copy output file: $!";
+    }
+    # If there is an output web page file, we create the detail page.
+    if ($options{outHtml}) {
+        my $detailFile = $options{template} // "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt";
+        my $retVal = BinningReports::Detail(undef, undef, $detailFile, $geo, $nMap);
+        open(my $oh, '>', $options{outHtml}) || die "Could not open HTML output file: $!";
+        print $oh $retVal;
+    }
+    # Copy the quality metrics to the GTO.
+    my $geoQuality = $geo->{quality};
+    my $gtoQuality = $gto->{quality} // {};
+    for my $key (keys %$geoQuality) {
+        $gtoQuality->{$key} = $geoQuality->{$key};
+    }
+    $gto->{quality} = $gtoQuality;
+}
+
+
 =head3 Process
 
-    my $html = EvalHelper::Process($genome, %options);
+    my $geo = EvalHelper::Process($genome, %options);
 
 Evaluate a single genome.
 
