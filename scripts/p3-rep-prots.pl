@@ -128,6 +128,7 @@ while (! eof $ih) {
             push @couples, [$genome, [$genome]];
             $stats->Add(genomeNew => 1);
         }
+        $gCount++;
     }
     if (@couples) {
         # Get the features of interest for the new genomes.
