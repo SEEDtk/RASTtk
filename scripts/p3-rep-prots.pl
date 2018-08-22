@@ -133,7 +133,6 @@ while (! eof $ih) {
     if (@couples) {
         # Get the features of interest for the new genomes.
         my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
-        $gCount += scalar @couples;
         # Collate them by genome ID, discarding the nulls.
         for my $prot (@$protList) {
             my ($genome, $name, $fid, $sequence, $product) = @$prot;
