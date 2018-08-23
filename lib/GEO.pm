@@ -65,6 +65,11 @@ The domain of the genome in question-- either C<Bacteria> or C<Archaea>.
 
 The taxonomic grouping ID for the genome in question.
 
+=item lineage
+
+Reference to a list of taxonomic grouping IDs, representing the complete lineage of the genome, in order from largest group
+to smallest.
+
 =back
 
 The following fields are usually passed in by the client.
@@ -84,11 +89,6 @@ Reference to a hash that maps role checksums to role IDs.
 The following optional fields may also be present.
 
 =over 4
-
-=item lineage
-
-Reference to a list of taxonomic grouping IDs, representing the complete lineage of the genome.
-This is only present if the genome was loaded directly from PATRIC.
 
 =item refGeo
 
@@ -182,10 +182,19 @@ Number of under-represented roles.
 
 Number of predicted roles.
 
-=item roles
+=item consistency_roles
 
-Reference to a hash that maps the ID of each predicted role to a 3-tuple consisting of (0) the prediction, (1) the
-actual count, and (2) a comment.
+Reference to a hash that maps the ID of each role examined by L<GenomeChecker> to a 2-tuple consisting of (0) the predicted count
+and (1) the actual count.
+
+=item completeness_roles
+
+Reference to a hash that maps the ID of each role examined by L<EvalCon> to a 2-tuple consisting of (0) the predicted count and
+(1) the actual count.
+
+=item role_comments
+
+Reference to a hash that maps the ID of each problematic role to an HTML comment about why it doesn't match the predictions.
 
 =item contigs
 
@@ -794,6 +803,53 @@ sub roleCounts {
     my %retVal = map { $_ => scalar(@{$roleMap->{$_}}) } keys %$roleMap;
     return \%retVal;
 }
+
+=head3 roleMetrics
+
+    my ($predicted, $actual, $comment) = $geo->roleMetrics($role);
+
+Return the predicted count, actual count, and explanatory comment for the role with the specified ID. The numbers will only be meaningful
+if quality data is present in the GEO.
+
+=over 4
+
+=item role
+
+The ID of the role whose information is desired.
+
+=item RETURN
+
+Returns a 3-element list containing (0) the number of occurrences predicted, (1) the actual number of occurrences, and (2) an HTML comment.
+
+=back
+
+=cut
+
+sub roleMetrics {
+    my ($self, $role) = @_;
+    my ($predicted, $actual, $comment) = (0, 0, '');
+    my $quality = $self->{quality};
+    if ($quality) {
+        # Default to the completeness prediction.
+        my $tuple = $quality->{completeness_roles}{$role};
+        if ($tuple) {
+            ($predicted, $actual, $comment) = (@$tuple, 'Universal role.');
+        }
+        # If there is a consistency prediction, it overrides if (1) it indicates a problem or (2)
+        # the completeness prediction does not indicate a problem.
+        $tuple = $quality->{consistency_roles}{$role};
+        if ($tuple && ($tuple->[0] != $tuple->[1] || $predicted == $actual)) {
+            ($predicted, $actual) = @$tuple;
+        }
+        # Check for a comment. If one exists, it overrides anything we have.
+        if ($quality->{role_comments}) {
+            $comment = $quality->{role_comments}{$role} || $comment;
+        }
+    }
+    # Return the results.
+    return ($predicted, $actual, $comment);
+}
+
 
 =head3 good_seed
 
@@ -1806,20 +1862,15 @@ sub _BuildGeo {
         $quality{contam} = $gtoQ->{contamination};
         $quality{taxon} = $gtoQ->{completeness_group};
         $quality{metrics} = $gtoQ->{genome_metrics};
-        # Get the problematic role scores.
+        # Get the problematic role scores and counts.
         my $ppr = $gtoQ->{problematic_roles_report};
         $quality{over_roles} = $ppr->{over_present};
         $quality{under_roles} = $ppr->{under_present};
         $quality{pred_roles} = $ppr->{pred_roles};
-        # Build the role report.
-        my $roleReport = $ppr->{roles};
-        my %roles;
-        for my $role (keys %$roleReport) {
-            $roles{$role} = [@{$roleReport->{$role}}, ''];
-        }
-        $quality{roles} = \%roles;
-        # We do not bother to load the contig report at this time.
-        # So far, we are not using it post-process.
+        $quality{consistency_roles} = $ppr->{consistency_roles};
+        $quality{completeness_roles} = $ppr->{completeness_roles};
+        # To get a full role report ("role_comments" and "contigs"), you
+        # need to call AnalyzeQualityData.
         $retVal->{quality} = \%quality;
     }
     # Compute the aa-len limits for the seed protein.
