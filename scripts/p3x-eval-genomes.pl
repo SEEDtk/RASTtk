@@ -41,8 +41,7 @@ If specified, the output directory is erased before any output is produced.
 
 =item web
 
-If specified, web pages for all of the genome evaluations will be produced in the output directory. (This option is not
-yet implemented.)
+If specified, web pages for all of the genome evaluations will be produced in the output directory.
 
 =item deep
 
