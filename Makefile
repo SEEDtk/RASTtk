@@ -6,6 +6,6 @@ DEPLOY_RUNTIME ?= /vol/kbase/runtime
 
 all: bin
 
-bin: $(BIN_PERL)
+bin: $(BIN_PERL) $(BIN_PYTHON)
 
 include $(TOP_DIR)/tools/Makefile.common.rules
