@@ -573,16 +573,18 @@ sub Detail {
     for my $role (sort keys %$pprRoleData) {
         my $pa = $pprRoleData->{$role} // [0,0, ''];
         my ($predicted, $actual, $comment) = @$pa;
-        $pprs++;
-        my $roleName = $roleMap->{$role} // $role;
-        my $fidList = $geo->roleFids($role);
-        my $n_fids = scalar @$fidList;
-        my %pprThing = (role => $roleName, predicted => $predicted, actual => $actual, n_fids => $n_fids, comment => $comment);
-        $pprThing{fid_url} = fid_list_url($fidList);
-        push @pprList, \%pprThing;
-        # Save the feature IDs in the PPR fid hash.
-        for my $fid (@$fidList) {
-            $pprFids{$fid} = 1;
+        if ($predicted != $actual) {
+            $pprs++;
+            my $roleName = $roleMap->{$role} // $role;
+            my $fidList = $geo->roleFids($role);
+            my $n_fids = scalar @$fidList;
+            my %pprThing = (role => $roleName, predicted => $predicted, actual => $actual, n_fids => $n_fids, comment => $comment);
+            $pprThing{fid_url} = fid_list_url($fidList);
+            push @pprList, \%pprThing;
+            # Save the feature IDs in the PPR fid hash.
+            for my $fid (@$fidList) {
+                $pprFids{$fid} = 1;
+            }
         }
     }
     # Store the PPR count in the main descriptor.

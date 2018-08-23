@@ -29,7 +29,7 @@ package GEO;
     use SeedUtils;
     use URI::Escape;
     use File::Spec;
-    use Data::Dumper;
+#    use Data::Dumper;
 #    use Carp;
 
 =head1 Genome Evaluation Object
@@ -102,11 +102,6 @@ Reference to a hash that maps each feature belonging to an mapped role to its lo
 
 Reference to a hash that maps each contig ID to the contig length.
 
-=item quality
-
-If the quality results have been processed, a reference to a hash containing genome quality information,
-with the following keys.
-
 =item proteins
 
 Reference to a hash that maps each feature to its protein sequence.
@@ -121,7 +116,9 @@ The absolute file name of the GTO file from which this object was created.
 
 =item quality
 
-Reference to a hash containing the following fields relating to the genome's evaluation.
+Reference to a hash containing the following fields relating to the genome's evaluation. This is only present
+if the genome has been evaluated. Note also that only a subset of these fields may be present depending on
+the detail level of the evaluation.
 
 =over 8
 
@@ -1058,7 +1055,7 @@ sub contigLen {
 
     my $fidList = $geo->roleFids($role);
 
-Return all the roles for the specified role ID, or an empty list if there are none.
+Return all the features for the specified role ID, or an empty list if there are none.
 
 =over 4
 
@@ -1314,11 +1311,11 @@ sub AddQuality {
     my $contigH = $self->{contigs};
     my @contigLengths = values %$contigH;
     $quality{metrics} = SeedUtils::compute_metrics(\@contigLengths);
-    # Now it is time to read the quality file. The following hashes
-    # will track over-represented and under-represented roles.
-    my (%over, %under, %pred, %good);
+    # Now it is time to read the quality file.
     open(my $ih, "<$summaryFile") || die "Could not open quality output file $summaryFile: $!";
+    # This will track the current recommended role comment.
     my $comment = '';
+    # Loop through the file.
     while (! eof $ih) {
         my $line = <$ih>;
         if ($line =~ /^([^\t]+):\s+(.+)/) {
@@ -1332,27 +1329,33 @@ sub AddQuality {
         } elsif ($line =~ /^(\S+)\t(\d+)\t(\d+)/) {
             # Here we have a role prediction.
             my ($role, $predicted, $actual) = ($1, $2, $3);
-            $pred{$role} = 1;
             if ($predicted != $actual) {
                 $roles{$role} = [$predicted, $actual, $comment];
-                if ($predicted < $actual) {
-                    $over{$role} = 1;
-                } elsif ($predicted > $actual) {
-                    $under{$role} = 1;
-                }
-            }
-            # The role is good if it is present and is predicted to occur
-            # equal or more times. This is a very conservative measure, so
-            # it will miss necessary roles.
-            if ($predicted >= 1 && $actual >= 1 && $actual <= $predicted) {
-                $good{$role} = 1;
+            } elsif (! $roles{$role}) {
+                $roles{$role} = [$predicted, $actual, $comment];
             }
         }
     }
-    # Compute the over and under numbers.
-    $quality{over_roles} = scalar keys %over;
-    $quality{under_roles} = scalar keys %under;
-    $quality{pred_roles} = scalar keys %pred;
+    # Now compute over-present and under-present roles.
+    my ($over, $under, $pred) = (0, 0, 0);
+    my %good;
+    for my $role (keys %roles) {
+        my $roleData = $roles{$role};
+        my ($predicted, $actual) = @$roleData;
+        if ($predicted > $actual) {
+            $over++;
+        } elsif ($predicted < $actual) {
+            $under++;
+        } else {
+            $good{$role} = 1;
+        }
+        $pred++;
+    }
+
+    # Store the over and under numbers.
+    $quality{over_roles} = $over;
+    $quality{under_roles} = $under;
+    $quality{pred_roles} = $pred;
     # Get the role features hash and the feature-locations hash.
     my $roleFids = $self->{roleFids};
     my $fidLocs = $self->{fidLocs};
@@ -1793,8 +1796,31 @@ sub _BuildGeo {
     my $detail = $options->{detail} // 0;
     my $logH = $options->{logH};
     # Check for quality data in the GTO.
-    if ($gto->{genome_quality_metrics}) {
-        $retVal->{quality} = $gto->{genome_quality_metrics};
+    if ($gto->{quality}) {
+        my %quality;
+        my $gtoQ = $gto->{quality};
+        # Pull out the basic scores.
+        $quality{coarse_consis} = $gtoQ->{coarse_consistency};
+        $quality{fine_consis} = $gtoQ->{fine_consistency};
+        $quality{complete} = $gtoQ->{completeness};
+        $quality{contam} = $gtoQ->{contamination};
+        $quality{taxon} = $gtoQ->{completeness_group};
+        $quality{metrics} = $gtoQ->{genome_metrics};
+        # Get the problematic role scores.
+        my $ppr = $gtoQ->{problematic_roles_report};
+        $quality{over_roles} = $ppr->{over_present};
+        $quality{under_roles} = $ppr->{under_present};
+        $quality{pred_roles} = $ppr->{pred_roles};
+        # Build the role report.
+        my $roleReport = $ppr->{roles};
+        my %roles;
+        for my $role (keys %$roleReport) {
+            $roles{$role} = [@{$roleReport->{$role}}, ''];
+        }
+        $quality{roles} = \%roles;
+        # We do not bother to load the contig report at this time.
+        # So far, we are not using it post-process.
+        $retVal->{quality} = \%quality;
     }
     # Compute the aa-len limits for the seed protein.
     my ($min, $max) = (209, 405);
