@@ -1051,12 +1051,21 @@ Return a hash of all the problematic roles. Each role ID will map to a 3-tuple--
 
 sub roleReport {
     my ($self) = @_;
-    my $retVal = {};
+    my %retVal;
     my $qData = $self->{quality};
     if ($qData) {
-        $retVal = $qData->{roles};
+        my $commentsH = $qData->{role_comments} // {};
+        for my $hash ($qData->{completeness_roles}, $qData->{consistency_roles}) {
+            for my $role (keys %$hash) {
+                my ($predicted, $actual) = @{$hash->{$role}};
+                if ($predicted != $actual) {
+                    my $comment = $commentsH->{$role} // '';
+                    $retVal{$role} = [$predicted, $actual, $comment];
+                }
+            }
+        }
     }
-    return $retVal;
+    return \%retVal;
 }
 
 =head3 contigReport
@@ -1295,6 +1304,65 @@ sub role_similarity {
     return $retVal;
 }
 
+=head3 UpdateGTO
+
+    $geo->UpdateGTO($gto);
+
+Copy the quality information from this GEO into a L<GenomeTypeObject>.
+
+=over 4
+
+=item gto
+
+The L<GenomeTypeObject> whose quality data is to be updated from this object.
+
+=back
+
+=cut
+
+sub UpdateGTO {
+    my ($self, $gto) = @_;
+    # Get our quality data.
+    my $quality = $self->{quality};
+    # Make sure there is a quality hash in the GTO and get access to it.
+    my $gtoQ = $gto->{quality};
+    if (! $gtoQ) {
+        $gtoQ = {};
+        $gto->{quality} = $gtoQ;
+    }
+    # Ditto for the PPR.
+    my $ppr = $gtoQ->{problematic_roles_report};
+    if (! $ppr) {
+        $ppr = {};
+        $gtoQ->{problematic_roles_report} = $ppr;
+    }
+    # Fill in the basic metrics.
+    $gtoQ->{coarse_consistency} = $quality->{coarse_consis};
+    $gtoQ->{fine_consistency} = $quality->{fine_consis};
+    $gtoQ->{completeness} = $quality->{complete};
+    $gtoQ->{contamination} = $quality->{contam};
+    $gtoQ->{completeness_group} = $quality->{taxon};
+    $gtoQ->{genome_metrics} = $quality->{metrics};
+    $ppr->{over_present} = $quality->{over_roles};
+    $ppr->{under_present} = $quality->{under_roles};
+    $ppr->{predicted_roles} = $quality->{pred_roles};
+    # Copy the role predictions.
+    $ppr->{completeness_roles} = $quality->{completeness_roles};
+    $ppr->{consistency_roles} = $quality->{consistency_roles};
+    # Build the role maps.
+    my (%roleFids, %roleMap);
+    my $nMap = $self->{nameMap};
+    for my $hash ($ppr->{completeness_roles}, $ppr->{consistency_roles}) {
+        for my $role (keys %$hash) {
+            $roleFids{$role} = $self->roleFids($role);
+            $roleMap{$role} = $nMap->{$role} || $role;
+        }
+    }
+    # Store the role maps back in the GTO.
+    $ppr->{role_map} = \%roleMap;
+    $ppr->{role_fids} = \%roleFids;
+}
+
 
 =head2 Public Manipulation Methods
 
@@ -1320,18 +1388,18 @@ sub AddRefGenome {
 }
 
 
-=head3 AddQuality
+=head3 AddQualityData
 
-    $geo->AddQuality($summaryFile);
+    $geo->AddQualityData($summaryFile);
 
-Add the quality information for this genome to this object, using the data in the specified summary file.
-This method fills in the C<quality> member described above.
+Read the basic quality information from the specified summary file. This updates the metrics and role counts,
+but does not compute the comments.
 
 =over 4
 
 =item summaryFile
 
-The name of the genome summary file produced by L<p3x-eval-genomes.pl> for this genome. This contains the role
+The name of the genome summary file produced by the evaluators for this genome. This contains the role
 information and the quality metrics.
 
 =back
@@ -1339,62 +1407,61 @@ information and the quality metrics.
 =cut
 
 # Commands for processing the summary file headings.
-use constant HEADINGS => { 'Fine Consistency' => ['fine_consis', ''],
-                           'Coarse Consistency' => ['coarse_consis', ''],
-                           'Group' => ['taxon', 'Universal role.'],
-                           'Completeness' => ['complete', 'Universal role.'],
-                           'Contamination' => ['contam', 'Universal role.']
+use constant HEADINGS => { 'Fine Consistency' => ['fine_consis', 'consistency_roles'],
+                           'Coarse Consistency' => ['coarse_consis', 'consisency_roles'],
+                           'Group' => ['taxon', 'completeness_roles'],
+                           'Completeness' => ['complete', 'completeness_roles'],
+                           'Contamination' => ['contam', 'completeness_roles']
 };
 
-# Maximum length for a short feature.
-use constant SHORT_FEATURE => 180;
-
-# Margin at the end of each contig.
-use constant CONTIG_EDGE => 5;
-
-sub AddQuality {
+sub AddQualityData {
     my ($self, $summaryFile) = @_;
     # This will be the quality member.
     my %quality;
     $self->{quality} = \%quality;
-    # Get the reference genomes (if any).
-    my $refGeoL = $self->{refGeo} // [];
-    my $refGeoCount = scalar @$refGeoL;
-    # This will be the role prediction hash.
-    my %roles;
-    $quality{roles} = \%roles;
     # Compute the metrics based on the contig lengths.
     my $contigH = $self->{contigs};
     my @contigLengths = values %$contigH;
     $quality{metrics} = SeedUtils::compute_metrics(\@contigLengths);
     # Now it is time to read the quality file.
     open(my $ih, "<$summaryFile") || die "Could not open quality output file $summaryFile: $!";
-    # This will track the current recommended role comment.
-    my $comment = '';
+    # These are the role prediction hashes.
+    my (%consistency_roles, %completeness_roles);
+    $quality{consistency_roles} = \%consistency_roles;
+    $quality{completeness_roles} = \%completeness_roles;
+    # This will track the current target hash. If there is not a command
+    # at the beginning of the file, we will fail.
+    my $roleHash = '';
+    # This will contain all the predicted roles, which we will use for counting
+    # later.
+    my %roles;
     # Loop through the file.
     while (! eof $ih) {
         my $line = <$ih>;
         if ($line =~ /^([^\t]+):\s+(.+)/) {
             # Find out what we are supposed to do with this keyword.
+            # We store a value and pick a target hash.
             my ($label, $value) = ($1, $2);
             my $command = HEADINGS->{$label};
             if ($command) {
                 $quality{$command->[0]} = $value;
-                $comment = $command->[1];
+                $roleHash = $quality{$command->[1]};
             }
         } elsif ($line =~ /^(\S+)\t(\d+)\t(\d+)/) {
             # Here we have a role prediction.
             my ($role, $predicted, $actual) = ($1, $2, $3);
+            # Store it in the quality hash.
+            $roleHash->{$role} = [$predicted, $actual];
+            # Track it for later counting.
             if ($predicted != $actual) {
-                $roles{$role} = [$predicted, $actual, $comment];
+                $roles{$role} = [$predicted, $actual];
             } elsif (! $roles{$role}) {
-                $roles{$role} = [$predicted, $actual, $comment];
+                $roles{$role} = [$predicted, $actual];
             }
         }
     }
     # Now compute over-present and under-present roles.
     my ($over, $under, $pred) = (0, 0, 0);
-    my %good;
     for my $role (keys %roles) {
         my $roleData = $roles{$role};
         my ($predicted, $actual) = @$roleData;
@@ -1402,22 +1469,67 @@ sub AddQuality {
             $over++;
         } elsif ($predicted < $actual) {
             $under++;
-        } else {
-            $good{$role} = 1;
         }
         $pred++;
     }
-
     # Store the over and under numbers.
     $quality{over_roles} = $over;
     $quality{under_roles} = $under;
     $quality{pred_roles} = $pred;
+    # We are all done reading the quality file.
+}
+
+=head3 AnalyzeQualityData
+
+    $geo->AnalyzeQualityData();
+
+This method analyzes the quality data read into the summary file, compares it with the reference genomes,
+and produces the contig report and role comments.  It can be called after L</AddQualityData> or on a GEO
+read from a L<GenomeTypeObject> with evaluation data in it.
+
+=cut
+
+# Maximum length for a short feature.
+use constant SHORT_FEATURE => 180;
+
+# Margin at the end of each contig.
+use constant CONTIG_EDGE => 5;
+
+sub AnalyzeQualityData {
+    my ($self) = @_;
+    # Get the reference genomes.
+    my $refGeoL = $self->{refGeo} // [];
+    my $refGeoCount = scalar @$refGeoL;
     # Get the role features hash and the feature-locations hash.
     my $roleFids = $self->{roleFids};
     my $fidLocs = $self->{fidLocs};
+    # Get the quality data previously stored.
+    my $quality = $self->{quality};
+    # Build the list of good roles and the list of problematic roles. This list gives us the default comment
+    # for each role prediction hash.
+    my @hashData = ([$quality->{completeness_roles}, 'Universal role.'], [$quality->{consistency_roles}, '']);
+    # This will hold the predicted roles that have actual occurrences.
+    my @pred;
+    # This will hold the problematic role comments.
+    my %role_comments;
+    $quality->{role_comments} = \%role_comments;
+    for my $hashDatum (@hashData) {
+        my ($roleH, $comment) = @$hashDatum;
+        for my $role (keys %$roleH) {
+            my ($pred, $actual) = @{$roleH->{$role}};
+            if ($pred != $actual) {
+                $role_comments{$role} = $comment;
+            }
+            if ($actual > 0) {
+                push @pred, $role;
+            }
+        }
+    }
+    # Extract the good roles;
+    my %good = map { $_ => 1 } grep { ! exists $role_comments{$_} } @pred;
     # Now compute the number of good roles in each contig.
     my %contigs;
-    $quality{contigs} = \%contigs;
+    $quality->{contigs} = \%contigs;
     for my $role (keys %good) {
         my $fids = $roleFids->{$role};
         for my $fid (@$fids) {
@@ -1427,7 +1539,8 @@ sub AddQuality {
     }
     # Memorize the contigs with no good roles and the contigs shorter than
     # the N70.
-    my $shortContig = $quality{metrics}{N70};
+    my $contigH = $self->{contigs};
+    my $shortContig = $quality->{metrics}{N70};
     my %badContigs;
     for my $contig (keys %$contigH) {
         my $connect = 0;
@@ -1448,11 +1561,11 @@ sub AddQuality {
     my $ourProteins = $self->{proteins};
     # Now we must analyze the features for each problematic role and update the
     # comments.
-    for my $role (keys %roles) {
-        my ($predicted, $actual, $comment) = @{$roles{$role}};
+    for my $role (keys %role_comments) {
+        my ($predicted, $actual, $comment) = $self->roleMetrics($role);
         # Set up to accumulate comments about the role in here.
-        my @roleComments;
-        if ($comment) { push @roleComments, $comment; }
+        my @rComments;
+        if ($comment) { push @rComments, $comment; }
         # If there are existing features for the role, we make comments on each one.
         if ($actual >= 1) {
             # Get the list of features found, and save their proteins.
@@ -1498,7 +1611,7 @@ sub AddQuality {
                                 } else {
                                     $comment .= " but has no close features in this genome."
                                 }
-                                push @roleComments, $comment
+                                push @rComments, $comment
                             }
                         }
                     }
@@ -1544,7 +1657,7 @@ sub AddQuality {
                 # Now build the feature comment. There will be at least one, but may
                 # be more.
                 my $fcomment = _cr_link($fid) . ' ' . _format_comments(@comments);
-                push @roleComments, $fcomment;
+                push @rComments, $fcomment;
                 # Finally, we must record this feature as a bad feature for the contig.
                 push @{$contigs{$contigID}}, $fid;
             }
@@ -1564,25 +1677,49 @@ sub AddQuality {
             my $genomeWord = ($refGeoCount == 1 ? 'genome' : 'genomes');
             my $fidCount = scalar keys %rProteins;
             if (! $fidCount) {
-                push @roleComments, "Role is not present in the reference $genomeWord.";
+                push @rComments, "Role is not present in the reference $genomeWord.";
             } else {
                 my $verb = ($fidCount == 1 ? 'performs' : 'perform');
-                push @roleComments, _fid_link(sort keys %rProteins) . " $verb this role in the reference $genomeWord.";
+                push @rComments, _fid_link(sort keys %rProteins) . " $verb this role in the reference $genomeWord.";
                 # Find the closest feature for each reference genome protein.
                 for my $rFid (sort keys %rProteins) {
                     my $rProtein = $rProteins{$rFid};
                     if ($rProtein) {
                         my ($fid, $score) = closest_protein($rProtein, $ourProteins);
                         if ($fid) {
-                            push @roleComments, _cr_link($fid) . " is the closest protein to the reference feature " . _fid_link($rFid) . " with $score kmers in common.";
+                            push @rComments, _cr_link($fid) . " is the closest protein to the reference feature " . _fid_link($rFid) . " with $score kmers in common.";
                         }
                     }
                 }
             }
         }
         # Form all the comments for this role.
-        $roles{$role}[2] = join('<br />', @roleComments);
+        $role_comments{$role} = join('<br />', @rComments);
     }
+}
+
+=head3 AddQuality
+
+    $geo->AddQuality($summaryFile);
+
+Add the quality information for this genome to this object, using the data in the specified summary file.
+This method fills in the C<quality> member described above.
+
+=over 4
+
+=item summaryFile
+
+The name of the genome summary file produced by the evaluators for this genome. This contains the role
+information and the quality metrics.
+
+=back
+
+=cut
+
+sub AddQuality {
+    my ($self, $summaryFile) = @_;
+    $self->AddQualityData($summaryFile);
+    $self->AnalyzeQualityData();
 }
 
 =head2 Internal Methods

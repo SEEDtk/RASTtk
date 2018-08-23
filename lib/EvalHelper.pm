@@ -182,38 +182,7 @@ sub ProcessGto {
         print $oh $retVal;
     }
     # Copy the quality metrics to the GTO.
-    my $quality = $geo->{quality};
-    my $gtoQ = $gto->{quality};
-    if (! $gtoQ) {
-        $gtoQ = {};
-        $gto->{quality} = $gtoQ;
-    }
-    my $ppr = $gtoQ->{problematic_roles_report};
-    if (! $ppr) {
-        $ppr = {};
-        $gtoQ->{problematic_roles_report} = $ppr;
-    }
-    $gtoQ->{coarse_consistency} = $quality->{coarse_consis};
-    $gtoQ->{fine_consistency} = $quality->{fine_consis};
-    $gtoQ->{completeness} = $quality->{complete};
-    $gtoQ->{contamination} = $quality->{contam};
-    $gtoQ->{completeness_group} = $quality->{taxon};
-    $gtoQ->{genome_metrics} = $quality->{metrics};
-    $ppr->{over_present} = $quality->{over_roles};
-    $ppr->{under_present} = $quality->{under_roles};
-    $ppr->{pred_roles} = $quality->{pred_roles};
-    # Build the role reports for the GTO.
-    my (%roles, %roleFids, %roleMap);
-    my $qRoles = $quality->{roles};
-    for my $role (keys %$qRoles) {
-        my ($predicted, $actual) = @{$qRoles->{$role}};
-        $roles{$role} = [$predicted, $actual];
-        $roleFids{$role} = $geo->roleFids($role);
-        $roleMap{$role} = $nMap->{$role} || $role;
-    }
-    $ppr->{role_map} = \%roleMap;
-    $ppr->{role_fids} = \%roleFids;
-    $ppr->{roles} = \%roles;
+    $geo->UpdateGTO($gto);
 }
 
 
