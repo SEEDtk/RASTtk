@@ -461,16 +461,18 @@ sub CreateFromGto {
     # Create the GEO and bless it.
     my $retVal = _BuildGeo($gto, $p3, $nMap, $cMap, $stats, \%options);
     bless $retVal, $class;
-    # Compute the taxonomic lineage.
-    my $taxon = $retVal->taxon;
-    my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [$taxon]);
-    # Default to just the input taxon ID.
-    my $lineage = [$taxon];
-    # Update if we got something. Note we can get a null string even if a result did come back.
-    if (@$taxResults) {
-        $lineage = $taxResults->[0][1] || [$taxon];
+    # Compute the taxonomic lineage, if needed.
+    if (! $retVal->{lineage}) {
+        my $taxon = $retVal->taxon;
+        my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [$taxon]);
+        # Default to just the input taxon ID.
+        my $lineage = [$taxon];
+        # Update if we got something. Note we can get a null string even if a result did come back.
+        if (@$taxResults) {
+            $lineage = $taxResults->[0][1] || [$taxon];
+        }
+        $retVal->{lineage} = $lineage;
     }
-    $retVal->{lineage} = $lineage;
     # Return the result.
     return $retVal;
 }
@@ -565,21 +567,27 @@ sub CreateFromGtoFiles {
             $retVal{$geo->{id}} = $geo;
         }
     }
-    # Run through all the objects, blessing them and extracting the taxonomic IDs..
+    # Run through all the objects, blessing them and extracting the taxonomic IDs of the ones that need lineages.
     my %taxons;
+    my $lineageNeeded;
     for my $genome (keys %retVal) {
         my $geo = $retVal{$genome};
         bless $geo, $class;
-        push @{$taxons{$geo->taxon}}, $geo
+        if (! $geo->{lineage}) {
+            push @{$taxons{$geo->taxon}}, $geo;
+            $lineageNeeded = 1;
+        }
     }
-    # Get the lineage for each GEO.
-    my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [keys %taxons]);
-    for my $taxResult (@$taxResults) {
-        my ($taxon, $lineage) = @$taxResult;
-        $lineage ||= [$taxon];
-        my $geos = $taxons{$taxon} // [];
-        for my $geo (@$geos) {
-            $geo->{lineage} = $lineage;
+    # Get the lineage for each GEO that needs one.
+    if ($lineageNeeded) {
+        my $taxResults = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'lineage_ids'], [keys %taxons]);
+        for my $taxResult (@$taxResults) {
+            my ($taxon, $lineage) = @$taxResult;
+            $lineage ||= [$taxon];
+            my $geos = $taxons{$taxon} // [];
+            for my $geo (@$geos) {
+                $geo->{lineage} = $lineage;
+            }
         }
     }
     # Return the hash of objects.
@@ -2011,6 +2019,10 @@ sub _BuildGeo {
         # To get a full role report ("role_comments" and "contigs"), you
         # need to call AnalyzeQualityData.
         $retVal->{quality} = \%quality;
+    }
+    # Check for a lineage.
+    if ($gto->{ncbi_lineage}) {
+        $retVal->{lineage} = [map { $_->[1] } @{$gto->{ncbi_lineage}} ];
     }
     # Compute the aa-len limits for the seed protein.
     my ($min, $max) = (209, 405);
