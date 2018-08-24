@@ -1658,7 +1658,10 @@ sub AnalyzeQualityData {
                 my $fcomment = _cr_link($fid) . ' ' . _format_comments(@comments);
                 push @rComments, $fcomment;
                 # Finally, we must record this feature as a bad feature for the contig.
-                push @{$contigs{$contigID}}, $fid;
+                my $contigFids = $contigs{$contigID};
+                if (! grep { $_ eq $fid } @$contigFids) {
+                    push @$contigFids, $fid;
+                }
             }
         } elsif ($refGeoCount) {
             # The role is missing, but we have a reference genome. Get its instances
