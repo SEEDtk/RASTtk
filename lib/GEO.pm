@@ -1465,9 +1465,9 @@ sub AddQualityData {
     for my $role (keys %roles) {
         my $roleData = $roles{$role};
         my ($predicted, $actual) = @$roleData;
-        if ($predicted > $actual) {
+        if ($predicted < $actual) {
             $over++;
-        } elsif ($predicted < $actual) {
+        } elsif ($predicted > $actual) {
             $under++;
         }
         $pred++;
@@ -1580,9 +1580,8 @@ sub AnalyzeQualityData {
             }
             # We accumulate reference-genome comments for each feature in this hash.
             my %fComments;
-            # If we have actual features and we have proteins, we can ask which feature
-            # is the best.
-            if ($actual > 0 && scalar(keys %proteins) > 1) {
+            # If we have proteins, we can ask which feature is the best.
+            if (scalar(keys %proteins) > 1) {
                 # Check for this role in each reference genome.
                 for my $refGeo (@$refGeoL) {
                     my $rFids = $refGeo->{roleFids}{$role};
