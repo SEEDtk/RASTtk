@@ -917,6 +917,20 @@ sub qscore {
     return $retVal;
 }
 
+=head3 quality
+
+    my $quality = $geo->quality;
+
+Return the hash containing the genome's quality analysis data. If the genome has not been evaluated, this will return C<undef>.
+
+=cut
+
+sub quality {
+    my ($self) = @_;
+    return $self->{quality};
+}
+
+
 =head3 metrics
 
     my $metricsH = $geo->metrics;

@@ -2695,7 +2695,8 @@ sub gto_of {
         [
             "select",      "genome_id",
             "genome_name", "genome_status",
-            "taxon_id",    "taxon_lineage_names"
+            "taxon_id",    "taxon_lineage_names",
+            "taxon_lineage_ids"
         ],
     );
 
@@ -2722,6 +2723,7 @@ sub gto_of {
     my $genetic_code = 11;
     $genetic_code = $code[0]->{genetic_code} if (@code);
 
+
     # Create the initial GTO.
     $retVal = GenomeTypeObject->new();
     $retVal->set_metadata(
@@ -2736,6 +2738,16 @@ sub gto_of {
                           genetic_code     => $genetic_code
                           }
                          );
+
+    # Get the taxonomic ranks.
+    my $lineage = $g->{taxon_lineage_ids};
+    if ($lineage) {
+        my %taxMap = map { $_->{taxon_id} => [$_->{taxon_name}, $_->{taxon_id}, $_->{taxon_rank}] } $self->query(
+                            "taxonomy",
+                            [ "in", "taxon_id", '(' . join(',', @$lineage) . ')'],
+                            ["select", "taxon_id", "taxon_name", "taxon_rank"]);
+        $retVal->{ncbi_lineage} = [map { $taxMap{$_} } @$lineage];
+    }
 
     # Get the contigs.
     my @contigs = $self->query(

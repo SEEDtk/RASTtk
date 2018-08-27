@@ -143,6 +143,9 @@ for my $sample (@samples) {
         my %nameMap = map { $geoHash->{$_}->name => $_ } keys %$geoHash;
         # We will save the GEOs to evaluate in this list.
         my @evalGeos;
+        # The GEOs for bins will be saved in this list. Some of the GEOs are pre-evaluated,
+        # so this list is bigger.
+        my @binGeos;
         # Now we must link the bins to the reference genomes. We use the bins.rast.json file for this.
         # First we get a hash that maps each bin name to its coverage and reference genomes. This hash
         # is used by the web page builder as well as us. The nested call means we don't need to keep
@@ -159,7 +162,14 @@ for my $sample (@samples) {
                 my $binGeo = $geoHash->{$binID};
                 print "Genome $binID found for $binName.\n";
                 $stats->Add(binGenomeFound => 1);
-                push @evalGeos, $binGeo;
+                push @binGeos, $binGeo;
+                # If this bin is already evaluated, analyze the data so that it is fully evaluated.
+                if ($binGeo->quality) {
+                    $binGeo->AnalyzeQualityData();
+                    $stats->Add(binQualityReused => 1);
+                } else {
+                    push @evalGeos, $binGeo;
+                }
                 # Get the reference genome IDs.
                 my $refGenomes = $binHash->{$binName}{refs};
                 for my $refGenome (@$refGenomes) {
@@ -178,7 +188,7 @@ for my $sample (@samples) {
             }
         }
         # Only proceed if we have something to do.
-        if (! @evalGeos) {
+        if (! @binGeos) {
             print "No bins found to evaluate in $sample.\n";
             $stats->Add(sampleEmpty => 1);
         } else {
@@ -189,31 +199,38 @@ for my $sample (@samples) {
             } else {
                 File::Copy::Recursive::pathempty($outDir) || die "Could not erase $outDir: $!";
             }
-            # Start the predictor matrix for the consistency checker. We use the sample directory
-            # as our work directory, because the files are small.
-            $evalCon->OpenMatrix($sample);
-            # Now we loop through the bin GEOs.
-            for my $geo (@evalGeos) {
-                my $genome = $geo->id;
-                my $outFile = "$outDir/$genome.out";
-                open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
-                # Compute the consistency and completeness. This also writes the output.
-                $evalG->Check2($geo, $oh);
-                # Add this genome to the evalCon matrix.
-                $evalCon->AddGeoToMatrix($geo);
+            # If we need to do evaluations, we do them here.
+            if (@evalGeos) {
+                # Start the predictor matrix for the consistency checker. We use the sample directory
+                # as our work directory, because the files are small.
+                $evalCon->OpenMatrix($sample);
+                # Now we loop through the bin GEOs.
+                for my $geo (@evalGeos) {
+                    my $genome = $geo->id;
+                    my $outFile = "$outDir/$genome.out";
+                    open(my $oh, ">$outFile") || die "Could not open $outFile: $!";
+                    # Compute the consistency and completeness. This also writes the output.
+                    $evalG->Check2($geo, $oh);
+                    # Add this genome to the evalCon matrix.
+                    $evalCon->AddGeoToMatrix($geo);
+                }
+                # Evaluate all the genomes for consistency.
+                $evalCon->CloseMatrix();
+                my $rc = system('eval_matrix', $evalCon->predictors, $sample, $outDir);
+                $stats->Add(evalConRun => 1);
+                # Loop through the genomes again, storing the quality metrics in the GEOs.
+                for my $geo (@evalGeos) {
+                    my $genome = $geo->id;
+                    print "Processing output for $genome.\n";
+                    $geo->AddQuality("$outDir/$genome.out");
+                }
             }
-            # Evaluate all the genomes for consistency.
-            $evalCon->CloseMatrix();
-            my $rc = system('eval_matrix', $evalCon->predictors, $sample, $outDir);
-            $stats->Add(evalConRun => 1);
-            # Loop through the genomes again, storing the quality metrics in the GEOs and creating the summary output file.
+            # Now we need to produce the summary output file and the web pages.
             open(my $oh, ">$outDir/index.tbl") || die "Could not create summary output file: $!";
             P3Utils::print_cols(['Sample', 'Bin ID', 'Bin Name', 'Ref ID', 'Ref Name', 'Contigs', 'Base Pairs', 'N50', 'Coarse Consistency', 'Fine Consistency',
                     'Completeness', 'Contamination', 'Taxonomic Grouping', 'Good PheS', 'Good'], oh => $oh);
-            for my $geo (@evalGeos) {
+            for my $geo (@binGeos) {
                 my $genome = $geo->id;
-                print "Processing output for $genome.\n";
-                $geo->AddQuality("$outDir/$genome.out");
                 # Create the detail page.
                 my $editHash;
                 if ($editURL) {
@@ -238,7 +255,7 @@ for my $sample (@samples) {
             }
             close $oh; undef $oh;
             # Now we need to create the summary page. First we need to create URLs for the bins.
-            my %urlMap = map { $_->id => ($_->id . ".html") } @evalGeos;
+            my %urlMap = map { $_->id => ($_->id . ".html") } @binGeos;
             open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
             my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@evalGeos, \%urlMap);
             print $oh $prefix . "<title>$sample</title></head><body>" . $html . $suffix;
