@@ -22,7 +22,7 @@ table.p3basic th {
 [% IF job_id %]
 <h1>Metagenomics Binning Report for [% job_id %]</h1>
 
-<p><a href="https://docs.patricbrc.org//tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
+<p><a href="https://docs.patricbrc.org/tutorial/metagenomic_binning/metagenomic_output.html#the-binning-output-directory">Tutorial for this page.</a></p>
 
 <h2>Input data</h2>
 <p>[% IF params.contigs %]

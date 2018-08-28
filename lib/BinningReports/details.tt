@@ -1,6 +1,6 @@
 <h1>Results for [% g.genome_id %]</h1>
 
-<p><a href="https://docs.patricbrc.org//tutorial/genome_quality_report/genome_quality_report">Tutorial for this page.</a></p>
+<p><a href="https://docs.patricbrc.org/tutorial/genome_quality_report/genome_quality_report.html">Tutorial for this page.</a></p>
 
 <table class="p3basic">
 <tr>
