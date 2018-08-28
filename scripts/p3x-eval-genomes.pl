@@ -404,7 +404,7 @@ eval {
         my %urlMap = map { $_->id => ($_->id . ".html") } @summary;
         open(my $oh, ">$outDir/index.html") || die "Could not open summary web page: $!";
         my $html = BinningReports::Summary('', {}, undef, $summaryTFile, '', \@summary, \%urlMap);
-        print $oh $prefix . "<title>Genome Evaluations</title></head><body>\n" . $html . $suffix;
+        print $oh "<html><head><title>Genome Evaluations</title></head><body>\n" . $html . $suffix;
         close $oh;
     }
 };
