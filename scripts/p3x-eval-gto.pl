@@ -64,6 +64,7 @@ my $opt = P3Utils::script_opts('gtoFile outFile outHtml',
         ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt" }],
         ['external', 'the genome is not currently installed in PATRIC'],
         ['binned', 'the genome contig IDs are user-suppled, not PATRIC-generated'],
+        ['parallel=i', 'parallelism to use in matrix evaluation', { default => 8 }],
         );
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
@@ -83,6 +84,7 @@ if (! $gto) {
 }
 # Call the main processor.
 my $geo = EvalHelper::ProcessGto($gto, 'ref' => $opt->ref, deep => $opt->deep, checkDir => $opt->checkdir, predictors => $opt->predictors,
+    parallel => $opt->parallel,
     p3 => $p3, outFile => $outFile, outHtml => $outHtml, template => $opt->template, external => $opt->external, binned => $opt->binned);
 # Write the results.
 $gto->destroy_to_file($gtoFile);
