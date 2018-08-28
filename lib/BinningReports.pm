@@ -397,6 +397,7 @@ sub Summary {
     # Create the summary report parm structure.
     my $vars = { job_id => $jobID, params => $params, found => \%found, good => \@good, bad => \@bad, group_path => $genome_group_path,
                  min_checkm => GEO::MIN_CHECKM, min_scikit => GEO::MIN_SCIKIT, max_contam => GEO::MAX_CONTAM };
+    # print STDERR Dumper($vars);
     # Create the summary report.
     $templateEngine->process($summary_tt, $vars, \$retVal);
     # Return the report.

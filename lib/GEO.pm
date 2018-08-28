@@ -2027,7 +2027,7 @@ sub _BuildGeo {
         my $ppr = $gtoQ->{problematic_roles_report};
         $quality{over_roles} = $ppr->{over_present};
         $quality{under_roles} = $ppr->{under_present};
-        $quality{pred_roles} = $ppr->{pred_roles};
+        $quality{pred_roles} = $ppr->{predicted_roles};
         $quality{consistency_roles} = $ppr->{consistency_roles};
         $quality{completeness_roles} = $ppr->{completeness_roles};
         # To get a full role report ("role_comments" and "contigs"), you

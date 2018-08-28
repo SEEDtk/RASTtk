@@ -257,7 +257,7 @@ for my $sample (@samples) {
             # Now we need to create the summary page. First we need to create URLs for the bins.
             my %urlMap = map { $_->id => ($_->id . ".html") } @binGeos;
             open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
-            my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@evalGeos, \%urlMap);
+            my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@binGeos, \%urlMap);
             print $oh $prefix . "<title>$sample</title></head><body>" . $html . $suffix;
             close $oh;
         }
