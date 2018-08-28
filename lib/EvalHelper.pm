@@ -164,7 +164,8 @@ sub ProcessGto {
     $evalCon->AddGeoToMatrix($geo);
     $evalCon->CloseMatrix();
     # Evaluate the consistency.
-    my $rc = system('eval_matrix', '-q', $evalCon->predictors, $workDir, $workDir);
+    my $par = $options{parallel} // 16;
+    my $rc = system('eval_matrix', "-p", $par, '-q', $evalCon->predictors, $workDir, $workDir);
     if ($rc) {
         die "EvalCon returned error code $rc.";
     }

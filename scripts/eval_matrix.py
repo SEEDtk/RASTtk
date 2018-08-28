@@ -61,6 +61,7 @@ parser.add_argument("-c", "--classifier", dest="clfType", default="RandomForestC
 parser.add_argument("--LDA", action="store_true",
                   help="Use Linear Discriminant Analysis")
 parser.add_argument("-q", "--quiet", action="store_true", help="suppress status output")
+parser.add_argument("-p", "--parallel", type=int, help="number of processes to use", default=16)
 args = parser.parse_args()
 q = args.quiet;
 if __name__ == '__main__':
@@ -86,7 +87,7 @@ if len(genomes.shape) != 2:
 
 if __name__ == '__main__':
 
-    predictions = joblib.Parallel(n_jobs=32)(joblib.delayed(run_predictor)(n_col) for n_col in range(X_all.shape[1]))
+    predictions = joblib.Parallel(n_jobs=args.parallel)(joblib.delayed(run_predictor)(n_col) for n_col in range(X_all.shape[1]))
 
     predictions = np.asarray(predictions)
     predictions = np.transpose(predictions)
