@@ -114,7 +114,7 @@ my ($nMap, $cMap) = $evalCon->roleHashes;
 my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
 my $detail = ($opt->deep ? 2 : 1);
-my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, binned => 1);
+my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, binned => 1, stats => $stats);
 # Check for an editor URL.
 my $editURL = $opt->editurl;
 # Loop through the samples.
@@ -163,13 +163,6 @@ for my $sample (@samples) {
                 print "Genome $binID found for $binName.\n";
                 $stats->Add(binGenomeFound => 1);
                 push @binGeos, $binGeo;
-                # If this bin is already evaluated, analyze the data so that it is fully evaluated.
-                if ($binGeo->quality) {
-                    $binGeo->AnalyzeQualityData();
-                    $stats->Add(binQualityReused => 1);
-                } else {
-                    push @evalGeos, $binGeo;
-                }
                 # Get the reference genome IDs.
                 my $refGenomes = $binHash->{$binName}{refs};
                 for my $refGenome (@$refGenomes) {
@@ -184,6 +177,13 @@ for my $sample (@samples) {
                         print "$refGenomeID is a reference for $binID.\n";
                         $stats->Add(refGenomeFound => 1);
                     }
+                }
+                # If this bin is already evaluated, analyze the data so that it is fully evaluated.
+                if ($binGeo->quality) {
+                    $binGeo->AnalyzeQualityData();
+                    $stats->Add(binQualityReused => 1);
+                } else {
+                    push @evalGeos, $binGeo;
                 }
             }
         }

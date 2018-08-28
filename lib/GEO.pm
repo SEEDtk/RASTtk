@@ -1606,7 +1606,7 @@ sub AnalyzeQualityData {
             if (scalar(keys %proteins) > 1) {
                 # Check for this role in each reference genome.
                 for my $refGeo (@$refGeoL) {
-                    my $rFids = $refGeo->{roleFids}{$role};
+                    my $rFids = $refGeo->roleFids($role);
                     # Loop through the reference genome features.
                     for my $rFid (@$rFids) {
                         my $rProtein = $refGeo->protein($rFid);
@@ -2096,7 +2096,8 @@ sub _BuildGeo {
                 $locs{$fid} = $loc;
             }
             if ($detail > 1 && $prot) {
-                $proteins{$fid} = $feature->{protein_translation};
+                $proteins{$fid} = $prot;
+                $stats->Add(proteinStored => 1);
             }
         }
     }
