@@ -1,3 +1,24 @@
+<style type="text/css">
+div.body {
+    font-family: Arial, sans-serif;
+    color: #333333;
+    font-weight: 200;
+    font-size: small;
+    background: #FCFCFC;
+}
+table.p3basic, table.p3basic th,
+table.p3basic td, table.p3basic tr {
+    border-style: inset;
+    border-collapse: collapse;
+    vertical-align: top;
+    padding: 3px;
+}
+table.p3basic th {
+    text-align: left;
+    background: #EEEEEE;
+}
+</style>
+<div class="body">
 [% IF job_id %]
 <h1>Metagenomics Binning Report for [% job_id %]</h1>
 
@@ -94,7 +115,7 @@ The following bins did not meet the quality criteria:</p>
 
 [% BLOCK qual_row %]
 <tr>
-<td><a href="[% g.report_url %]">[% g.qscore %]</a></td>
+<td><a target="_parent" href="[% g.report_url %]">[% g.qscore %]</a></td>
 <td><a target="_blank" href="[% g.genome_url %]">[% g.genome_id %]</a></td>
 <td>[% g.genome_name %]</td>
 <td>
@@ -116,3 +137,4 @@ The following bins did not meet the quality criteria:</p>
 <td [% g.seed_color %]>[% g.good_seed %]</td>
 </tr>
 [% END %]
+</div>
