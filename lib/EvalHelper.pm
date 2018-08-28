@@ -101,6 +101,10 @@ If TRUE, the incoming genome is presumed to be external, and no contig links wil
 If TRUE, the incoming genome is presumed to have user-specified contig IDs, which are stored as descriptions in the PATRIC genome_sequence records.
 This overrides C<external>.
 
+=item parallel
+
+Number of parallel processes to run when evaluating the function predictors. The default is C<16>.
+
 =back
 
 =back

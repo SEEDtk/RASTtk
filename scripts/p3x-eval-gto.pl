@@ -45,6 +45,10 @@ If specifed, the incoming genome is presumed to be external, and no contig links
 If specified, the incoming genome is presumed to have external contig IDs which are stored in the description fields of
 the sequences in PATRIC.
 
+=item parallel
+
+The number of parallel processed to run when applying the function predictors. The default is C<8>.
+
 =back
 
 =cut
