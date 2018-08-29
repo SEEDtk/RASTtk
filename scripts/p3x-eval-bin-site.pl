@@ -1,6 +1,6 @@
 =head1 Create Master Web Site for Bin Evaluation Pages
 
-    p3-master-bin-site.pl [options] binDir webDir
+    p3x-eval-bin-site.pl [options] binDir webDir
 
 This will create a master web site in the specified location from all the completed bin evaluations in a specified binning sample directory.
 It will look for an C<Eval> subdirectory under the sample directory itself, parse the C<index.tbl>, and move all the HTML files to a web
