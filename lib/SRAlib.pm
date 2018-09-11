@@ -298,6 +298,7 @@ sub download_runs {
         # Create a FastQ object to read the run from NCBI.
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
+        my $lCount = 0;
         my $line;
         while (! eof $ih && ! $error) {
             $line = <$ih>;
@@ -325,6 +326,8 @@ sub download_runs {
                             $line = <$ih>;
                             print $rh $line;
                         }
+                        $lCount++;
+                        $self->_log("$lCount spots output.\n") if $lCount % 10000 == 0;
                     }
                 } else {
                     # No valid right read.

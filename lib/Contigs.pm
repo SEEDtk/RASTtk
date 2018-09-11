@@ -515,4 +515,66 @@ sub fasta_out {
     }
 }
 
+=head3 present
+
+    my $foundFlag = $contigs->present($contigID);
+
+Return TRUE if the specified contig is present, else FALSE.
+
+=over 4
+
+=item contigID
+
+The ID of the contig to check.
+
+=item RETURN
+
+Returns TRUE if the contig is in the object, else FALSE.
+
+=back
+
+=cut
+
+sub present {
+    my ($self, $contigID) = @_;
+    my $retVal = 0;
+    if ($self->{triples}{$contigID}) {
+        $retVal = 1;
+    }
+    return $retVal;
+}
+
+
+=head2 Public Manipulation Methods
+
+    $contigs->AddContig($id, $comment, $dna);
+
+Add the specified contig to this object.
+
+=over 4
+
+=item id
+
+ID of the contig to add.
+
+=item comment
+
+An optional comment. If undefined, an empty string is used.
+
+=item dna
+
+The DNA sequence for the contig.
+
+=back
+
+=cut
+
+sub AddContig {
+    my ($self, $id, $comment, $dna) = @_;
+    $comment //= '';
+    my $triplesH = $self->{triples};
+    $triplesH->{$id} = [$id, $comment, $dna];
+    $self->{lens}{$id} = length $dna;
+}
+
 1;
