@@ -4,7 +4,8 @@
 
 This will create a master web site in the specified location from all the completed bin evaluations in a specified binning sample directory.
 It will look for an C<Eval> subdirectory under the sample directory itself, parse the C<index.tbl>, and move all the HTML files to a web
-directory with the same name as the sample under the master web directory.
+directory with the same name as the sample under the master web directory. In addition, a C<good.tbl> file will be created in the output
+directory that lists all the good genomes.
 
 =head2 Parameters
 
@@ -56,6 +57,9 @@ my ($prefix, $suffix) = BinningReports::build_strings($opt);
 # These structures will contain the data for the master index page.
 my @s;
 my %master = (bad_count => 0, good_count => 0, sample_count => 0);
+# This will be the output file for the good genomes.
+open(my $gh, ">$webDir/good.tbl") || die "Could not open good.tbl: $!";
+print $gh "genome_id\tgenome_name\n";
 # Get all the completed samples in the input directory.
 print "Searching $binDir.\n";
 opendir(my $dh, $binDir) || die "Could not open $binDir: $!";
@@ -71,15 +75,16 @@ for my $sample (@samples) {
     # Initialize the counters.
     my ($good, $bad, $total) = (0, 0, 0);
     open(my $ih, "<$inDir/index.tbl") || die "Could not open index file for $sample: $!";
-    my (undef, $cols) = P3Utils::find_headers($ih, indexFile => 'Bin ID', 'Good');
+    my (undef, $cols) = P3Utils::find_headers($ih, indexFile => 'Bin ID', 'Bin Name', 'Good');
     while (! eof $ih) {
-        my ($binID, $goodFlag) = P3Utils::get_cols($ih, $cols);
+        my ($binID, $binName, $goodFlag) = P3Utils::get_cols($ih, $cols);
         # Copy this bin's HTML file.
         File::Copy::Recursive::fcopy("$inDir/$binID.html", "$outDir/$binID.html") || die "Could not copy $binID for $sample: $!";
         # Count the bin.
         $total++;
         if ($goodFlag) {
             $good++;
+            print $gh "$binID\t$binName\n";
         } else {
             $bad++;
         }
