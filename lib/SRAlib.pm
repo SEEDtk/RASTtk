@@ -166,7 +166,7 @@ sub get_runs {
             $retVal = [];
             my @lines = split /\n/, $content;
             for my $line (@lines) {
-                if ($line =~ /^(SRR\d+),/) {
+                if ($line =~ /^(.RR\d+),/) {
                     push @$retVal, $1;
                     $stats->Add(runFound => 1);
                 }
@@ -223,7 +223,7 @@ sub get_stats {
         my @lines = split /\n/, $content;
         for my $line (@lines) {
             my ($run, undef, undef, $spot0, $base0) = split /,/, $line;
-            if ($run && $run =~ /^SRR/) {
+            if ($run && $run =~ /^.RR/) {
                 $spots += $spot0;
                 $bases += $base0;
             }
