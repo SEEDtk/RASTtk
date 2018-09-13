@@ -18,7 +18,7 @@ supported.
 
 =item gap
 
-The maximum gap distance for two proteins to be considered physically close. The default is C<300>.
+The maximum gap distance for two proteins to be considered physically close. The default is C<2000>.
 
 =item type
 
@@ -26,7 +26,7 @@ The type of category-- currently C<role>, C<ecnum>, or C<family>. The default is
 
 =item verbose
 
-If specified, status messages will be written to the standard output.
+If specified, status messages will be written to the standard error output.
 
 =back
 
