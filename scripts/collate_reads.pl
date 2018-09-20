@@ -138,7 +138,7 @@ while ($ih->next) {
         $binned++;
     }
     $progress++;
-    print "$progress reads processed, $binned binned.\n" if $progress % 10000 == 0;
+    print "$progress reads processed, $binned binned.\n" if $progress % 100000 == 0;
 }
 # Close all the files.
 print "Closing output files.\n";
