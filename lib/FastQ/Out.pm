@@ -32,7 +32,7 @@ which performs the same service for L<FastA> objects.
 
     my $oh = FastQ::Out->new($fileName);
 
-Create FASTA paired output files with the given file name. The extensions C<_1.fq> and C<_2.fq> will be appended.
+Create FASTA paired output files with the given file name. The extensions C<_1.fastq> and C<_2.fastq> will be appended.
 
 =over 4
 
@@ -47,8 +47,8 @@ The name to give to the output file, without the filename extensions.
 sub new {
     my ($class, $fileName) = @_;
     # Create the output files.
-    open(my $oh1, ">${fileName}_1.fq") || die "Could not open $fileName left fastq: $!";
-    open(my $oh2, ">${fileName}_2.fq") || die "Could not open $fileName right fastq: $!";
+    open(my $oh1, ">${fileName}_1.fastq") || die "Could not open $fileName left fastq: $!";
+    open(my $oh2, ">${fileName}_2.fastq") || die "Could not open $fileName right fastq: $!";
     # Create the object.
     my $retVal = { lh => $oh1, rh => $oh2 };
     bless $retVal, $class;

@@ -20,7 +20,6 @@ package FastA::Out;
 
     use strict;
     use warnings;
-    ## TODO more use clauses
 
 =head1 FASTA Writer
 
@@ -33,7 +32,7 @@ which performs the same service for L<FastQ> objects.
 
     my $oh = FastA::Out->new($fileName);
 
-Create a FASTA output file with the given file name. The extension C<.fa> will be appended.
+Create a FASTA output file with the given file name. The extension C<.fasta> will be appended.
 
 =over 4
 
@@ -48,7 +47,7 @@ The name to give to the output file, without the filename extension.
 sub new {
     my ($class, $fileName) = @_;
     # Create the output file.
-    open(my $oh, ">$fileName.fa") || die "Could not open $fileName fasta: $!";
+    open(my $oh, ">$fileName.fasta") || die "Could not open $fileName fasta: $!";
     # Create the object.
     my $retVal = { oh => $oh };
     bless $retVal, $class;
