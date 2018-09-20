@@ -30,6 +30,11 @@ Role name of the protein to use. The default is C<Phenylalanyl-tRNA synthetase a
 Resume an interrupted run. The current files will be read into memory and written back out, then
 only new genomes will be added. Mutually exclusive with C<--clear>.
 
+=item dna
+
+If specified, a C<6.1.1.20.dna.fasta> file will be produced in addition to the others, containing
+the DNA sequences of the proteins.
+
 =back
 
 =cut
@@ -49,7 +54,8 @@ $| = 1;
 my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_options(),
         ['clear', 'clear the output directory if it exists'],
         ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl-tRNA synthetase alpha chain' }],
-        ['resume', 'finish an interrupted run']
+        ['resume', 'finish an interrupted run'],
+        ['dna', 'produce a DNA FASTA file in addition to the default files']
         );
 # Verify the mutually exclusive options.
 my $resume = $opt->resume;
@@ -66,6 +72,11 @@ if (! $outDir) {
 } elsif ($opt->clear) {
     print "Erasing directory $outDir.\n";
     File::Copy::Recursive::pathempty($outDir) || die "Error clearing $outDir: $!";
+}
+# Check for DNA mode.
+my $dnaFile;
+if ($opt->dna) {
+    $dnaFile = "$outDir/6.1.1.20.dna.fasta";
 }
 # Create the statistics object.
 my $stats = Stats->new();
@@ -90,6 +101,16 @@ if ($resume) {
             $stats->Add(previousStored => 1);
         }
     }
+    if ($dnaFile) {
+        $fh = FastA->new($dnaFile);
+        while ($fh->next) {
+            my $id = $fh->id;
+            if ($previous{$id}) {
+                $stats->Add(previousDna => 1);
+                push @{$previous{$id}}, $fh->left;
+            }
+        }
+    }
 }
 # Create a filter from the protein name.
 my $protName = $opt->prot;
@@ -98,10 +119,17 @@ my @filter = (['eq', 'product', $protName]);
 my $roleCheck = RoleParse::Checksum($protName);
 # Create a list of the columns we want.
 my @cols = qw(genome_name patric_id aa_sequence product);
+if ($dnaFile) {
+    push @cols, 'na_sequence';
+}
 # Open the output files.
 print "Setting up files.\n";
 open(my $gh, '>', "$outDir/complete.genomes") || die "Could not open genome output file: $!";
 open(my $fh, '>', "$outDir/6.1.1.20.fasta") || die "Could not open FASTA output file: $!";
+my $nh;
+if ($dnaFile) {
+    open($nh, '>', $dnaFile) || die "Could not open DNA output file: $!";
+}
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Open the input file.
@@ -135,14 +163,14 @@ while (! eof $ih) {
         my $protList = P3Utils::get_data($p3, feature => \@filter, \@cols, genome_id => \@couples);
         # Collate them by genome ID, discarding the nulls.
         for my $prot (@$protList) {
-            my ($genome, $name, $fid, $sequence, $product) = @$prot;
+            my ($genome, $name, $fid, $sequence, $product, $dna) = @$prot;
             if ($fid) {
                 # We have a real feature, check the function.
                 my $check = RoleParse::Checksum($product // '');
                 if ($check ne $roleCheck) {
                     $stats->Add(funnyProt => 1);
                 } else {
-                    push @{$proteins{$genome}}, [$name, $sequence];
+                    push @{$proteins{$genome}}, [$name, $sequence, $dna];
                     $stats->Add(protFound => 1);
                 }
             }
@@ -157,9 +185,13 @@ while (! eof $ih) {
             $stats->Add(multiProt => 1);
         } else {
             # Get the genome name and sequence.
-            my ($name, $seq) = @{$prots[0]};
+            my ($name, $seq, $dna) = @{$prots[0]};
             print $gh "$genome\t$name\n";
             print $fh ">$genome\n$seq\n";
+            if ($nh && $dna) {
+                print $nh ">$genome\n$dna\n";
+                $stats->Add(dnaOut => 1);
+            }
             $stats->Add(genomeOut => 1);
         }
     }

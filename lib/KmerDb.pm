@@ -58,6 +58,10 @@ Reference to a hash mapping each group ID to the group name.
 TRUE if the object has been finalized, else FALSE. Finalizing the object removes kmers considered too common
 to be useful.
 
+=item mirror
+
+TRUE if the database has both the forward and reverse complement of every kmer.
+
 =back
 
 =head2 Special Methods
@@ -84,6 +88,10 @@ the hash. The default is C<10>.
 The name of a JSON file (or an open file handle) containing the group and kmer hashes. This file is created by
 the L</Save> method.
 
+=item mirror
+
+If TRUE, both the forward and reverse complement of every kmer will be added.
+
 =back
 
 =cut
@@ -94,6 +102,7 @@ sub new {
     my $retVal = {
         kmerSize => ($options{kmerSize} // 10),
         maxFound => ($options{maxFound} // 10),
+        mirror => ($options{mirror} // 0),
         groupHash => {},
         kmerHash => {},
         finalized => 0
@@ -104,6 +113,7 @@ sub new {
         $retVal->{groupHash} = $hashes->{groupHash};
         $retVal->{kmerHash} = $hashes->{kmerHash};
         $retVal->{kmerSize} = $hashes->{kmerSize};
+        $retVal->{mirror} = $hashes->{mirror};
         $retVal->{finalized} = 1;
     }
     # Bless and return the object.
@@ -147,9 +157,15 @@ sub AddSequence {
     my $kmerHash = $self->{kmerHash};
     # Loop through the sequence, processing the kmers. We normalize them to
     # upper case.
-    for (my $i = 0; $i < $last; $i++) {
-        my $kmer = uc substr($sequence, $i, $klen);
-        $kmerHash->{$kmer}{$groupID}++;
+    my @seqs = uc $sequence;
+    if ($self->{mirror}) {
+        push @seqs, SeedUtils::rev_comp($seqs[0]);
+    }
+    for my $seq (@seqs) {
+        for (my $i = 0; $i < $last; $i++) {
+            my $kmer = substr($seq, $i, $klen);
+            $kmerHash->{$kmer}{$groupID}++;
+        }
     }
     # Process the group name if we got one.
     if ($name) {
@@ -403,30 +419,41 @@ Sequence to be compared to the kmer database.
 =item counts
 
 Reference to a hash where the counts will be accumulated. The counts will be added to existing data in the
-hash.
+hash. The hash is keyed by group ID.
 
 =item genetic_code (optional)
 
 If specified, the sequence will be translated using the specified genetic code; otherwise, the sequence will
 be used unmodified.
 
+=item stride
+
+If specified, the number of positions in the sequence to skip between checks.  The default is C<1>, meaning all
+positions are checked.  If a genetic code is specified, the stride is ignored.
+
 =back
 
 =cut
 
 sub count_hits {
-    my ($self, $sequence, $counts, $genetic_code) = @_;
+    my ($self, $sequence, $counts, $genetic_code, $stride) = @_;
+    # Determine if we are mirrored.
+    my $mirror = $self->{mirror};
     # Compute the kmer length in the sequence.
     my $kmerLen = $self->{kmerSize};
+    # Insure the stride is valid.
+    $stride ||= 1;
     # Normalize the sequence to upper case.
     my $nsequence = uc $sequence;
     # Are we translating?
     if (! $genetic_code) {
         # No translation. Accumulate the hits on the forward strand.
-        $self->accumulate_hits($nsequence, $counts);
-        # Get the other strand and accumulate those hits.
-        SeedUtils::rev_comp($nsequence);
-        $self->accumulate_hits($nsequence, $counts);
+        $self->accumulate_hits($nsequence, $counts, $stride);
+        # If we are NOT mirrored, get the other strand and accumulate those hits.
+        if (! $mirror) {
+            SeedUtils::rev_comp($nsequence);
+            $self->accumulate_hits($nsequence, $counts, $stride);
+        }
     } else {
         # Yes. Gget the genetic code.
         my $xlateH = SeedUtils::genetic_code($genetic_code);
@@ -440,7 +467,7 @@ sub count_hits {
                 my $psequence = SeedUtils::translate($frame, $xlateH);
                 # Accumulate the hits.
                 $self->accumulate_hits($psequence, $counts);
-                # Get the other strand and translate it.
+                # Get the other strand and translate it. The proteins should NOT be mirrored, ever!
                 SeedUtils::rev_comp(\$frame);
                 $psequence = SeedUtils::translate($frame, $xlateH);
                 # Accumulate those hits.
@@ -478,11 +505,25 @@ sub name {
     return $retVal;
 }
 
+=head3 all_groups
+
+    my $groupList = $kmerdb->all_groups();
+
+Return a reference to a list of all the groups in this database.
+
+=cut
+
+sub all_groups {
+    my ($self) = @_;
+    my @retVal = keys %{$self->{groupHash}};
+    return \@retVal;
+}
+
 =head2 Internal Methods
 
 =head3 accumulate_hits
 
-    $kmerdb->accumulate_hits($sequence, \%counts);
+    $kmerdb->accumulate_hits($sequence, \%counts, $stride);
 
 Accumulate the kmer hits in a sequence. The sequence must already be translated if translation is
 needed.
@@ -497,18 +538,22 @@ Sequence to examine for kmers.
 
 Reference to a hash mapping group IDs to hit counts.
 
+=item stride
+
+Number of positions to step for each check.
+
 =back
 
 =cut
 
 sub accumulate_hits {
-    my ($self, $sequence, $counts) = @_;
+    my ($self, $sequence, $counts, $stride) = @_;
     # Get the kmer length and the hash.
     my $kmerSize = $self->{kmerSize};
     my $kmerHash = $self->{kmerHash};
     # Loop through the kmers.
     my $n = length($sequence) - $kmerSize;
-    for (my $i = 0; $i <= $n; $i++) {
+    for (my $i = 0; $i <= $n; $i += $stride) {
         my $kmer = substr($sequence, $i, $kmerSize);
         my $groups = $kmerHash->{$kmer};
         if ($groups) {

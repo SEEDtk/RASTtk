@@ -205,6 +205,32 @@ sub Write {
     print $oh ">$header\n$self->{left}\n";
 }
 
+=head3 Out
+
+    my $fqhandle->Out($fileName);
+
+Open an output file with the given name. The file name should not have an extension: one will be added.
+
+=over 4
+
+=item fileName
+
+The name to give to the output file, without an extension.  The extension C<.fa> will be appended.
+
+=item RETURN
+
+Returns a L<FastA::Out> object for writing to the file.
+
+=back
+
+=cut
+
+sub Out {
+    my ($self, $fileName) = @_;
+    require FastA::Out;
+    return FastA::Out->new($fileName);
+}
+
 
 =head2 Data Access Methods
 

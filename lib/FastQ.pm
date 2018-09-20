@@ -237,6 +237,27 @@ sub next {
     return $retVal;
 }
 
+=head3 Out
+
+    my $fqhandle->Out($fileName);
+
+Open output files with the given name. The file name should not have an extension: appropriate extensions will be added.
+
+=over 4
+
+=item fileName
+
+The name to give to the output files, without an extension.  The extensions C<_1.fq> and C<_2.fq> will be appended.
+
+=cut
+
+sub Out {
+    my ($self, $fileName) = @_;
+    require FastQ::Out;
+    return FastQ::Out->new($fileName);
+}
+
+
 =head3 Echo
 
     $fqhandle->Echo($oh);

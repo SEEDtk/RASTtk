@@ -26,6 +26,14 @@ The index (1-based) or name of the key column in the first file. The default C<0
 
 The index (1-based) or name of the key column in the second file. The default is the value of C<--key1>.
 
+=item nohead
+
+If specified, the files are assumed to not have headers.
+
+=item batchSize
+
+The number of records to read in each group from the first file.  The default is C<10>.
+
 =back
 
 =cut
