@@ -341,7 +341,8 @@ sub Save {
         $self->Finalize();
     }
     # Write out the hashes.
-    my $hashes = { kmerHash => $self->{kmerHash}, groupHash => $self->{groupHash}, kmerSize => $self->{kmerSize} };
+    my $hashes = { kmerHash => $self->{kmerHash}, groupHash => $self->{groupHash},
+        kmerSize => $self->{kmerSize}, mirror => $self->{mirror} };
     SeedUtils::write_encoded_object($hashes, $file);
 }
 
