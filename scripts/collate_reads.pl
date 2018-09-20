@@ -102,10 +102,10 @@ if (@inFiles == 2) {
     $ih = FastA->new(@inFiles);
 }
 # Create the output bins.
-my @groups = $kmerDb->all_groups();
-print scalar(@groups) . " bins will be produced, starting with bin$idx.\n";
+my $groups = $kmerDb->all_groups();
+print scalar(@$groups) . " bins will be produced, starting with bin$idx.\n";
 my %bins;
-for my $group (@groups) {
+for my $group (@$groups) {
     my $name = $kmerDb->name($group);
     print "bin$idx is $group $name.\n";
     my $oh = $ih->Out("$workDir/bin$idx");
@@ -118,7 +118,7 @@ while ($ih->next) {
     my @seqs = $ih->seqs;
     my %counts;
     for my $seq (@seqs) {
-        $kmerDb->count_hits($seq, \%counts, , $stride);
+        $kmerDb->count_hits($seq, \%counts, undef, $stride);
     }
     # Write the sequence to every bin that exceeds the minimum number of hits.
     my $used;
