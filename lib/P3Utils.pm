@@ -1473,16 +1473,14 @@ sub _process_entries {
                     if ($algorithm) {
                         # Related field, found in relatedMap hash.
                         my $value = $entry->{$algorithm->[0]} // '';
-                        if ($value) {
-                            my $related = $relatedMap{$col}{$value};
-                            if (defined $related) {
-                                # Keeping this record-- we have a value.
-                                $reject = 0;
-                            } else {
-                                $related = '';
-                            }
-                            push @outCols, $related;
+                        my $related = $relatedMap{$col}{$value};
+                        if (defined $related) {
+                            # Keeping this record-- we have a value.
+                            $reject = 0;
+                        } else {
+                            $related = '';
                         }
+                        push @outCols, $related;
                     } else {
                         # Here we have a normal or derived field, computed from the values of other fields.
                         $algorithm = $derivedH->{$col} // ['altName', $col];
