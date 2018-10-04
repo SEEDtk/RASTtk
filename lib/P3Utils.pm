@@ -851,21 +851,28 @@ sub get_data_batch {
     if (scalar @keys) {
         # Create a filter for the keys.
         my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
-        # Next we run the query and create a hash mapping keys to return sets.
-        my @results = $p3->query($realName, $keyClause, @mods);
+        # Next we run the query and process it into rows.
+        my $results = [ $p3->query($realName, $keyClause, @mods) ];
+        my $entries = [];
+        _process_entries($p3, $object, $entries, $results, [], $cols, $idCol, $keyField);
+        # Remove the results to save space.
+        undef $results;
+        # Convert the entries into a hash.
         my %entries;
-        for my $result (@results) {
-            my $keyValue = $result->{$keyField};
-            push @{$entries{$keyValue}}, $result;
+        for my $result (@$entries) {
+            my ($keyValue, @data) = @$result;
+            push @{$entries{$keyValue}}, \@data;
         }
-        # Empty the results array to save memory.
-        undef @results;
+        # Empty the entries array to save memory.
+        undef $entries;
         # Now loop through the couplets, producing output.
         for my $couplet (@$couplets) {
             my ($key, $row) = @$couplet;
             my $entryList = $entries{$key};
             if ($entryList) {
-                _process_entries($p3, $object, \@retVal, $entryList, $row, $cols, $idCol);
+                for my $entry (@$entryList) {
+                    push @retVal, [@$row, @$entry];
+                }
             }
         }
     }
@@ -1422,12 +1429,16 @@ Reference to a list of the names of the columns to be put in the output row, or 
 
 Name of an ID field that should not be zero or empty. This is used to filter out invalid records.
 
+=item keyField (optional)
+
+Name of an ID field whose value should be put at the beginning of every output row.
+
 =back
 
 =cut
 
 sub _process_entries {
-    my ($p3, $object, $retList, $entries, $row, $cols, $id) = @_;
+    my ($p3, $object, $retList, $entries, $row, $cols, $id, $keyField) = @_;
     # Are we counting?
     if (! $cols) {
         # Yes. Pop on the count.
@@ -1461,7 +1472,7 @@ sub _process_entries {
                     my $algorithm = $relatedH->{$col};
                     if ($algorithm) {
                         # Related field, found in relatedMap hash.
-                        my $value = $entry->{$algorithm->[1]} // '';
+                        my $value = $entry->{$algorithm->[0]} // '';
                         if ($value) {
                             my $related = $relatedMap{$col}{$value};
                             if (defined $related) {
@@ -1494,7 +1505,11 @@ sub _process_entries {
             }
             # Output the record if it is NOT rejected.
             if (! $reject) {
-                push @$retList, [@$row, @outCols];
+                my @col0;
+                if ($keyField) {
+                    @col0 = ($entry->{$keyField});
+                }
+                push @$retList, [@col0, @$row, @outCols];
             }
         }
     }
@@ -1502,7 +1517,7 @@ sub _process_entries {
 
 =head3 _related_field
 
-    my $relatedMap = P3Utils::_related_field($p3, $command, $linkField, $table, $dataField, $entries);
+    my $relatedMap = P3Utils::_related_field($p3, $linkField, $table, $dataField, $entries);
 
 Extract the values for a related field from a list of entries produced by
 a query. The link field value is taken from the entry and used to find a
@@ -1516,10 +1531,6 @@ field values to a data values.
 =item p3
 
 The L<P3DataAPI> object used to query the database.
-
-=item command
-
-Currently, the constant C<related>.
 
 =item linkField
 
@@ -1547,7 +1558,7 @@ Returns a reference to a hash mapping link field values to data field values.
 
 sub _related_field {
     # Get the parameters.
-    my ($p3, $command, $linkField, $table, $dataField, $entries) = @_;
+    my ($p3, $linkField, $table, $dataField, $entries) = @_;
     # Declare the return variable.
     my %retVal;
     # We need to create a query for the link field values found. The query is limited in size to 2000 characters.
@@ -1625,8 +1636,8 @@ sub _execute_query {
     my $select = ['select', $keyField, $dataField];
     my $filter = ['in', $keyField, '(' . join(",", @$keys) . ')'];
     # Execute the query.
-    my $entries = $p3->query($core, $select, $filter);
-    for my $entry (@$entries) {
+    my @entries = $p3->query($core, $select, $filter);
+    for my $entry (@entries) {
         $retHash->{$entry->{$keyField}} = $entry->{$dataField};
     }
 }
@@ -1720,7 +1731,7 @@ sub _select_list {
     for my $col (@$cols) {
         my $algorithm = $relatedH->{$col};
         if ($algorithm) {
-            $retVal{$algorithm->[1]} = 1;
+            $retVal{$algorithm->[0]} = 1;
         } else {
             $algorithm = $derivedH->{$col} // ['altName', $col];
             my ($function, @parms) = @$algorithm;
