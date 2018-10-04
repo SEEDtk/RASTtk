@@ -25,6 +25,13 @@ eval {
     require HTTP::Async;
     $have_async = 1;
 };
+
+our $have_p3auth;
+eval {
+    require P3AuthToken;
+    $have_p3auth = 1;
+};
+
 use IO::Socket::SSL;
 
 $IO::Socket::SSL::DEBUG = 0;
@@ -81,11 +88,22 @@ sub new {
 
     if (!$token)
     {
-        if (open(my $fh, "<", $token_path))
+        if ($have_p3auth)
         {
-            $token = <$fh>;
-            chomp $token;
-            close($fh);
+            my $token_obj = P3AuthToken->new();
+            if ($token_obj)
+            {
+                $token = $token_obj->token;
+            }
+        }
+        else
+        {
+            if (open(my $fh, "<", $token_path))
+            {
+                $token = <$fh>;
+                chomp $token;
+                close($fh);
+            }
         }
     }
 
@@ -221,9 +239,9 @@ sub query
         my $q   = "$qstr&$lim";
 
         #       print STDERR "Qry $url '$q'\n";
-        #	my $resp = $ua->post($url,
-        #			     Accept => "application/json",
-        #			     Content => $q);
+        #       my $resp = $ua->post($url,
+        #                            Accept => "application/json",
+        #                            Content => $q);
         my $end;
         $start = gettimeofday if $self->{benchmark};
         $self->_log("$url?$q\n");
@@ -245,7 +263,7 @@ sub query
         #        print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
-        #	print "r=$r\n";
+        #       print "r=$r\n";
         if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
             my $this_start = $1;
             my $next       = $2;
@@ -510,10 +528,10 @@ sub solr_query_raw_multi
         $resmap{$id} = $i;
 
         # my $res = $self->ua->get($uri,
-        # 			 "Content-type" => "application/solrquery+x-www-form-urlencoded",
-        # 			 "Accept", "application/solr+json",
-        # 			 $self->auth_header,
-        # 			);
+        #                        "Content-type" => "application/solrquery+x-www-form-urlencoded",
+        #                        "Accept", "application/solr+json",
+        #                        $self->auth_header,
+        #                       );
     }
 
     my @out;
@@ -1024,8 +1042,8 @@ sub compare_regions_for_peg_new
 
     if (!$context)
     {
-#	$context = ['group', 'pheS.3.0-1.1'];
-#	$coloring_field = 'group_family';
+#       $context = ['group', 'pheS.3.0-1.1'];
+#       $coloring_field = 'group_family';
     }
 
     my $group_data;
@@ -1148,7 +1166,7 @@ sub compute_pin_features_by_family_lookup
         {
             chomp;
             last if $_ eq '///';
-            # fig|96345.64.peg.772	96345.64.con.0001	4142224	898080	899369	+
+            # fig|96345.64.peg.772      96345.64.con.0001       4142224 898080  899369  +
             my($fid, $contig, $start, $end, $contig_length, $strand) = split(/\t/);
 
             my $len = abs($start - $end);
@@ -1267,9 +1285,9 @@ sub compare_regions_for_peg
     {
         my $elt = $pin[$pin_row];
 
-#	my ($left, $right);
-#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-#	my $mid = int(($left + $right) / 2);
+#       my ($left, $right);
+#       ($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+#       my $mid = int(($left + $right) / 2);
 
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
@@ -1338,9 +1356,9 @@ sub compare_regions_for_peg
     {
         my $elt = $pin[$pin_row];
 
-#	my ($left, $right);
-#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-#	my $mid = int(($left + $right) / 2);
+#       my ($left, $right);
+#       ($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+#       my $mid = int(($left + $right) / 2);
 
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
@@ -1361,7 +1379,7 @@ sub compare_regions_for_peg
         my($reg, $leftmost, $rightmost) = @{$genes_in_region_response[$pin_row]};
         my $features = [];
 
-#	my $region_mid = int(($leftmost + $rightmost) / 2) ;
+#       my $region_mid = int(($leftmost + $rightmost) / 2) ;
 
         print STDERR "Shift: $elt->{patric_id} $elt->{blast_shift}\n";
 
@@ -2085,8 +2103,8 @@ truncate to the desired size. The truncation mechanism may either be
 case N matches stratified through the list are kept.
 
 Each element in $pin is a hash with the following keys:
-    patric_id		Feature ID
-    aa_sequence 	Amino acid sequence for the protein
+    patric_id           Feature ID
+    aa_sequence         Amino acid sequence for the protein
 
 =cut
 
@@ -2285,18 +2303,18 @@ sub expand_pin_to_regions
 
     # for my $gir (@genes_in_region_response)
     # {
-    # 	my($reg) = @$gir;
-    # 	for my $fent (@$reg)
-    # 	{
-    # 	    if (my $i = $fent->{pgfam_id})
-    # 	    {
-    # 		$all_families->{$fent->{patric_id}}->{pgfam} = [$i, ''];
-    # 	    }
-    # 	    if (my $i = $fent->{plfam_id})
-    # 	    {
-    # 		$all_families->{$fent->{patric_id}}->{plfam} = [$i, ''];
-    # 	    }
-    # 	}
+    #   my($reg) = @$gir;
+    #   for my $fent (@$reg)
+    #   {
+    #       if (my $i = $fent->{pgfam_id})
+    #       {
+    #           $all_families->{$fent->{patric_id}}->{pgfam} = [$i, ''];
+    #       }
+    #       if (my $i = $fent->{plfam_id})
+    #       {
+    #           $all_families->{$fent->{patric_id}}->{plfam} = [$i, ''];
+    #       }
+    #   }
     # }
 
     for my $pin_row (0..$#$pin)
@@ -2723,7 +2741,6 @@ sub gto_of {
     my $genetic_code = 11;
     $genetic_code = $code[0]->{genetic_code} if (@code);
 
-
     # Create the initial GTO.
     $retVal = GenomeTypeObject->new();
     $retVal->set_metadata(
@@ -2838,7 +2855,7 @@ sub gto_of {
     #
     # Fill in subsystem data.
     #
-    # Since the data we're pulling from has been normalized, we need to
+    # Since the data we're pulling from has been denormalized, we need to
     # collapse both the subsystem and role-binding information back into
     # key/list data sets. We do this with the intermediate data structures
     # %subs hash for subsystems and the $sub->{rbhash} hash for role bindings.

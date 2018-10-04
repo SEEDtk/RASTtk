@@ -51,7 +51,8 @@ use constant OBJECTS => {   genome => 'genome',
                             taxonomy => 'taxonomy',
                             experiment => 'transcriptomics_experiment',
                             expression => 'transcriptomics_gene',
-                            sample => 'transcriptomics_sample' };
+                            sample => 'transcriptomics_sample',
+                            sequence => 'feature_sequence' };
 
 =head3 FIELDS
 
@@ -68,7 +69,8 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             experiment => ['eid', 'title', 'genes', 'pmid', 'organism', 'strain', 'mutant', 'timeseries', 'release_date'],
                             sample => ['eid', 'expid', 'genes', 'sig_log_ratio', 'sig_z_score', 'pmid', 'organism', 'strain', 'mutant', 'condition', 'timepoint', 'release_date'],
                             expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'],
-                            taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank', 'genome_count', 'genome_length_mean'] };
+                            taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank', 'genome_count', 'genome_length_mean'],
+                            sequence => ['md5', 'sequence_type', 'sequence'] };
 
 =head3 IDCOL
 
@@ -85,7 +87,8 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             experiment => 'eid',
                             sample => 'expid',
                             expression => 'id',
-                            taxonomy => 'taxon_id' };
+                            taxonomy => 'taxon_id',
+                            sequence => 'md5' };
 
 =head3 DERIVED
 
@@ -114,6 +117,21 @@ use constant DERIVED => {
             expression => {
                         }
 };
+
+=head3 RELATED
+
+Mapping from objects to fields in related records. For each related field we have a list reference consisting of the key field name, the
+target table, and the target field.
+
+=cut
+
+use constant RELATED => {
+        feature =>  {   na_sequence => ['na_sequence_md5', 'sequence', 'sequence'],
+                        aa_sequence => ['aa_sequence_md5', 'sequence', 'sequence']
+        },
+};
+
+
 =head2  Methods
 
 =head3 data_options
@@ -750,7 +768,7 @@ sub get_data {
     # no additional filtering.
     if (! $fieldName) {
         my @entries = $p3->query($realName, @mods);
-        _process_entries($object, \@retVal, \@entries, [], $cols, $idCol);
+        _process_entries($p3, $object, \@retVal, \@entries, [], $cols, $idCol);
     } else {
         # Here we need to loop through the couplets one at a time.
         for my $couplet (@$couplets) {
@@ -760,7 +778,7 @@ sub get_data {
             # Make the query.
             my @entries = $p3->query($realName, $keyField, @mods);
             # Process the results.
-            _process_entries($object, \@retVal, \@entries, $row, $cols, $idCol);
+            _process_entries($p3, $object, \@retVal, \@entries, $row, $cols, $idCol);
         }
     }
     # Return the result rows.
@@ -847,7 +865,7 @@ sub get_data_batch {
             my ($key, $row) = @$couplet;
             my $entryList = $entries{$key};
             if ($entryList) {
-                _process_entries($object, \@retVal, $entryList, $row, $cols, $idCol);
+                _process_entries($p3, $object, \@retVal, $entryList, $row, $cols, $idCol);
             }
         }
     }
@@ -912,8 +930,7 @@ sub get_data_keyed {
     }
     my $computed = _select_list($object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
-    # Create a filter for the keys.
-    # Loop through the keys, a group at a time.
+    # Create a filter for the keys.  We loop through the keys, a group at a time.
     my $n = @$keys;
     for (my $i = 0; $i < @$keys; $i += 200) {
         # Split out the keys in this batch.
@@ -923,7 +940,7 @@ sub get_data_keyed {
         my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
         # Next we run the query and push the output into the return list.
         my @results = $p3->query($realName, $keyClause, @mods);
-        _process_entries($object, \@retVal, \@results, [], $cols, $idCol);
+        _process_entries($p3, $object, \@retVal, \@results, [], $cols, $idCol);
     }
     # Return the result rows.
     return \@retVal;
@@ -1341,7 +1358,7 @@ sub list_object_fields {
     my $realName = OBJECTS->{$object};
     # Ask for the JSON schema string.
     my $ua = LWP::UserAgent->new();
-    my $url = "https://www.patricbrc.org/api/$realName/schema?http_content-type=application/solrquery+x-www-form-urlencoded&http_accept=application/solr+json";
+    my $url = "$FIG_Config::p3_data_api_url/$realName/schema?http_content-type=application/solrquery+x-www-form-urlencoded&http_accept=application/solr+json";
     my $request = HTTP::Request->new(GET => $url);
     my $response = $ua->request($request);
     if ($response->code ne 200) {
@@ -1359,6 +1376,9 @@ sub list_object_fields {
         # Get the derived fields.
         my $derivedH = DERIVED->{$object};
         push @retVal, map { "$_ (derived)" } keys %$derivedH;
+        # Get the related fields.
+        $derivedH = RELATED->{$object};
+        push @retVal, map { "$_ (related)" } keys %$derivedH;
     }
     # Return the list.
     return [sort @retVal];
@@ -1368,11 +1388,15 @@ sub list_object_fields {
 
 =head3 _process_entries
 
-    P3Utils::_process_entries($object, \@retList, \@entries, \@row, \@cols, $id);
+    P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id);
 
 Process the specified results from a PATRIC query and store them in the output list.
 
 =over 4
+
+=item p3
+
+The L<P3DataAPI> object for querying derived fields.
 
 =item object
 
@@ -1403,13 +1427,24 @@ Name of an ID field that should not be zero or empty. This is used to filter out
 =cut
 
 sub _process_entries {
-    my ($object, $retList, $entries, $row, $cols, $id) = @_;
+    my ($p3, $object, $retList, $entries, $row, $cols, $id) = @_;
     # Are we counting?
     if (! $cols) {
         # Yes. Pop on the count.
         push @$retList, [@$row, scalar(@$entries)];
     } else {
-        # No. Generate the data. First we need the derived-field hash.
+        # No. Generate the data. First we need the related-field hash.
+        my $relatedH = RELATED->{$object};
+        # Now we process the related fields. This is a two-level hash with primary key column name and secondary key input field value
+        # that maps each input field value to its target value.
+        my %relatedMap;
+        for my $col (@$cols) {
+            my $algorithm = $relatedH->{$col};
+            if ($algorithm) {
+                $relatedMap{$col} = _related_field($p3, @$algorithm, $entries);
+            }
+        }
+        # Now we need the derived fields, too.
         my $derivedH = DERIVED->{$object};
         # Loop through the entries.
         for my $entry (@$entries) {
@@ -1422,20 +1457,39 @@ sub _process_entries {
                 # Loop through the columns to create.
                 for my $col (@$cols) {
                     # Get the rule for this column.
-                    my $algorithm = $derivedH->{$col} // ['altName', $col];
-                    my ($function, @fields) = @$algorithm;
-                    my @values = map { $entry->{$_} } @fields;
-                    # Verify the values.
-                    for (my $i = 0; $i < @values; $i++) {
-                        if (! defined $values[$i]) {
-                            $values[$i] = '';
-                        } else {
-                            $reject = 0;
+                    my @suffix;
+                    my $algorithm = $relatedH->{$col};
+                    if ($algorithm) {
+                        # Related field, found in relatedMap hash.
+                        my $value = $entry->{$algorithm->[1]} // '';
+                        if ($value) {
+                            my $related = $relatedMap{$col}{$value};
+                            if (defined $related) {
+                                # Keeping this record-- we have a value.
+                                $reject = 0;
+                            } else {
+                                $related = '';
+                            }
+                            push @outCols, $related;
                         }
+                    } else {
+                        # Here we have a normal or derived field, computed from the values of other fields.
+                        $algorithm = $derivedH->{$col} // ['altName', $col];
+                        my ($function, @fields) = @$algorithm;
+                        my @values = map { $entry->{$_} } @fields;
+                        # Verify the values.
+                        for (my $i = 0; $i < @values; $i++) {
+                            if (! defined $values[$i]) {
+                                $values[$i] = '';
+                            } else {
+                                # Keeping this record-- we have a value.
+                                $reject = 0;
+                            }
+                        }
+                        # Now we compute the output value.
+                        my $outCol = _apply($function, @values, @suffix);
+                        push @outCols, $outCol;
                     }
-                    # Now we compute the output value.
-                    my $outCol = _apply($function, @values);
-                    push @outCols, $outCol;
                 }
             }
             # Output the record if it is NOT rejected.
@@ -1445,6 +1499,138 @@ sub _process_entries {
         }
     }
 }
+
+=head3 _related_field
+
+    my $relatedMap = P3Utils::_related_field($p3, $command, $linkField, $table, $dataField, $entries);
+
+Extract the values for a related field from a list of entries produced by
+a query. The link field value is taken from the entry and used to find a
+record in a secondary table. The actual desired value for the related
+field is taken from the data field in the secondary-table record having
+the link field value as key. The return value is a hash mapping link
+field values to a data values.
+
+=over 4
+
+=item p3
+
+The L<P3DataAPI> object used to query the database.
+
+=item command
+
+Currently, the constant C<related>.
+
+=item linkField
+
+The name of the field in the incoming entries containing the key for the secondary table.
+
+=item table
+
+The name of the secondary table containing the actual values.
+
+=item dataField
+
+The name of the field in the secondary table containing the actual values. This cannot be a derived or related field.
+
+=item entries
+
+A reference to a list of the results from the base query.  Each result is a hash keyed on field name.
+
+=item RETURN
+
+Returns a reference to a hash mapping link field values to data field values.
+
+=back
+
+=cut
+
+sub _related_field {
+    # Get the parameters.
+    my ($p3, $command, $linkField, $table, $dataField, $entries) = @_;
+    # Declare the return variable.
+    my %retVal;
+    # We need to create a query for the link field values found. The query is limited in size to 2000 characters.
+    my $core = OBJECTS->{$table};
+    my $key = IDCOL->{$table};
+    # Estimate the length of the query data excluding the keys.
+    my $inLength0 = length("$p3->{url}/$core?select($key, $dataField)&in($key, ())&limit(25000,25000)");
+    # These variables accumulate the current query.
+    my ($inLength, @keys) = ($inLength0);
+    # Now loop through the entries, creating queries.
+    for my $entry (@$entries) {
+        my $link = $entry->{$linkField};
+        if ($link && ! $retVal{$link}) {
+            # Here we have a new link field value.
+            $inLength += length($link) + 1;
+            if ($inLength >= 2000) {
+                # The new key would make the query too big. Execute it.
+                _execute_query($p3, $core, $key, $dataField, \@keys, \%retVal);
+                $inLength = $inLength0;
+                @keys = ();
+            }
+            # Now we have room for the new value.
+            push @keys, $link;
+        }
+    }
+    # Process the residual.
+    if (@keys) {
+        _execute_query($p3, $core, $key, $dataField, \@keys, \%retVal);
+    }
+    # Return the result.
+    return \%retVal;
+}
+
+=head3 _execute_query
+
+    P3Utils::_execute_query($p3, $core, $keyField, $dataField, \@keys, \%retHash);
+
+Execute a query to get the data values associated with a key. The mapping
+from keys to data values is added to the specified hash.
+
+=over 4
+
+=item p3
+
+The L<P3DataAPI> object for accessing the database.
+
+=item core
+
+The real name of the table containing the data.
+
+=item keyField
+
+The real name of the table's key field.
+
+=item dataField
+
+The real name of the associated data field.
+
+=item keys
+
+A reference to a list of the keys whose data values are desired.
+
+=item retHash
+
+A reference to a hash into which results should be placed.
+
+=back
+
+=cut
+
+sub _execute_query {
+    # Get the parameters.
+    my ($p3, $core, $keyField, $dataField, $keys, $retHash) = @_;
+    # Create the query elements.
+    my $select = ['select', $keyField, $dataField];
+    my $filter = ['in', $keyField, '(' . join(",", @$keys) . ')'];
+    # Execute the query.
+    my $entries = $p3->query($core, $select, $filter);
+    for my $entry (@$entries) {
+        $retHash->{$entry->{$keyField}} = $entry->{$dataField};
+    }
+}
+
 
 =head3 _apply
 
@@ -1527,14 +1713,20 @@ sub _select_list {
     my ($object, $cols) = @_;
     # The field names will be accumulated in here.
     my %retVal;
-    # Get the derived-field hash.
+    # Get the modified-field hashes.
     my $derivedH = DERIVED->{$object};
+    my $relatedH = RELATED->{$object};
     # Loop through the field names.
     for my $col (@$cols) {
-        my $algorithm = $derivedH->{$col} // ['altName', $col];
-        my ($function, @parms) = @$algorithm;
-        for my $parm (@parms) {
-            $retVal{$parm} = 1;
+        my $algorithm = $relatedH->{$col};
+        if ($algorithm) {
+            $retVal{$algorithm->[1]} = 1;
+        } else {
+            $algorithm = $derivedH->{$col} // ['altName', $col];
+            my ($function, @parms) = @$algorithm;
+            for my $parm (@parms) {
+                $retVal{$parm} = 1;
+            }
         }
     }
     # Insure we have the ID column.
