@@ -6,13 +6,13 @@ use File::Temp;
 use LWP::UserAgent;
 use strict;
 use JSON::XS;
-use Data::Dumper;
 use gjoseqlib;
 use URI::Escape;
 use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
 use DBI;
 use HTTP::Request::Common;
+use Data::Dumper;
 eval {
     require IPC::Run;
 };
@@ -239,13 +239,18 @@ sub query
         my $q   = "$qstr&$lim";
 
         #       print STDERR "Qry $url '$q'\n";
-        #       my $resp = $ua->post($url,
-        #                            Accept => "application/json",
-        #                            Content => $q);
+        #	my $resp = $ua->post($url,
+        #			     Accept => "application/json",
+        #			     Content => $q);
         my $end;
         $start = gettimeofday if $self->{benchmark};
+        $q =~ tr/ /+/; # Form url-encoding
         $self->_log("$url?$q\n");
-        my $resp = $ua->get( "$url?$q", Accept => "application/json" , $self->auth_header);
+        my $resp = $ua->post($url,
+                             Accept => "application/json",
+                             $self->auth_header,
+                             Content => $q,
+                        );
         # print STDERR Dumper($resp);
         $end = gettimeofday if $self->{benchmark};
         if ( !$resp->is_success ) {
@@ -263,7 +268,7 @@ sub query
         #        print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
-        #       print "r=$r\n";
+        #	print "r=$r\n";
         if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
             my $this_start = $1;
             my $next       = $2;
@@ -396,13 +401,14 @@ sub query_cb {
         my $q   = "$qstr&$lim";
         my $qurl = "$url?$q";
 
-        my $resp = $ua->get($qurl,
-                            Accept => "application/json",
-                            $self->auth_header,
+        my $resp = $ua->post($url,
+                             Accept => "application/json",
+                             $self->auth_header,
+                             Content => $q,
                            );
         if (!$resp->is_success)
         {
-            die "Failed: " . $resp->code . "\n" . $resp->content;
+            die "Failed: " . $resp->code . "\n" . $resp->content . "\n    for query '$q'\n";
         }
 
         my $data = eval { decode_json( $resp->content ); };
@@ -528,10 +534,10 @@ sub solr_query_raw_multi
         $resmap{$id} = $i;
 
         # my $res = $self->ua->get($uri,
-        #                        "Content-type" => "application/solrquery+x-www-form-urlencoded",
-        #                        "Accept", "application/solr+json",
-        #                        $self->auth_header,
-        #                       );
+        # 			 "Content-type" => "application/solrquery+x-www-form-urlencoded",
+        # 			 "Accept", "application/solr+json",
+        # 			 $self->auth_header,
+        # 			);
     }
 
     my @out;
@@ -635,6 +641,55 @@ sub retrieve_contigs_in_genomes {
 
 }
 
+
+=item B<lookup_sequence_data>
+
+Given a list of MD5s, retrieve the corresponding sequence data.
+Invoke the callback for each one.
+
+=cut
+
+sub lookup_sequence_data
+{
+    my($self, $ids, $cb) = @_;
+
+    my $batchsize = 10;
+    my $n = @$ids;
+    for (my $i = 0; $i < $n; $i++)
+    {
+        my $end = ($i + $batchsize) > $n-1 ? ($n - 1) : ($i + $batchsize);
+        $self->query_cb('feature_sequence',
+                        sub {
+                            my($data) = @_;
+                            for my $ent (@$data)
+                            {
+                                $cb->($ent);
+                            }
+                        },
+                        ['select', 'sequence,md5,sequence_type'],
+                        ['in', 'md5', '(' . join(",", @$ids[$i .. $end]) . ')']);
+        $i += $batchsize;
+    }
+}
+
+=item B<lookup_sequence_data_hash>
+
+Like L<lookup_sequence_data> but return a hash mapping md5 => sequence data.
+
+=cut
+
+sub lookup_sequence_data_hash
+{
+    my($self, $ids) = @_;
+
+    my %by_md5;
+    $self->lookup_sequence_data($ids, sub {
+        my $ent = shift;
+        $by_md5{$ent->{md5}} = $ent->{sequence};
+    });
+    return \%by_md5;
+}
+
 sub retrieve_contigs_in_genome_to_temp {
     my ($self, $genome_id) = @_;
 
@@ -682,6 +737,15 @@ sub compute_contig_md5s_in_genomes {
     return $out;
 }
 
+=item B<retrieve_protein_features_in_genomes>
+
+Looks up and returns all protein features from the genome.
+
+Unique proteins by MD5 checksum are written to C<$fasta_file> and a mapping from
+MD5 checksum to list of feature IDs is written to C<$id_map_file>.
+
+=cut
+
 sub retrieve_protein_features_in_genomes {
     my ( $self, $genome_ids, $fasta_file, $id_map_file ) = @_;
 
@@ -692,64 +756,112 @@ sub retrieve_protein_features_in_genomes {
 
     my %map;
 
+    #
+    # Query for features.
+    #
+
     for my $gid (@$genome_ids) {
         $self->query_cb(
             "genome_feature",
             sub {
                 my ($data) = @_;
                 for my $ent (@$data) {
-                    if ( !exists( $map{ $ent->{aa_sequence_md5} } ) ) {
-                        $map{ $ent->{aa_sequence_md5} } =
-                          [ $ent->{feature_id} ];
-                        print_alignment_as_fasta(
-                            $fasta_fh,
-                            [
-                                $ent->{aa_sequence_md5}, undef,
-                                $ent->{aa_sequence}
-                            ]
-                        );
-                    } else {
-                        push(
-                            @{ $map{ $ent->{aa_sequence_md5} } },
-                            $ent->{feature_id}
-                        );
-                    }
+                    push(@{ $map{ $ent->{aa_sequence_md5} } },
+                         $ent->{patric_id});
                 }
                 return 1;
             },
             [ "eq",     "feature_type", "CDS" ],
             [ "eq",     "genome_id",    $gid ],
-            [ "select", "feature_id,aa_sequence,aa_sequence_md5" ],
+            [ "select", "patric_id,aa_sequence_md5" ],
         );
     }
+
+    #
+    # Query for sequences.
+    #
+    $self->lookup_sequence_data([keys %map], sub {
+        my($ent) = @_;
+        print_alignment_as_fasta($fasta_fh, [$ent->{md5}, undef, $ent->{sequence}]);
+    });
+
     close($fasta_fh);
+
     while ( my ( $k, $v ) = each %map ) {
+
         print $id_map_fh join( "\t", $k, @$v ), "\n";
     }
     close($id_map_fh);
 }
 
-sub retrieve_protein_features_in_genome_in_export_format {
-    my ( $self, $genome_id, $fasta_fh ) = @_;
+sub retrieve_protein_feature_sequence {
+    my ( $self, $fids) = @_;
+
+    my %map;
+
+    #
+    # Query for features.
+    #
 
     $self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
                         for my $ent (@$data) {
-                            my $def = "  $ent->{product} [$ent->{genome_name} | $genome_id]";
-                            print_alignment_as_fasta($fasta_fh,
-                                                     [
-                                                      $ent->{patric_id},
-                                                      $def,
-                                                      $ent->{aa_sequence}
-                                                      ]
-                                                    );
+                            push(@{ $map{ $ent->{aa_sequence_md5} } },
+                                 $ent->{patric_id});
                         }
                         return 1;
                     },
                     [ "eq",     "feature_type", "CDS" ],
+                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "select", "patric_id,aa_sequence_md5" ],
+                   );
+
+    #
+    # Query for sequences.
+    #
+
+    my $seqs = $self->lookup_sequence_data_hash([keys %map]);
+
+    my %out;
+    while ( my ( $k, $v ) = each %map )
+    {
+        $out{$_} = $seqs->{$k} foreach @$v;
+    }
+    return \%out;
+}
+
+sub retrieve_protein_features_in_genome_in_export_format {
+    my ( $self, $genome_id, $fasta_fh ) = @_;
+
+    my $on_feature =  sub {
+        my ($data) = @_;
+
+        my %by_md5;
+
+        $self->lookup_sequence_data([map { $_->{aa_sequence_md5} } @$data ], sub {
+            my $ent = shift;
+            $by_md5{$ent->{md5}} = $ent;
+        });
+
+        for my $ent (@$data) {
+            my $def = "  $ent->{product} [$ent->{genome_name} | $genome_id]";
+            print_alignment_as_fasta($fasta_fh,
+                                     [
+                                      $ent->{patric_id},
+                                      $def,
+                                      $by_md5{$ent->{aa_sequence_md5}}->{sequence}
+                                      ]
+                                    );
+        }
+        return 1;
+    };
+
+    $self->query_cb("genome_feature",
+                    $on_feature,
+                    [ "eq",     "feature_type", "CDS" ],
                     [ "eq",     "genome_id",    $genome_id ],
-                    [ "select", "patric_id,aa_sequence,genome_name,product" ],
+                    [ "select", "patric_id,aa_sequence_md5,genome_name,product" ],
                    );
 }
 
@@ -771,11 +883,19 @@ sub retrieve_protein_features_in_genomes_to_temp {
             "genome_feature",
             sub {
                 my ($data) = @_;
+
+                my %by_md5;
+
+                $self->lookup_sequence_data([map { $_->{aa_sequence_md5} } @$data ], sub {
+                    my $ent = shift;
+                    $by_md5{$ent->{md5}} = $ent->{sequence};
+                });
+
                 for my $ent (@$data) {
                     print_alignment_as_fasta($temp,
                                              [
                                               $ent->{patric_id}, $ent->{product},
-                                              $ent->{aa_sequence}
+                                              $by_md5{$ent->{aa_sequence_md5}}
                                               ]
                                             );
                     push(@$ret_list, [@$ent{qw(patric_id product plfam_id pgfam_id)}]) if $ret_list;
@@ -785,59 +905,32 @@ sub retrieve_protein_features_in_genomes_to_temp {
             [ "eq",     "feature_type", "CDS" ],
              [ "eq", "annotation", "PATRIC"],
             [ "eq",     "genome_id",    $gid ],
-            [ "select", "patric_id,product,aa_sequence,plfam_id,pgfam_id" ],
+            [ "select", "patric_id,product,aa_sequence_md5,plfam_id,pgfam_id" ],
         );
     }
     close($temp);
     return wantarray ? ($temp, $ret_list) : $temp;
 }
 
-sub retrieve_protein_features_with_role {
-    my ( $self, $role ) = @_;
-
-    my @out;
+sub _escape_role_for_search
+{
+    my($self, $role) = @_;
 
     $role =~ s/\s*\([ET]C.*\)\s*$//;
+    $role =~ s/^\s+//;
+    $role =~ s/\s+$//;
 
     my $esc_role = uri_escape( $role, " " );
     $esc_role =~ s/\(.*$/*/;
 
-    my %misses;
-    $self->query_cb(
-        "genome_feature",
-        sub {
-            my ($data) = @_;
-            for my $ent (@$data) {
-                my $fn = $ent->{product};
-                $fn =~ s/\s*\(EC.*\)\s*$//;
+    return($role, $esc_role);
+}
 
-                $fn =~ s/^\s*//;
-                $fn =~ s/\s*$//;
+sub retrieve_protein_features_with_role {
 
-                if ( $fn eq $role ) {
-                    push( @out, [ $ent->{genome_id}, $ent->{aa_sequence} ] );
+    my ( $self, $role ) = @_;
 
-                    # print "$ent->{patric_id} $fn\n";
-                } else {
-                    $misses{$fn}++;
-                }
-            }
-            return 1;
-        },
-        [ "eq",     "feature_type", "CDS" ],
-        [ "eq",     "annotation",   "PATRIC" ],
-        [ "eq",     "product",      $esc_role ],
-        [ "select", "genome_id,aa_sequence,product,patric_id" ],
-    );
-
-    if (%misses) {
-        print STDERR "Misses for $role:\n";
-        for my $f ( sort keys %misses ) {
-            print STDERR "$f\t$misses{$f}\n";
-        }
-    }
-
-    return @out;
+    return $self->retrieve_features_of_type_with_role('CDS', $role);
 }
 
 sub retrieve_features_of_type_with_role {
@@ -845,16 +938,17 @@ sub retrieve_features_of_type_with_role {
 
     my @out;
 
-    $role =~ s/\s*\([ET]C.*\)\s*$//;
+    ($role, my $esc_role) = $self->_escape_role_for_search($role);
 
-    my $esc_role = uri_escape( $role, " " );
-    $esc_role =~ s/\(.*$/*/;
+    my $md5_field = ($type eq "CDS") ? 'aa_sequence_md5' : 'na_sequence_md5';
 
     my %misses;
     $self->query_cb(
         "genome_feature",
         sub {
             my ($data) = @_;
+            my @lout;
+            my %ids;
             for my $ent (@$data) {
                 my $fn = $ent->{product};
                 $fn =~ s/\s*\(EC.*\)\s*$//;
@@ -865,19 +959,22 @@ sub retrieve_features_of_type_with_role {
                 $fn =~ s/\s*$//;
 
                 if ( $fn eq $role ) {
-                    push( @out, [ $ent->{genome_id}, $ent->{aa_sequence} ] );
-
+                    push( @lout, [ $ent->{genome_id}, $ent->{$md5_field} ] );
+                    $ids{$ent->{$md5_field}} = 1;
                     # print "$ent->{patric_id} $fn\n";
                 } else {
                     $misses{$fn}++;
                 }
             }
+            my $seqs = $self->lookup_sequence_data_hash([keys %ids]);
+            push(@out, [$_->[0], $seqs->{$_->[1]}]) foreach @lout;
             return 1;
         },
         [ "eq", "feature_type", $type ],
+        [ "eq", "patric_id", "*"],
         [ "eq", "annotation",   "PATRIC" ],
         [ "eq", "product",      $esc_role ],
-        [ "select", "genome_id,aa_sequence,na_sequence,product,patric_id" ],
+        [ "select", "genome_id,$md5_field,product,patric_id" ],
     );
 
     if (%misses) {
@@ -907,21 +1004,30 @@ sub retrieve_ssu_rnas {
         "genome_feature",
         sub {
             my ($data) = @_;
+            my %ids;
+            my @lout;
             for my $ent (@$data) {
                 my $fn = $ent->{product};
                 if ( $fn =~
 /(SSU\s+rRNA|Small\s+Subunit\s+(Ribosomal\s+r)?RNA|ssuRNA|16S\s+(r(ibosomal\s+)?)?RNA)/io
                   )
                 {
-                    push( @out, $ent );
+                    push( @lout, $ent );
+                    $ids{$ent->{na_sequence_md5}} = 1;
                 }
+            }
+            my $seqs = $self->lookup_sequence_data_hash([keys %ids]);
+            for my $ent (@lout)
+            {
+                $ent->{na_sequence} = $seqs->{$ent->{na_sequence_md5}};
+                push(@out, $ent);
             }
             return 1;
         },
         [ "eq", "feature_type", "rrna" ],
         [ "eq", "annotation",   "PATRIC" ],
         $qry,
-        [ "select", "genome_id,na_sequence,product,patric_id" ],
+        [ "select", "genome_id,na_sequence_md5,product,patric_id" ],
     );
     return @out;
 }
@@ -962,10 +1068,16 @@ sub retrieve_protein_features_in_genomes_with_role {
             "genome_feature",
             sub {
                 my ($data) = @_;
+                my @lout;
+                my %ids;
                 for my $ent (@$data) {
-                    push( @out, [ $gid, $ent->{aa_sequence} ] );
+                    push( @lout, [ $gid, $ent->{aa_sequence_md5} ] );
+                    $ids{$ent->{aa_sequence_md5}} = 1;
                     # print "$ent->{patric_id} $ent->{product}\n";
                 }
+                my $seqs = $self->lookup_sequence_data_hash([keys %ids]);
+                push(@out, [$_->[0], $seqs->{$_->[1]}]) foreach @lout;
+
                 return 1;
             },
             [ "eq", "feature_type", "CDS" ],
@@ -974,7 +1086,7 @@ sub retrieve_protein_features_in_genomes_with_role {
             [ "eq", "product",      $role ],
             [
                 "select",
-                "feature_id,aa_sequence,aa_sequence_md5,product,patric_id"
+                "feature_id,aa_sequence_md5,product,patric_id"
             ],
         );
     }
@@ -997,22 +1109,22 @@ sub retrieve_dna_features_in_genomes {
             sub {
                 my ($data) = @_;
                 for my $ent (@$data) {
-                    my $seq = $ent->{na_sequence};
-                    my $md5 = md5_hex( uc($seq) );
-                    if ( !exists( $map{$md5} ) ) {
-                        $map{$md5} = [ $ent->{feature_id} ];
-                        print_alignment_as_fasta( $fasta_fh,
-                            [ $md5, undef, $ent->{na_sequence} ] );
-                    } else {
-                        push( @{ $map{$md5} }, $ent->{feature_id} );
-                    }
+                    push( @{ $map{$ent->{na_sequence_md5}} }, $ent->{patric_id} );
                 }
                 return 1;
             },
-            [ "eq",     "genome_id", $gid ],
-            [ "select", "feature_id,na_sequence" ],
+                        [ "eq",     "genome_id", $gid ],
+                        [ "eq", "patric_id", "*"],
+                        [ "select", "patric_id,na_sequence_md5" ],
         );
     }
+    #
+    # Query for sequences.
+    #
+    $self->lookup_sequence_data([keys %map], sub {
+        my($ent) = @_;
+        print_alignment_as_fasta($fasta_fh, [$ent->{md5}, undef, $ent->{sequence}]);
+    });
     close($fasta_fh);
     while ( my ( $k, $v ) = each %map ) {
         print $id_map_fh join( "\t", $k, @$v ), "\n";
@@ -1042,8 +1154,8 @@ sub compare_regions_for_peg_new
 
     if (!$context)
     {
-#       $context = ['group', 'pheS.3.0-1.1'];
-#       $coloring_field = 'group_family';
+#	$context = ['group', 'pheS.3.0-1.1'];
+#	$coloring_field = 'group_family';
     }
 
     my $group_data;
@@ -1120,6 +1232,7 @@ sub compute_pin_features_for_group
     return [$peg, grep { $_ ne $peg } @$fids];
 }
 
+## FIX - defer, not used currently. New functionality to be resumed.
 sub compute_pin_features_by_family_lookup
 {
     my($self, $peg, $n_genomes) = @_;
@@ -1128,10 +1241,8 @@ sub compute_pin_features_by_family_lookup
     # Get AA sequence of protein
     #
 
-    my($fid_data) = $self->query("genome_feature",
-                                ["eq", "patric_id", $peg],
-                                ["select", "aa_sequence"]);
-    $fid_data or die "no aa for $peg\n";
+    my($fid_sequence) = $self->retrieve_protein_feature_sequence([$peg]);
+    my $peg_trans = $fid_sequence->{$peg};
 
     # print Dumper($fid_data);
 
@@ -1140,9 +1251,9 @@ sub compute_pin_features_by_family_lookup
     #
 
     my $ua = LWP::UserAgent->new();
-    # my $url = "http://spruce:6100/lookup";
-    my $url = "http://pear:6900/lookup?find_reps=1";
-    my $res = $ua->post($url, "Content" => ">$peg\n$fid_data->{aa_sequence}\n");
+    my $url = "http://spruce:6100/lookup";
+    # my $url = "http://pear:6900/lookup?find_reps=1";
+    my $res = $ua->post($url, "Content" => ">$peg\n$peg_trans\n");
     if (!$res->is_success)
     {
         die "lookup failed: " . $res->content;
@@ -1166,7 +1277,7 @@ sub compute_pin_features_by_family_lookup
         {
             chomp;
             last if $_ eq '///';
-            # fig|96345.64.peg.772      96345.64.con.0001       4142224 898080  899369  +
+            # fig|96345.64.peg.772	96345.64.con.0001	4142224	898080	899369	+
             my($fid, $contig, $start, $end, $contig_length, $strand) = split(/\t/);
 
             my $len = abs($start - $end);
@@ -1268,7 +1379,8 @@ sub compare_regions_for_peg
         $solr_filter = $self->representative_reference_genome_filter();
     }
 
-    my @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter);
+    my %seqs;
+    my @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
     print STDERR "got pin size=" . scalar(@pin) . "\n";
     # print STDERR Dumper(\@pin);
     my $half_width = int($width / 2);
@@ -1285,9 +1397,9 @@ sub compare_regions_for_peg
     {
         my $elt = $pin[$pin_row];
 
-#       my ($left, $right);
-#       ($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-#       my $mid = int(($left + $right) / 2);
+#	my ($left, $right);
+#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+#	my $mid = int(($left + $right) / 2);
 
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
@@ -1311,10 +1423,10 @@ sub compare_regions_for_peg
     my %contig_lengths;
     $contig_lengths{$_->{genome_id}, $_->{accession}} = $_->{length} foreach @$lengths;
     # $contig_lengths{$_->{genome_id}, $_->{sequence_id}} = $_->{length} foreach @$lengths;
-    print STDERR Dumper(GIR => \@length_queries, $lengths, \%contig_lengths, \@genes_in_region_request);
+    # print STDERR Dumper(GIR => \@length_queries, $lengths, \%contig_lengths, \@genes_in_region_request);
 
     my @genes_in_region_response = $self->genes_in_region_bulk(\@genes_in_region_request);
-    print STDERR Dumper(GIR_ANSWER => \@genes_in_region_response);
+    # print STDERR Dumper(GIR_ANSWER => \@genes_in_region_response);
     my $all_families = {};
 
     if (0)
@@ -1356,9 +1468,9 @@ sub compare_regions_for_peg
     {
         my $elt = $pin[$pin_row];
 
-#       my ($left, $right);
-#       ($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-#       my $mid = int(($left + $right) / 2);
+#	my ($left, $right);
+#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+#	my $mid = int(($left + $right) / 2);
 
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
@@ -1379,7 +1491,7 @@ sub compare_regions_for_peg
         my($reg, $leftmost, $rightmost) = @{$genes_in_region_response[$pin_row]};
         my $features = [];
 
-#       my $region_mid = int(($leftmost + $rightmost) / 2) ;
+#	my $region_mid = int(($leftmost + $rightmost) / 2) ;
 
         print STDERR "Shift: $elt->{patric_id} $elt->{blast_shift}\n";
 
@@ -1559,7 +1671,7 @@ sub compute_reference_pin
     {
         die "$focus_peg: feature not found";
     }
-    print Dumper(\@res);
+    # print Dumper(\@res);
     my $focus_genome = genome_of($focus_peg);
 
     my @genomes = $self->compute_reference_genomes($focus_genome, $n_genomes, $distribution_mode);
@@ -1641,6 +1753,7 @@ Look for a protein with the given product in the given genome.
 
 =cut
 
+## FIX - defer, not used currently.
 sub find_protein_in_genome_by_product
 {
     my($self, $genome_id, $product_name) = @_;
@@ -1701,6 +1814,8 @@ sub genome_name
     return \%out;
 }
 
+## FIX - returns sequence md5s not sequence. If user wants sequence data needs to
+## pull separately.
 sub genes_in_region
 {
     my($self, $genome, $contig, $beg, $end) = @_;
@@ -1715,17 +1830,19 @@ sub genes_in_region
     my $endx = $end + $slop;
 
     my $res = $self->solr_query("genome_feature", { q => "genome_id:$genome AND accession:$contig AND (start:[$begx TO $endx] OR end:[$begx TO $endx]) AND annotation:PATRIC AND NOT feature_type:source",
-                                                        fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence,genome_name,feature_type',
+                                                        fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type',
                                                     });
 
     my @out;
     my $leftmost = 1e12;
     my $rightmost = 0;
+    my %md5s;
     for my $ent (@$res)
     {
         #
         # PATRIC stores start/end as left/right. Change to the SEED meaning.aa
         #
+        $md5s{$ent->{aa_sequence_md5}} = 1;
         my ($left, $right) = @$ent{'start', 'end'};
         if ($ent->{strand} eq '-')
         {
@@ -1833,7 +1950,6 @@ sub genes_in_region_bulk_mysql
     return @sorted;
 }
 
-
 sub genes_in_region_bulk
 {
     my($self, $reqlist) = @_;
@@ -1856,7 +1972,7 @@ sub genes_in_region_bulk
         $begx = 1 if $begx < 1;
 
         push(@queries, ["genome_feature", { q => "genome_id:$genome AND (sequence_id:$contig OR accession:$contig) AND (start:[$begx TO $endx] OR end:[$begx TO $endx]) AND annotation:PATRIC AND NOT feature_type:source",
-                                                        fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence,genome_name,feature_type',
+                                                        fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type',
                                                     }]);
     }
 
@@ -2000,6 +2116,7 @@ sub get_pin_mysql
     return ($me, @out);
 }
 
+## Now does not return sequence data.
 sub get_pin_p3
 {
     my($self, $fid, $family_type, $max_size, $genome_filter, $solr_filter) = @_;
@@ -2015,7 +2132,7 @@ sub get_pin_p3
 
         my $q = "patric_id:$fid";
         my $res = $self->solr_query("genome_feature",
-                                { q => $q, fl => "patric_id,aa_sequence,accession,start,end,genome_id,genome_name,strand" });
+                                { q => $q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand" });
         #
         # need to rewrite start/end for neg strand
         #
@@ -2063,7 +2180,7 @@ sub expand_fids_to_pin
 
     my @todo = @$fids;
 
-    my @fields = qw(patric_id aa_sequence start end strand sequence_id accession genome_id genome_name);
+    my @fields = qw(patric_id aa_sequence_md5 start end strand sequence_id accession genome_id genome_name);
     my $fields = join(",", @fields, $additional_fields ? @$additional_fields : ());
 
     while (@todo)
@@ -2103,11 +2220,12 @@ truncate to the desired size. The truncation mechanism may either be
 case N matches stratified through the list are kept.
 
 Each element in $pin is a hash with the following keys:
-    patric_id           Feature ID
-    aa_sequence         Amino acid sequence for the protein
+    patric_id		Feature ID
+    aa_sequence 	Amino acid sequence for the protein
 
 =cut
 
+## FIX - defer, not yet in use
 sub compute_pin_alignment
 {
     my($self, $pin, $n_genomes, $truncation_mechanism) = @_;
@@ -2173,7 +2291,7 @@ sub compute_pin_alignment
 
 sub get_pin
 {
-    my($self, $fid, $family_type, $max_size, $genome_filter, $solr_filter) = @_;
+    my($self, $fid, $family_type, $max_size, $genome_filter, $solr_filter, $seqs) = @_;
 
     my($me, @pin) = $self->get_pin_p3($fid, $family_type, $max_size, $genome_filter, $solr_filter);
     #my($me, @pin) = $self->get_pin_mysql($fid, $family_type, $max_size, $genome_filter);
@@ -2191,16 +2309,32 @@ sub get_pin
     {
         my %cut_pin = map { $_->{patric_id} => $_ } @pin;
 
+        my %md5_to_id;
+        push(@{$md5_to_id{$_->{aa_sequence_md5}}}, $_->{patric_id}) foreach $me, @pin;
+
+        $seqs //= {};
+
+        $self->lookup_sequence_data([ keys %md5_to_id ], sub {
+            my $ent = shift;
+            $seqs->{$ent->{md5}} = $ent->{sequence};
+        });
+
+        my $me_md5 = $me->{aa_sequence_md5};
+        my $me_seq = $seqs->{$me->{aa_sequence_md5}};
+
         my $tmpdir = File::Temp->newdir();
         my $tmp = "$tmpdir/pin";
         my $tmp2 = "$tmpdir/qry";
 
         open(my $tmp_fh, ">", $tmp2) or die "Cannot write $tmp2: $!";
-        print $tmp_fh ">$fid\n$me->{aa_sequence}\n";
+        print $tmp_fh ">$me_md5\n$me_seq\n";
         close($tmp_fh); undef $tmp_fh;
 
         open($tmp_fh, ">", $tmp) or die "Cannot write $tmp: $!";
-        print $tmp_fh ">$_->{patric_id}\n$_->{aa_sequence}\n" foreach @pin;
+        while (my($md5, $seq) = each(%$seqs))
+        {
+            print $tmp_fh ">$md5\n$seq\n";
+        }
         close($tmp_fh);
         my $rc = system("formatdb", "-p", "t", "-i", $tmp);
         $rc == 0 or die "formatdb failed with $rc\n";
@@ -2212,14 +2346,30 @@ sub get_pin
              ($max_size ? ("-b", $max_size) : ()))
             or die "cannot run blastall: $!";
         my %seen;
+        #
+        # We are blasting against the unique sequences. For now,
+        # just remap the blast output. We may be able to be more
+        # clever moving forward.
+        #
+        my @hits;
         while (<$blast>)
         {
-            print STDERR $_;
             chomp;
             my($id1, $id2, $iden, undef, undef, undef, $b1, $e1, $b2, $e2) = split(/\t/);
+
+            if ($id1 ne $me_md5)
+            {
+                die "Invalid BLAST output: $id1 ne $me_md5";
+            }
+            push(@hits, [$me->{patric_id}, $_, $iden, $b1, $e1, $b2, $e2])
+                foreach @{$md5_to_id{$id2}};
+        }
+        for my $hit (@hits)
+        {
+            my($id1, $id2, $iden, $b1, $e1, $b2, $e2) = @$hit;
             next if $seen{$id1, $id2}++;
 
-            if (!defined($me->{blast_shift}))
+            if ($id2 eq $fid)
             {
                 my $shift = 0;
                 my $match = $cut_pin{$id1};
@@ -2227,6 +2377,7 @@ sub get_pin
                 $me->{match_beg} = $b1;
                 $me->{match_end} = $e1;
                 $me->{match_iden} = 100;
+                next;
             }
             my $shift = ($e1 - $e2) * 3;
             my $match = $cut_pin{$id2};
@@ -2294,27 +2445,27 @@ sub expand_pin_to_regions
                                       fl => "genome_id,sequence_id,sequence_id,length" });
     my %contig_lengths;
     $contig_lengths{$_->{genome_id}, $_->{sequence_id}} = $_->{length} foreach @$lengths;
-    print STDERR Dumper(GIR => \@length_queries, $lengths, \%contig_lengths, \@genes_in_region_request);
+    # print STDERR Dumper(GIR => \@length_queries, $lengths, \%contig_lengths, \@genes_in_region_request);
 
     my @genes_in_region_response = $self->genes_in_region_bulk_mysql(\@genes_in_region_request);
-    print STDERR Dumper(GIR_OUT => \@genes_in_region_response);
+    # print STDERR Dumper(GIR_OUT => \@genes_in_region_response);
 
     # my $all_families = {};
 
     # for my $gir (@genes_in_region_response)
     # {
-    #   my($reg) = @$gir;
-    #   for my $fent (@$reg)
-    #   {
-    #       if (my $i = $fent->{pgfam_id})
-    #       {
-    #           $all_families->{$fent->{patric_id}}->{pgfam} = [$i, ''];
-    #       }
-    #       if (my $i = $fent->{plfam_id})
-    #       {
-    #           $all_families->{$fent->{patric_id}}->{plfam} = [$i, ''];
-    #       }
-    #   }
+    # 	my($reg) = @$gir;
+    # 	for my $fent (@$reg)
+    # 	{
+    # 	    if (my $i = $fent->{pgfam_id})
+    # 	    {
+    # 		$all_families->{$fent->{patric_id}}->{pgfam} = [$i, ''];
+    # 	    }
+    # 	    if (my $i = $fent->{plfam_id})
+    # 	    {
+    # 		$all_families->{$fent->{patric_id}}->{plfam} = [$i, ''];
+    # 	    }
+    # 	}
     # }
 
     for my $pin_row (0..$#$pin)
@@ -2446,7 +2597,7 @@ sub expand_pin_to_regions
         };
         push(@out, $out_ent);
     }
-    print STDERR Dumper(expand_out => \@out);
+    # print STDERR Dumper(expand_out => \@out);
     return(\@out, \@all_features);
 }
 
@@ -2597,6 +2748,9 @@ sub members_of_family_mysql
     return \@out;
 }
 
+#
+# This routine doesn't return the sequence data; rather the md5s.
+#
 sub members_of_family
 {
     my($self, $fam, $family_type, $solr_filter, $fid, $max_count) = @_;
@@ -2605,7 +2759,7 @@ sub members_of_family
     $fam_field or die "Unknown family type '$family_type'\n";
 
     my $q = join(" AND ", "$fam_field:$fam", $solr_filter ? "($solr_filter OR patric_id:$fid)" : ());
-    my $res = $self->solr_query("genome_feature", { q => $q, fl => "patric_id,aa_sequence,accession,start,end,genome_id,genome_name,strand" }, $max_count);
+    my $res = $self->solr_query("genome_feature", { q => $q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand" }, $max_count);
     #
     # need to rewrite start/end for neg strand
     #
@@ -2658,8 +2812,6 @@ sub genetic_code_bulk
     return $ret;
 }
 
-
-
 sub function_of
 {
     my($self, $fids) = @_;
@@ -2701,6 +2853,7 @@ Returns a blessed L<GenomeTypeObject> for the genome, or C<undef> if the genome 
 
 =cut
 
+## FIX
 sub gto_of {
     my ( $self, $genomeID ) = @_;
     require GenomeTypeObject;
@@ -2723,7 +2876,6 @@ sub gto_of {
     if (!$g) {
         return $retVal;
     }
-
 
     # Compute the domain.
     my $domain = $g->{taxon_lineage_names}[1];
@@ -2794,13 +2946,16 @@ sub gto_of {
                           "select",        "patric_id",
                           "sequence_id",   "strand",
                           "segments",      "feature_type",
-                          "product",       "aa_sequence",
+                          "product",       "aa_sequence_md5",
                           "alt_locus_tag", "refseq_locus_tag",
                           "protein_id",    "gene_id",
                           "gi",            "gene",
                           "uniprotkb_accession", "genome_id"
                           ]
                         );
+
+    my %md5s = map { $_->{aa_sequence_md5} => 1 } grep { $_ } @f;
+    my $sequences = $self->lookup_sequence_data_hash([ keys %md5s ]);
 
     # This prevents duplicates.
     my %fids;
@@ -2843,7 +2998,7 @@ sub gto_of {
                                  -location            => \@locs,
                                  -type                => $f->{feature_type},
                                  -function            => $f->{product},
-                                 -protein_translation => $f->{aa_sequence},
+                                 -protein_translation => $sequences->{$f->{aa_sequence_md5}},
                                  -aliases             => \@aliases,
                                  -family_assignments => \@familyList
                                  }

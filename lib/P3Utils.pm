@@ -1562,20 +1562,18 @@ sub _related_field {
     # We need to create a query for the link field values found. The query is limited in size to 2000 characters.
     my $core = OBJECTS->{$table};
     my $key = IDCOL->{$table};
-    # Estimate the length of the query data excluding the keys.
-    my $inLength0 = length("$p3->{url}/$core?select($key, $dataField)&in($key, ())&limit(25000,25000)");
     # These variables accumulate the current query.
-    my ($inLength, @keys) = ($inLength0);
+    my ($batchSize, @keys) = (0);
     # Now loop through the entries, creating queries.
     for my $entry (@$entries) {
         my $link = $entry->{$linkField};
         if ($link && ! $retVal{$link}) {
             # Here we have a new link field value.
-            $inLength += length($link) + 1;
-            if ($inLength >= 2000) {
+            $batchSize++;
+            if ($batchSize >= 200) {
                 # The new key would make the query too big. Execute it.
                 _execute_query($p3, $core, $key, $dataField, \@keys, \%retVal);
-                $inLength = $inLength0;
+                $batchSize = 0;
                 @keys = ();
             }
             # Now we have room for the new value.
