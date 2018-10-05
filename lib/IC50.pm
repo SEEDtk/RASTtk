@@ -41,7 +41,15 @@ Create a new, blank IC50 computation object.
 
 =item options
 
-A hash containing option values. Currently, there are none.
+A hash containing zero or more of the following option values.
+
+=over 8
+
+=item negative
+
+If TRUE, then the IC50 will be at -50 instead of +50. The default is FALSE.
+
+=back
 
 =back
 
@@ -49,9 +57,38 @@ A hash containing option values. Currently, there are none.
 
 sub new {
     my ($class, %options) = @_;
+    my $target = ($options{negative} ? -50 : 50);
     my $retVal = {
+        target => $target,
     };
     bless $retVal, $class;
+    return $retVal;
+}
+
+=head3 clean
+
+    my $cleaned = IC50::clean($name);
+
+Clean a drug or cell line name.
+
+=over 4
+
+=item name
+
+The drug or cell line name to clean.
+
+=item RETURN
+
+Returns an uppercase version of the name with no special characters.
+
+=back
+
+=cut
+
+sub clean {
+    my ($name) = @_;
+    my $retVal = uc $name;
+    $retVal =~ s/[^A-Z0-9]//g;
     return $retVal;
 }
 
@@ -89,7 +126,7 @@ sub compute {
 
     my $ic50Value = $ic50->compute(\@growthPairs);
 
-Compute the IC50 from a se
+Compute the IC50 from a set of dosage/growth pairs.
 
 =over 4
 
@@ -112,7 +149,7 @@ sub computeFromPairs {
     # This will be the return value.
     my $retVal;
     # Compute the IC50.
-    my $discrim = $b * $b - 4 * $a * ($c - 50);
+    my $discrim = $b * $b - 4 * $a * ($c - $self->{target});
     if ($discrim >= 0.0) {
         $discrim = sqrt($discrim);
         my $scale = 2 * $a;
@@ -137,6 +174,8 @@ sub computeFromPairs {
     my ($a, $b, $c) = $ic50->quadFit(\@growthPairs);
 
 Fit a quadratic curve to the growth data.
+
+=over 4
 
 =item growthPairs
 

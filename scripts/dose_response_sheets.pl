@@ -478,15 +478,6 @@ print "Updating spreadsheet.\n";
 $workbook->close();
 print "All done.\n" . $stats->Show();
 
-## Clean a drug or cell line name.
-sub clean {
-    my ($name) = @_;
-    my $retVal = uc $name;
-    $retVal =~ s/[^A-Z0-9]//g;
-    return $retVal;
-}
-
-
 ## Create the id-to-name mappings for drugs or cell lines.
 sub ReadNames {
     my ($dir, $type, $inFile) = @_;
