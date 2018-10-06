@@ -45,6 +45,7 @@ format as input, except that the drug and cell line IDs will be replaced with th
 
 The positional parameters are the name of the PATRIC data directory, the name of the file containing the cleaned drug
 names, and the name of the file containing the cleaned cell line names. The name files should contain one name per line.
+A parameter of C<all> means all drugs or cell lines will be used.
 
 The command-line options are the following (currently none).
 
@@ -70,11 +71,11 @@ if (! $pDir) {
     die "$pDir is missing or invalid.";
 } elsif (! $drugFile) {
     die "No drug name file specified.";
-} elsif (! -s $drugFile) {
+} elsif ($drugFile ne 'all' && ! -s $drugFile) {
     die "$drugFile is missing or empty.";
 } elsif (! $lineFile) {
     die "No cell line name file specified.";
-} elsif (! -s $lineFile) {
+} elsif ($lineFile ne 'all' && ! -s $lineFile) {
     die "$lineFile is missing or empty.";
 }
 my $stats = Stats->new();
@@ -111,16 +112,20 @@ sub ReadNames {
     # This will be the return hash.
     my %retVal;
     # Read in the names of interest.
-    print STDERR "Reading $inFile for $type names.\n";
-    open(my $ih, "<$inFile") || die "Could not open $inFile: $!";
-    my %names;
-    while (! eof $ih) {
-        my $line = <$ih>;
-        chomp $line;
-        $stats->Add("$type-in" => 1);
-        $names{$line} = 1;
+    my $names;
+    if ($inFile eq 'all') {
+        print STDERR "All $type names will be used.\n";
+    } else {
+        print STDERR "Reading $inFile for $type names.\n";
+        open(my $ih, "<$inFile") || die "Could not open $inFile: $!";
+        while (! eof $ih) {
+            my $line = <$ih>;
+            chomp $line;
+            $stats->Add("$type-in" => 1);
+            $names->{$line} = 1;
+        }
+        close $ih;
     }
-    close $ih;
     # We need to process each data source.
     for my $source (@{TYPES()}) {
         # Open the data source's mapping file.
@@ -133,7 +138,7 @@ sub ReadNames {
             my ($id, undef, $name) = ScriptUtils::get_line($dh);
             if (! $name) {
                 print STDERR "Bug for $id in $fname.\n";
-            } elsif ($names{$name}) {
+            } elsif (! $names || $names->{$name}) {
                 $retVal{$id} = $name;
                 $stats->Add("$type-mapped" => 1);
             } else {

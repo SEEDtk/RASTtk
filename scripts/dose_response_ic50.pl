@@ -56,47 +56,53 @@ my $stats = Stats->new();
 my $ic50 = IC50->new();
 # Open the input file.
 my $ih = ScriptUtils::IH($opt->input);
-# This is a three-level hash. The primary key is drug names. For each drug name, there will be one sub-hash per cell line.
-# For each drug/cell-line pair there will be a hash mapping dosages to shrinkage rates. This last hash is passed to the IC50
-# engine.
-my %drugs;
+# This is a four-level hash. The primary key is data sources, then drug names, cell lines, and concentrations.
+my %sources;
 print STDERR "Gathering input.\n";
 # Skip the header.
 my $line = <$ih>;
 # Loop through the data.
 while (! eof $ih) {
-    my ($drug, $cl, undef, $conc, undef, $growth) = ScriptUtils::get_line($ih);
+    my ($drug, $cl, undef, $conc, $source, $growth) = ScriptUtils::get_line($ih);
     $stats->Add(lineIn => 1);
-    # Note we negate the growth. Our data file is the opposite of the one used to write the IC50 module.
-    $drugs{$drug}{$cl}{$conc} = -$growth;
+    $sources{$source}{$drug}{$cl}{$conc} = -$growth;
 }
 # Now we produce the output.
-print join("\t", qw(Drug Cell-Line IC50 Min Max Bad)) . "\n";
-# Loop through the drug / line pairs.
-for my $drug (sort keys %drugs) {
-    my $lineH = $drugs{$drug};
-    $stats->Add(drug => 1);
-    for my $cl (sort keys %$lineH) {
-        my $dataHash = $lineH->{$cl};
-        $stats->Add(pairs => 1);
-        # Analyze the dosages.
-        my @dosages = sort { $a <=> $b } keys %$dataHash;
-        if (@dosages < 3) {
-            print STDERR "Too few dosages to compute a value for $drug and $cl.\n";
-            $stats->Add(badPairs => 1);
-        } else {
-            my $min = shift @dosages;
-            my $max = pop @dosages;
-            my $mid = $ic50->compute($dataHash);
-            my $bad = '';
-            if ($mid < $min || $mid > $max) {
-                $stats->Add(iffyPairs => 1);
-                $bad = '*';
+print join("\t", qw(Source Drug Cell-Line IC50 Min Max Bad)) . "\n";
+# Loop through the sources.
+for my $source (sort keys %sources) {
+    $stats->Add(source => 1);
+    my $drugs = $sources{$source};
+    # Loop through the drug / line pairs.
+    for my $drug (sort keys %$drugs) {
+        my $lineH = $drugs->{$drug};
+        $stats->Add(drug => 1);
+        for my $cl (sort keys %$lineH) {
+            my $dataHash = $lineH->{$cl};
+            $stats->Add(pairs => 1);
+            # Analyze the dosages.
+            my @dosages = sort { $a <=> $b } keys %$dataHash;
+            if (@dosages < 3) {
+                print STDERR "Too few dosages to compute a value for $drug and $cl.\n";
+                $stats->Add(badPairs => 1);
             } else {
-                $stats->Add(goodPairs => 1);
+                my $min = shift @dosages;
+                my $max = pop @dosages;
+                my $mid = $ic50->compute($dataHash);
+                my $bad = '';
+                if (! defined $mid) {
+                    $stats->Add(badPairs => 1);
+                } else {
+                    if ($mid < $min || $mid > $max) {
+                        $stats->Add(iffyPairs => 1);
+                        $bad = '*';
+                    } else {
+                        $stats->Add(goodPairs => 1);
+                    }
+                    print join("\t", $source, $drug, $cl, $mid, $min, $max, $bad) . "\n";
+                    $stats->Add(lineOut => 1);
+                }
             }
-            print join("\t", $drug, $cl, $mid, $min, $max, $bad) . "\n";
-            $stats->Add(lineOut => 1);
         }
     }
 }

@@ -149,20 +149,27 @@ sub computeFromPairs {
     # This will be the return value.
     my $retVal;
     # Compute the IC50.
-    my $discrim = $b * $b - 4 * $a * ($c - $self->{target});
-    if ($discrim >= 0.0) {
-        $discrim = sqrt($discrim);
-        my $scale = 2 * $a;
-        my ($x1, $x2) = (($discrim - $b) / $scale, -($discrim + $b) / $scale);
-        my $oldX = $growthPairs->[0][0];
-        for (my $i = 1; $i < @$growthPairs && ! defined $retVal; $i++) {
-            my $newX = $growthPairs->[$i][0];
-            if ($oldX <= $x1 && $x1 <= $newX) {
-                $retVal = $x1;
-            } elsif ($oldX <= $x2 && $x2 <= $newX) {
-                $retVal = $x2;
-            } else {
-                $oldX = $newX;
+    if ($a == 0.0) {
+        # Linear fit.
+        if ($b != 0.0) {
+            $retVal = ($self->{target} - $c) / $b;
+        }
+    } else {
+        my $discrim = $b * $b - 4 * $a * ($c - $self->{target});
+        if ($discrim >= 0.0) {
+            $discrim = sqrt($discrim);
+            my $scale = 2 * $a;
+            my ($x1, $x2) = (($discrim - $b) / $scale, -($discrim + $b) / $scale);
+            my $oldX = $growthPairs->[0][0];
+            for (my $i = 1; $i < @$growthPairs && ! defined $retVal; $i++) {
+                my $newX = $growthPairs->[$i][0];
+                if ($oldX <= $x1 && $x1 <= $newX) {
+                    $retVal = $x1;
+                } elsif ($oldX <= $x2 && $x2 <= $newX) {
+                    $retVal = $x2;
+                } else {
+                    $oldX = $newX;
+                }
             }
         }
     }

@@ -230,6 +230,8 @@ for my $drug (sort keys %ic50) {
     $ic50Sheet->write_string(0, 5, "Rick");
     $ic50Sheet->write_string(0, 6, "FangFang");
     my $r = 1;
+    # This array is used to compute the correlation.
+    my @x;
     # We need to sort the cell lines by rel IC50.
     my @clist = sort { $lineH->{$a}[1] <=> $lineH->{$b}[1] } keys %$lineH;
     # Loop through the cell lines.
@@ -237,6 +239,9 @@ for my $drug (sort keys %ic50) {
         my ($abs, $rel) = @{$lineH->{$cell_line}};
         my ($absL, $relL) = map { logD($_) } ($abs, $rel);
         my $predL = $predH->{$cell_line} // ['', ''];
+        if ($predL->[1] ne '') {
+            push @x, [$rel, $predL->[1]];
+        }
         print $oh join("\t", $drug, $cell_line, $abs, $rel, $absL // '', $relL // '', $predL->[0], $predL->[1]) . "\n";
         $ic50Sheet->write_string($r, 0, $cell_line);
         writeNum($ic50Sheet, $r, 1, $abs);
@@ -247,7 +252,9 @@ for my $drug (sort keys %ic50) {
         writeNum($ic50Sheet, $r, 6, $predL->[1]);
         $r++;
     }
-    # Create the graph.
+    # Compute the correlation.
+    my $cf = correlation(\@x);
+    # Create the line graph.
     my $chart = $outbook->add_chart( type => 'line', embedded => 1);
     my %options = (categories => ['IC50', 1, $r-1, 0, 0]);
     $chart->set_size(width => 1024, height => 640);
@@ -256,6 +263,14 @@ for my $drug (sort keys %ic50) {
     $chart->add_series( values => ['IC50', 1, $r-1, 5, 5], name => 'Rick', %options);
     $chart->add_series( values => ['IC50', 1, $r-1, 6, 6], name => 'FangFang', %options);
     $ic50Sheet->insert_chart(1, 8, $chart);
+    # Create the scatter graph.
+    $chart = $outbook->add_chart( type => 'scatter', name => 'Scatter Plot' );
+    $chart->set_legend(position => 'top');
+    $chart->add_series( values => ['IC50', 1, $r-1, 5, 5], name => 'Rick',
+                        categories => ['IC50', 1, $r-1, 2, 2]);
+    $chart->add_series( values => ['IC50', 1, $r-1, 6, 6], name => 'FangFang',
+                        categories => ['IC50', 1, $r-1, 2, 2]);
+    $chart->set_title(name => "FangFang Correlation Coefficient = $cf");
     # Close the spreadsheet.
     $outbook->close();
 }
@@ -291,4 +306,51 @@ sub writeNum {
     } else {
         $sheet->write_number($r, $c, $val);
     }
+}
+
+## Correlation coefficient stuff.
+sub mean {
+   my ($x)=@_;
+   my $num = scalar(@{$x}) - 1;
+   my $sum_x = '0';
+   my $sum_y = '0';
+   for (my $i = 1; $i < scalar(@{$x}); ++$i){
+      $sum_x += $x->[$i][0];
+      $sum_y += $x->[$i][1];
+   }
+   my $mu_x = $sum_x / $num;
+   my $mu_y = $sum_y / $num;
+   return($mu_x,$mu_y);
+}
+
+### ss = sum of squared deviations to the mean
+sub ss {
+   my ($x,$mean_x,$mean_y,$one,$two)=@_;
+   my $sum = '0';
+   for (my $i=1;$i<scalar(@{$x});++$i){
+     $sum += ($x->[$i][$one]-$mean_x)*($x->[$i][$two]-$mean_y);
+   }
+   return $sum;
+}
+
+sub correlation {
+   my ($x) = @_;
+   my ($mean_x,$mean_y) = mean($x);
+   my $ssxx=ss($x,$mean_x,$mean_y,0,0);
+   my $ssyy=ss($x,$mean_x,$mean_y,1,1);
+   my $ssxy=ss($x,$mean_x,$mean_y,0,1);
+   my $correl=correl($ssxx,$ssyy,$ssxy);
+   return($correl);
+
+}
+
+sub correl {
+   my($ssxx,$ssyy,$ssxy)=@_;
+   my $correl = 'invalid';
+   if ($ssxx && $ssyy) {
+       my $sign=$ssxy/abs($ssxy);
+       $correl=$sign*sqrt($ssxy*$ssxy/($ssxx*$ssyy));
+       $correl=sprintf("%.4f",$correl);
+   }
+   return $correl;
 }
