@@ -244,6 +244,7 @@ sub query
         #			     Content => $q);
         my $end;
         $start = gettimeofday if $self->{benchmark};
+        $q =~ s/\|/\%7C/g;
         $q =~ tr/ /+/; # Form url-encoding
         $self->_log("$url?$q\n");
         my $resp = $ua->post($url,

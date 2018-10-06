@@ -40,7 +40,7 @@ Pre-compiled pattern for matching EC numbers.
 
 =cut
 
-    our $EC_PATTERN = qr/\(\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-)\s*)\)/;
+    our $EC_PATTERN = qr/\(\s*E\.?C\.?(?:\s+|:)(\d\.(?:\d+|-)\.(?:\d+|-)\.(?:n?\d+|-))\s*\)/;
 
 =head3 TC_PATTERN
 

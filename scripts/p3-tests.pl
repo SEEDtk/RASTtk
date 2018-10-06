@@ -48,6 +48,8 @@ The positional parameter should be the name of a working directory to use for te
         '1345700.10' => ['1345700.10', 'Yersinia pestis 1670', '4718815', 'cellular organisms; Bacteria; Proteobacteria; Gammaproteobacteria; Enterobacterales; Yersiniaceae; Yersinia; Yersinia pseudotuberculosis complex; Yersinia pestis; Yersinia pestis 1670'],
 };
 
+use constant FTEST => ["$FIG_Config::global/ftest.tbl", '1986611.3'];
+
 # Get the working directory.
 my ($workDir) = @ARGV;
 if (! $workDir) {
@@ -214,7 +216,20 @@ is_deeply(\@found, [0, 1, 2], 'find_headers / get_cols test');
 my $line = "a\tb\tc\r\n";
 @found = P3Utils::get_fields($line);
 is_deeply(\@found, ['a','b','c'], 'get_fields test');
-
+# Now the feature test, which is our most complex. We get EC, ID, and DNA for a whole genome.
+@want = qw(patric_id ec na_sequence);
+my $fTest = P3Utils::get_data($p3, feature => [['eq', 'genome_id', FTEST->[1]]], \@want);
+my %fTestH = map { $_->[0] => $_ } @$fTest;
+# Compare to the file.
+undef $ih;
+open($ih, '<', FTEST->[0]) || die "Could not open ftest.tbl: $!";
+($tHeaders, $tCols) = P3Utils::find_headers($ih, ftestFile => @want);
+while (! eof $ih) {
+    my ($id, $ec, $seq) = P3Utils::get_cols($ih, $tCols);
+    $ec = [sort split /::/, $ec];
+    my $expected = $fTestH{$id} // ['not-found', [], ''];
+    is_deeply($expected, [$id, $ec, $seq], "ftest for $id");
+}
 done_testing();
 
 ######### UTILITY METHODS

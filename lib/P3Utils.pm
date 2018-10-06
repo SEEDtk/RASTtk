@@ -27,6 +27,7 @@ package P3Utils;
     use HTTP::Request;
     use SeedUtils;
     use Digest::MD5;
+    use RoleParse;
 
 =head1 PATRIC Script Utilities
 
@@ -101,12 +102,32 @@ use constant DERIVED => {
             genome =>   {   taxonomy => ['concatSemi', 'taxon_lineage_names'],
                         },
             feature =>  {   function => ['altName', 'product'],
+                            ec => ['ecParse', 'product']
                         },
             family =>   {
                         },
             genome_drug => {
                         },
             contig =>   {   md5 => ['md5', 'sequence'],
+                        },
+            drug =>     {
+                        },
+            experiment => {
+                        },
+            sample =>   {
+                        },
+            expression => {
+                        }
+};
+
+use constant DERIVED_MULTI => {
+            genome =>   {
+                        },
+            feature =>  {   ec => 1
+                        },
+            genome_drug => {
+                        },
+            contig =>   {
                         },
             drug =>     {
                         },
@@ -1382,7 +1403,14 @@ sub list_object_fields {
         }
         # Get the derived fields.
         my $derivedH = DERIVED->{$object};
-        push @retVal, map { "$_ (derived)" } keys %$derivedH;
+        my $multiH = DERIVED_MULTI->{$object};
+        for my $field (keys %$derivedH) {
+            if ($multiH->{$field}) {
+                push @retVal, "$field (derived) (multi)";
+            } else {
+                push @retVal, "$field (derived)";
+            }
+        }
         # Get the related fields.
         $derivedH = RELATED->{$object};
         push @retVal, map { "$_ (related)" } keys %$derivedH;
@@ -1688,8 +1716,36 @@ sub _apply {
         $retVal = join('; ', @{$values[0]});
     } elsif ($function eq 'md5') {
         $retVal = Digest::MD5::md5_hex(uc $values[0]);
+    } elsif ($function eq 'ecParse') {
+        $retVal = [ _ec_parse($values[0]) ];
     }
     return $retVal;
+}
+
+=head3 _ec_parse
+
+    my @ecNums = P3Utils::_ec_parse($product);
+
+Parse the EC numbers out of the functional assignment string of a feature.
+
+=over 4
+
+=item product
+
+The functional assignment string containing the EC numbers.
+
+=item RETURN
+
+Returns a list of EC numbers.
+
+=back
+
+=cut
+
+sub _ec_parse {
+    my ($product) = @_;
+    my %retVal = map { $_ => 1 } ($product =~ /$RoleParse::EC_PATTERN/g);
+    return sort keys %retVal;
 }
 
 =head3 _select_list
