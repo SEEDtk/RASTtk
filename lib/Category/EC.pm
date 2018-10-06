@@ -50,9 +50,9 @@ Returns the internal ID for the category.
 
 sub name_to_id {
     my ($self, $catName) = @_;
-    my ($retVal, $name)  = split /\|/, $catName;
+    my$retVal  = $catName;
     if ($self->{allMode}) {
-        $self->{catH}{$retVal} = "$name (EC $retVal)" // $retVal;
+        $self->{catH}{$retVal} = "EC $retVal";
     }
     return $retVal;
 }

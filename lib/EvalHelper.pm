@@ -29,6 +29,7 @@ package EvalHelper;
     use File::Temp;
     use File::Copy::Recursive;
     use GenomeTypeObject;
+    use Data::Dumper;
 
 =head1 Genome Evaluation Helper
 
@@ -320,7 +321,7 @@ sub Process {
         # Get the lineage ID list.
         my $taxResults;
         if ($retVal) {
-            $taxResults = [[$retVal->id, $retVal->lineage || []]];
+            $taxResults = [[$retVal->lineage || []]];
         } else {
             $taxResults = P3Utils::get_data_keyed($p3, genome => [], ['taxon_lineage_ids'], [$genome]);
         }
@@ -413,7 +414,7 @@ sub _FindRef {
     my $retVal;
     # Insure we have a result.
     if ($taxResults && @$taxResults) {
-        my $lineage = $taxResults->[0][1];
+        my $lineage = $taxResults->[0][0];
         # Loop through the lineage until we find something. Note that sometimes the lineage ID list comes back
         # as an empty string instead of a list so we need an extra IF.
         my $refFound;

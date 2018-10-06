@@ -654,11 +654,13 @@ sub lookup_sequence_data
 {
     my($self, $ids, $cb) = @_;
 
-    my $batchsize = 10;
-    my $n = @$ids;
-    for (my $i = 0; $i < $n; $i++)
+    my $batchsize = 100;
+    my @goodIds = grep { $_ } @$ids;
+    my $n = @goodIds;
+    my $end;
+    for (my $i = 0; $i < $n; $i = $end + 1)
     {
-        my $end = ($i + $batchsize) > $n-1 ? ($n - 1) : ($i + $batchsize);
+        $end = ($i + $batchsize) > $n-1 ? ($n - 1) : ($i + $batchsize);
         $self->query_cb('feature_sequence',
                         sub {
                             my($data) = @_;
@@ -668,8 +670,7 @@ sub lookup_sequence_data
                             }
                         },
                         ['select', 'sequence,md5,sequence_type'],
-                        ['in', 'md5', '(' . join(",", @$ids[$i .. $end]) . ')']);
-        $i += $batchsize;
+                        ['in', 'md5', '(' . join(",", @goodIds[$i .. $end]) . ')']);
     }
 }
 
