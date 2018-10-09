@@ -50,12 +50,12 @@ my $totErr = 0;
 my $numErr = 0;
 # This tracks the number of inputs.
 my $lineIn = 0;
-# This tracks the error by 10% brackets.
+# This tracks the error by 0.5 brackets.
 my %cats;
 # Skip the header line.
 my $line = <$ih>;
 # Write the output header.
-print join("\t", qw(drug cell-line source1 source2 err %err cat)) . "\n";
+print join("\t", qw(drug cell-line source1 source2 err cat)) . "\n";
 # Loop through the input file.
 while (! eof $ih) {
     my ($source, $drug, $cl, $ic50) = ScriptUtils::get_line($ih);
@@ -67,9 +67,8 @@ while (! eof $ih) {
         for my $source2 (sort keys %$prevH) {
             my $ic50_2 = $prevH->{$source2};
             my $err = abs($ic50 - $ic50_2);
-            my $perr = $err * 200 / (abs($ic50) + abs($ic50_2));
-            my $cat = int($perr / 10);
-            print join("\t", $drug, $cl, $source, $source2, $err, $perr, $cat) . "\n";
+            my $cat = int($err * 2);
+            print join("\t", $drug, $cl, $source, $source2, $err, $cat) . "\n";
             $totErr += $err;
             $numErr++;
             $cats{$cat}++;
@@ -80,6 +79,3 @@ while (! eof $ih) {
 }
 my $meanErr = $totErr / $numErr;
 print STDERR "All done. Average = $meanErr. $lineIn in, $numErr out.\n";
-for my $cat (sort { $a <=> $b } keys %cats) {
-    print STDERR $cat . "X%   $cats{$cat}\n";
-}
