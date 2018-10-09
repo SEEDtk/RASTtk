@@ -148,7 +148,7 @@ sub ProcessGto {
             }
         }
         # Get the lineage ID list.
-        my $taxResults = [[$genomeID, $geo->lineage || []]];
+        my $taxResults = [[$geo->lineage || []]];
         $refID = _FindRef($taxResults, \%refMap, $genomeID);
         if ($refID) {
             my $gHash = GEO->CreateFromPatric([$refID], %geoOptions);
