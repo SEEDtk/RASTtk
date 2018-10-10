@@ -28,10 +28,6 @@ The common gene name (e.g. C<rpoA>).
 
 The standard gene number.
 
-=item gi
-
-The GI accession number.
-
 =item aa_sequence_md5
 
 The protein sequence MD5 code.
@@ -75,7 +71,7 @@ use P3DataAPI;
 use P3Utils;
 
 # Common keys are type 2, uncommon type 1. This influences batching.
-use constant KEYS => { gene => 2, gene_id => 1, gi => 1, refseq_locus_tag => 1, protein_id => 2, aa_sequence_md5 => 2, product => 2 };
+use constant KEYS => { gene => 2, gene_id => 1, refseq_locus_tag => 1, protein_id => 2, aa_sequence_md5 => 2, product => 2 };
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('keyName', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
