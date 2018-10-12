@@ -245,7 +245,7 @@ P3Utils::print_cols(['1352.1532', 'Enterococcus faecium strain Efm0097', '', '']
 P3Utils::print_cols(['1000561.3', 'Pseudomonas aeruginosa AES-1R', '', 'Global/Qgto/1000561.3.gto'], oh => $oh);
 P3Utils::print_cols(['1261545.11', 'Halarchaeum acidiphilum MH1-52-1', 'Global/Qgto/1261545.11.gto'], oh => $oh);
 close $oh; undef $oh;
-my $rc = system('p3x-eval-genomes --col=genome_id --input=qtest.tbl --gtoCol=gto_file --clear Qwork Qout');
+my $rc = system('p3x-eval-genomes --col=genome_id --input=qtest.tbl --gtoCol=gto_file --clear --deep Qwork Qout');
 ok($rc == 0, 'Success from evaluator. Check Qout to verify.');
 #
 done_testing();
