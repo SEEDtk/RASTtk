@@ -654,13 +654,14 @@ sub lookup_sequence_data
 {
     my($self, $ids, $cb) = @_;
 
-    my $batchsize = 100;
+    my $batchsize = 500;
     my @goodIds = grep { $_ } @$ids;
     my $n = @goodIds;
     my $end;
     for (my $i = 0; $i < $n; $i = $end + 1)
     {
-        $end = ($i + $batchsize) > $n-1 ? ($n - 1) : ($i + $batchsize);
+        $end = ($i + $batchsize) > $n ? ($n - 1) : ($i + $batchsize - 1);
+        $self->_log("Processing $i to $end.\n");
         $self->query_cb('feature_sequence',
                         sub {
                             my($data) = @_;
