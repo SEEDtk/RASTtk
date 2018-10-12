@@ -38,6 +38,7 @@ The maximum number of base pairs allowed between two features in the same cluste
 =item location
 
 If the feature location is already present in the input file, the name of the column containing the feature location.
+The location should be in the form of a start and end with two dots in between, the format used in GenBank and PATRIC.
 
 =item sequence
 

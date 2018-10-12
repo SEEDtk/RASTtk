@@ -41,7 +41,15 @@ Create a new, blank IC50 computation object.
 
 =item options
 
-A hash containing option values. Currently, there are none.
+A hash containing zero or more of the following option values.
+
+=over 8
+
+=item negative
+
+If TRUE, then the IC50 will be at -50 instead of +50. The default is FALSE.
+
+=back
 
 =back
 
@@ -49,9 +57,38 @@ A hash containing option values. Currently, there are none.
 
 sub new {
     my ($class, %options) = @_;
+    my $target = ($options{negative} ? -50 : 50);
     my $retVal = {
+        target => $target,
     };
     bless $retVal, $class;
+    return $retVal;
+}
+
+=head3 clean
+
+    my $cleaned = IC50::clean($name);
+
+Clean a drug or cell line name.
+
+=over 4
+
+=item name
+
+The drug or cell line name to clean.
+
+=item RETURN
+
+Returns an uppercase version of the name with no special characters.
+
+=back
+
+=cut
+
+sub clean {
+    my ($name) = @_;
+    my $retVal = uc $name;
+    $retVal =~ s/[^A-Z0-9]//g;
     return $retVal;
 }
 
@@ -89,7 +126,7 @@ sub compute {
 
     my $ic50Value = $ic50->compute(\@growthPairs);
 
-Compute the IC50 from a se
+Compute the IC50 from a set of dosage/growth pairs.
 
 =over 4
 
@@ -107,25 +144,31 @@ Returns the estimated log-dosage at which growth will be 50%, or C<undef> if the
 
 sub computeFromPairs {
     my ($self, $growthPairs) = @_;
+    # Get a sorted list of dosages.
+    my @dosages = sort { $a <=> $b } map { $_->[0] } @$growthPairs;
     # Compute the quadratic fit.
     my ($a, $b, $c) = $self->quadFit($growthPairs);
     # This will be the return value.
     my $retVal;
     # Compute the IC50.
-    my $discrim = $b * $b - 4 * $a * ($c - 50);
-    if ($discrim >= 0.0) {
-        $discrim = sqrt($discrim);
-        my $scale = 2 * $a;
-        my ($x1, $x2) = (($discrim - $b) / $scale, -($discrim + $b) / $scale);
-        my $oldX = $growthPairs->[0][0];
-        for (my $i = 1; $i < @$growthPairs && ! defined $retVal; $i++) {
-            my $newX = $growthPairs->[$i][0];
-            if ($oldX <= $x1 && $x1 <= $newX) {
-                $retVal = $x1;
-            } elsif ($oldX <= $x2 && $x2 <= $newX) {
+    if ($a == 0.0) {
+        # Linear fit.
+        if ($b != 0.0) {
+            $retVal = ($self->{target} - $c) / $b;
+        }
+    } else {
+        # Quadratic fit.
+        my $discrim = $b * $b - 4 * $a * ($c - $self->{target});
+        if ($discrim >= 0.0) {
+            $discrim = sqrt($discrim);
+            my $scale = 2 * $a;
+            my ($x1, $x2) = (($discrim - $b) / $scale, -($discrim + $b) / $scale);
+            my ($minX, $maxX) = ($dosages[0], $dosages[$#dosages]);
+            my $midX = ($minX + $maxX) / 2;
+            if (abs($x2 - $midX) < abs($x1 - $midX)) {
                 $retVal = $x2;
             } else {
-                $oldX = $newX;
+                $retVal = $x1;
             }
         }
     }
@@ -137,6 +180,8 @@ sub computeFromPairs {
     my ($a, $b, $c) = $ic50->quadFit(\@growthPairs);
 
 Fit a quadratic curve to the growth data.
+
+=over 4
 
 =item growthPairs
 
