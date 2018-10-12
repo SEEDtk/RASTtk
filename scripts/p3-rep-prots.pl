@@ -76,9 +76,10 @@ my @filter = (['eq', 'product', $protName]);
 # Save the checksum for the seed role.
 my $roleCheck = RoleParse::Checksum($protName);
 # Create a list of the columns we want.
-my @cols = qw(genome_id genome_name patric_id aa_sequence product);
+my @cols = qw(genome_id genome_name patric_id aa_sequence
+ product);
 if ($dnaFile) {
-    push @cols, 'na_sequence';
+    push @cols, 'na_sequence_md5';
 }
 # Open the output files.
 print "Setting up files.\n";
@@ -103,7 +104,7 @@ print scalar(@$protList) . " proteins returned in " . Math::Round::nearest(0.01,
 print "Reading genomes.\n";
 my $genomes = P3Utils::get_col($ih, $keyCol);
 my %genomes = map { $_ => 1 } @$genomes;
-print scalar(@$genomes) . " found in input file.\n";
+print scalar(@$genomes) . " genomes found in input file.\n";
 my ($gCount, $pCount) = 0;
 # This will track the proteins for each genome. It maps a genome ID to a list of protein tuples [name, seq, dna].
 my %proteins;
@@ -112,13 +113,17 @@ print "Processing proteins.\n";
 for my $prot (@$protList) {
     my ($genome, $name, $fid, $seq, $product, $dna) = @$prot;
     if ($fid) {
-        # We have a real feature, check the function.
-        my $check = RoleParse::Checksum($product // '');
-        if ($check ne $roleCheck) {
-            $stats->Add(funnyProt => 1);
+        # We have a real feature, check the genome.
+        if (! $genomes{$genome}) {
+            $stats->Add(filteredGenome => 1);
         } else {
-            push @{$proteins{$genome}}, [$name, $seq, $dna];
-            $stats->Add(protFound => 1);
+            my $check = RoleParse::Checksum($product // '');
+            if ($check ne $roleCheck) {
+                $stats->Add(funnyProt => 1);
+            } else {
+                push @{$proteins{$genome}}, [$name, $seq, $dna];
+                $stats->Add(protFound => 1);
+            }
         }
     }
     $pCount++;
@@ -126,6 +131,7 @@ for my $prot (@$protList) {
 }
 # Process the genomes one at a time.
 print "Processing genomes.\n";
+
 for my $genome (keys %proteins) {
     my @prots = @{$proteins{$genome}};
     $stats->Add(genomeFound => 1);
@@ -133,7 +139,7 @@ for my $genome (keys %proteins) {
         # Skip if we have multiple proteins.
         $stats->Add(multiProt => 1);
     } else {
-        # Get the genome name and sequence.
+        # Get the genome name and sequence MD5s.
         my ($name, $seq, $dna) = @{$prots[0]};
         print $gh "$genome\t$name\n";
         print $fh ">$genome\n$seq\n";
