@@ -81,6 +81,7 @@ my @filter = (['eq', 'product', $protName]);
 # Save the checksum for the seed role.
 my $roleCheck = RoleParse::Checksum($protName);
 # Create a list of the columns we want.
+
 my @cols = qw(genome_id genome_name patric_id aa_sequence_md5 product);
 if ($dnaFile) {
     push @cols, 'na_sequence_md5';
@@ -111,7 +112,7 @@ print scalar(@$protList) . " proteins returned in " . Math::Round::nearest(0.01,
 print "Reading genomes.\n";
 my $genomes = P3Utils::get_col($ih, $keyCol);
 my %genomes = map { $_ => 1 } @$genomes;
-print scalar(@$genomes) . " found in input file.\n";
+print scalar(@$genomes) . " genomes found in input file.\n";
 my ($gCount, $pCount) = 0;
 # This will track the proteins for each genome. It maps a genome ID to a list of protein tuples [name, seq, dna].
 my %proteins;
