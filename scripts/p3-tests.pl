@@ -48,6 +48,8 @@ The positional parameter should be the name of a working directory to use for te
         '1345700.10' => ['1345700.10', 'Yersinia pestis 1670', '4718815', 'cellular organisms; Bacteria; Proteobacteria; Gammaproteobacteria; Enterobacterales; Yersiniaceae; Yersinia; Yersinia pseudotuberculosis complex; Yersinia pestis; Yersinia pestis 1670'],
 };
 
+use constant FTEST => ["$FIG_Config::global/ftest.tbl", '1986611.3'];
+
 # Get the working directory.
 my ($workDir) = @ARGV;
 if (! $workDir) {
@@ -179,7 +181,10 @@ while (! eof $ih) {
         P3Utils::print_cols($result, opt => $opt, oh => $oh);
     }
 }
+close $ih;
+undef $ih;
 close $oh;
+undef $oh;
 open($oh, '<', $outFile) || die "Could not re-open output file: $!";
 my ($header) = P3Utils::process_headers($oh, $opt, 1);
 is_deeply($header, EXPECTED->{header}, 'get_genomes header test');
@@ -214,7 +219,34 @@ is_deeply(\@found, [0, 1, 2], 'find_headers / get_cols test');
 my $line = "a\tb\tc\r\n";
 @found = P3Utils::get_fields($line);
 is_deeply(\@found, ['a','b','c'], 'get_fields test');
-
+close $oh;
+undef $oh;
+# Now the feature test, which is our most complex. We get ID and DNA for a whole genome (EC doesn't work the same in old PATRIC).
+@want = qw(patric_id na_sequence);
+my $fTest = P3Utils::get_data($p3, feature => [['eq', 'genome_id', FTEST->[1]]], \@want);
+my %fTestH = map { $_->[0] => $_ } @$fTest;
+# Compare to the file.
+open($ih, '<', FTEST->[0]) || die "Could not open ftest.tbl: $!";
+($tHeaders, $tCols) = P3Utils::find_headers($ih, ftestFile => @want);
+while (! eof $ih) {
+    my ($id, $seq) = P3Utils::get_cols($ih, $tCols);
+    my $found = $fTestH{$id} // ['not-found', ''];
+    is_deeply($found, [$id, $seq], "ftest for $id");
+}
+close $ih; undef $ih;
+# Evaluation engine test.
+open($oh, ">qtest.tbl") || die "Could not open qtest.tbl: $!";
+P3Utils::print_cols([qw(genome_id name ref_id gto_file)], oh => $oh);
+P3Utils::print_cols(['224308.244', 'Bacillus subtilis', '224308.43', 'Global/Qgto/224308.244.gto'], oh => $oh);
+P3Utils::print_cols(['1773.2312', 'Mycobacterium tuberculosis strain Bir 60', '', ''], oh => $oh);
+P3Utils::print_cols(['1986232.3', 'SAR92 bacterium MED-G29', '', ''], oh => $oh);
+P3Utils::print_cols(['1352.1532', 'Enterococcus faecium strain Efm0097', '', ''], oh => $oh);
+P3Utils::print_cols(['1000561.3', 'Pseudomonas aeruginosa AES-1R', '', 'Global/Qgto/1000561.3.gto'], oh => $oh);
+P3Utils::print_cols(['1261545.11', 'Halarchaeum acidiphilum MH1-52-1', 'Global/Qgto/1261545.11.gto'], oh => $oh);
+close $oh; undef $oh;
+my $rc = system('p3x-eval-genomes --col=genome_id --input=qtest.tbl --gtoCol=gto_file --clear --deep Qwork Qout');
+ok($rc == 0, 'Success from evaluator. Check Qout to verify.');
+#
 done_testing();
 
 ######### UTILITY METHODS
