@@ -1097,6 +1097,9 @@ sub write_seed_dir
                     };
     $write_md->("GENETIC_CODE", $self->{genetic_code});
     $write_md->("GENOME", $self->{scientific_name});
+
+    #
+    # Taxonomy is supposed to be a string ... (!)
     if (ref($self->{taxonomy}))
     {
 	my @t = @{$self->{taxonomy}};
@@ -1104,6 +1107,12 @@ sub write_seed_dir
 
 	print Dumper(\@t);
 	$write_md->("TAXONOMY", join("; ", @t));
+    }
+    else
+    {
+	my $t = $self->{taxonomy};
+	$t =~ s/^cellular[^;]+;\s+//;
+	$write_md->("TAXONOMY", $t);
     }
     $write_md->("TAXONOMY_ID", $self->{ncbi_taxonomy_id}) if $self->{ncbi_taxonomy_id};
 

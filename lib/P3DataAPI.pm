@@ -2,6 +2,8 @@ package P3DataAPI;
 
 # This is a SAS Component
 
+# Updated for new PATRIC.
+
 use File::Temp;
 use LWP::UserAgent;
 use strict;
