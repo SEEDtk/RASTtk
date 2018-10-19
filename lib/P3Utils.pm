@@ -1361,11 +1361,15 @@ sub get_fields {
 
 =head3 list_object_fields
 
-    my $fieldList = P3Utils::list_object_fields($object);
+    my $fieldList = P3Utils::list_object_fields($p3, $object);
 
 Return the list of field names for an object. The database schema is queried directly.
 
 =over 4
+
+=item p3
+
+The L<P3DataAPI> object for accessing PATRIC.
 
 =item object
 
@@ -1380,13 +1384,13 @@ Returns a reference to a list of the field names.
 =cut
 
 sub list_object_fields {
-    my ($object) = @_;
+    my ($p3, $object) = @_;
     my @retVal;
     # Get the real name of the object.
     my $realName = OBJECTS->{$object};
     # Ask for the JSON schema string.
     my $ua = LWP::UserAgent->new();
-    my $url = "$FIG_Config::p3_data_api_url/$realName/schema?http_content-type=application/solrquery+x-www-form-urlencoded&http_accept=application/solr+json";
+    my $url = $p3->{url} . "/$realName/schema?http_content-type=application/solrquery+x-www-form-urlencoded&http_accept=application/solr+json";
     my $request = HTTP::Request->new(GET => $url);
     my $response = $ua->request($request);
     if ($response->code ne 200) {

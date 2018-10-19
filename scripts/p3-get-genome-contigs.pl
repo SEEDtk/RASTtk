@@ -63,6 +63,6 @@ while (! eof $ih) {
 }
 
 sub print_usage {
-    my $fieldList = P3Utils::list_object_fields('contig');
+    my $fieldList = P3Utils::list_object_fields($p3, 'contig');
     print join("\n", @$fieldList, "");
 }

@@ -81,7 +81,8 @@ my $lastRow = pop @$couplets;
 is($lastRow->[0], '1345703.9', 'last key test');
 is($lastRow->[1][2], '4733482', 'last field test');
 # Test list-fields.
-my $fieldList = P3Utils::list_object_fields('genome');
+my $p3 = P3DataAPI->new();
+my $fieldList = P3Utils::list_object_fields($p3, 'genome');
 my ($tax1) = grep { $_ =~ /taxon_lineage_ids/ } @$fieldList;
 my ($tax2) = grep { $_ =~ /taxonomy/ } @$fieldList;
 is($tax1, 'taxon_lineage_ids (multi)', 'multivalue field test');
@@ -119,7 +120,6 @@ my $value = '   This is (very) dirty   ';
 my $clean = P3Utils::clean_value($value);
 is($clean,'This is very dirty', 'clean value test');
 # Test derived fields.
-my $p3 = P3DataAPI->new();
 my ($genomeID, undef, undef, $taxonomy) = @{EXPECTED->{'385964.3'}};
 my $results = P3Utils::get_data($p3, genome => [['eq', 'genome_id', $genomeID]], ['taxonomy']);
 is(scalar @$results, 1, 'get_data length test 1');

@@ -71,7 +71,7 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(),
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 if ($opt->fields) {
-    my $fieldList = P3Utils::list_object_fields('genome');
+    my $fieldList = P3Utils::list_object_fields($p3, 'genome');
     print join("\n", @$fieldList, "");
 } else {
     # Compute the output columns. Note we configure this as an ID-centric method.

@@ -56,7 +56,7 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 if ($opt->fields) {
-    my $fieldList = P3Utils::list_object_fields('feature');
+    my $fieldList = P3Utils::list_object_fields($p3, 'feature');
     print join("\n", @$fieldList, "");
 } else {
     # Compute the output columns.

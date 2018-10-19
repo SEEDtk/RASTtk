@@ -78,6 +78,6 @@ while (! eof $ih) {
 }
 
 sub print_usage {
-    my $fieldList = P3Utils::list_object_fields('genome');
+    my $fieldList = P3Utils::list_object_fields($p3, 'genome');
     print join("\n", @$fieldList, "");
 }
