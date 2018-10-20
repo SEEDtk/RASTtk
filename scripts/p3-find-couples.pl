@@ -44,6 +44,10 @@ The location should be in the form of a start and end with two dots in between, 
 
 If the sequence ID is already present in the input file, the name of the column containing the sequence ID.
 
+=item verbose
+
+If specified, status messages will be written to STDERR.
+
 =back
 
 =cut
@@ -51,14 +55,15 @@ If the sequence ID is already present in the input file, the name of the column 
 use strict;
 use P3DataAPI;
 use P3Utils;
-
+use Math::Round;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('catCol', P3Utils::delim_options(), P3Utils::col_options(), P3Utils::ih_options(),
         ['minCount|mincount|min|m=i', 'minimum occurrence count', { default => 5 }],
         ['maxGap|maxgap|maxG|maxg|g=i', 'maximum feature gap', { default => 2000 }],
         ['location|loc|l=s', 'index (1-based) or name of column containing feature location (if any)'],
-        ['sequence|seq|s=s', 'index (1-based) or name of column containing the ID of the contig containing the feature']
+        ['sequence|seq|s=s', 'index (1-based) or name of column containing the ID of the contig containing the feature'],
+        ['verbose|v', 'display progress messages on STDERR'],
         );
 # This is keyed on genomeID:sequenceID and will contain the list of features for each sequence, in the form
 # [category, start, end].
@@ -68,6 +73,7 @@ my $locCol = $opt->location;
 my $seqCol = $opt->sequence;
 my $maxGap = $opt->maxgap;
 my $minCount = $opt->mincount;
+my $debug = $opt->verbose;
 # Get the category column.
 my ($catCol) = @ARGV;
 if (! defined $catCol) {
@@ -95,13 +101,21 @@ if (defined $locCol) {
     push @selects, 'start', 'end';
     $queryNeeded = 1;
 }
+if ($queryNeeded && $debug) {
+    print STDERR "PATRIC queries will be needed.\n";
+}
 # Find the category column.
 $catCol = P3Utils::find_column($catCol, $outHeaders);
 # Form the full header set and write it out.
 if (! $opt->nohead) {
-    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count');
+    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count', 'percent');
     P3Utils::print_cols(\@headers);
 }
+# These are used for status messages.
+my $count = 0;
+my $period = ($queryNeeded ? 1000 : 100000);
+# This counts the category occurrences.
+my %catCounts;
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
@@ -115,6 +129,7 @@ while (! eof $ih) {
     for my $couplet (@$couplets) {
         my ($fid, $line) = @$couplet;
         my $category = $line->[$catCol];
+        $count++;
         if ($category) {
             my ($start, $end, $sequence);
             my $fidData = $rows{$fid};
@@ -145,18 +160,22 @@ while (! eof $ih) {
             push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
         }
     }
+    print STDERR "$count features processed.\n" if $debug && $count % $period == 0;
 }
 # Now we have category and position data for each feature sorted by sequence.
 # For each list, we sort by start position and figure out what qualifies as a couple.
 # The couples are counted in this hash, which is keyed by "element1\telement2".
 my %couples;
-for my $contig (keys %contigs) {
+print STDERR scalar(keys %contigs) . " contigs ready to examine.\n" if $debug;
+for my $contig (sort keys %contigs) {
     my @features = sort { $a->[1] <=> $b->[1] } @{$contigs{$contig}};
+    print STDERR "Processing $contig with " . scalar(@features) . " features.\n" if $debug;
     # We process one feature at a time, and stop when there are none left
     # to couple with it.
     my $feat = shift @features;
     while (scalar @features) {
         my $cat1 = $feat->[0];
+        $catCounts{$cat1}++;
         # Compute the latest start position that qualifies as a couple.
         my $limit = $feat->[2] + $maxGap;
         # Loop through the remaining features until we hit the limit.
@@ -171,7 +190,11 @@ for my $contig (keys %contigs) {
     }
 }
 # Sort the couples and output them.
+print STDERR "Writing couples.\n" if $debug;
 my @couples = sort { $couples{$b} <=> $couples{$a} } grep { $couples{$_} >= $minCount } keys %couples;
 for my $couple (@couples) {
-    P3Utils::print_cols([$couple, $couples{$couple}]);
+    my ($cat1, $cat2) = split /\t/, $couple;
+    my $count = $couples{$couple};
+    my $total = ($catCounts{$cat1} + $catCounts{$cat2}) / 2;
+    P3Utils::print_cols([$couple, $count, Math::Round::nearest(0.01, $count * 100 / $total)]);
 }

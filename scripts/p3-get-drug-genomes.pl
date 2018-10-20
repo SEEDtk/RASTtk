@@ -44,12 +44,12 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options
     ['fields|f', 'Show available fields']);
 
 my $fields = ($opt->fields ? 1 : 0);
+# Get access to PATRIC.
+my $p3 = P3DataAPI->new();
 if ($fields) {
     print_usage();
     exit();
 }
-# Get access to PATRIC.
-my $p3 = P3DataAPI->new();
 # Compute the output columns.
 my ($selectList, $newHeaders) = P3Utils::select_clause($p3, genome_drug => $opt);
 # Compute the filter.

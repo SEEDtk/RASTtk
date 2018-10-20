@@ -41,13 +41,13 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options
     ['susceptible|suscept|weak', 'filter for drugs to which the genome is susceptible'],
     ['fields|f', 'Show available fields']);
 
+# Get access to PATRIC.
+my $p3 = P3DataAPI->new();
 my $fields = ($opt->fields ? 1 : 0);
 if ($fields) {
     print_usage();
     exit();
 }
-# Get access to PATRIC.
-my $p3 = P3DataAPI->new();
 # Compute the output columns.
 my ($selectList, $newHeaders) = P3Utils::select_clause($p3, genome_drug => $opt);
 # Compute the filter.
