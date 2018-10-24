@@ -108,7 +108,7 @@ if ($queryNeeded && $debug) {
 $catCol = P3Utils::find_column($catCol, $outHeaders);
 # Form the full header set and write it out.
 if (! $opt->nohead) {
-    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count', 'percent');
+    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count', 'percent', 'found1', 'found2');
     P3Utils::print_cols(\@headers);
 }
 # These are used for status messages.
@@ -157,7 +157,8 @@ while (! eof $ih) {
             # Compute the genome ID.
             my ($genomeID) = ($fid =~ /(\d+\.\d+)/);
             # Put the feature in the hash.
-            push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end];
+            push @{$contigs{"$genomeID:$sequence"}}, [$category, $start, $end, $fid];
+            $catCounts{$category}++;
         }
     }
     print STDERR "$count features processed.\n" if $debug && $count % $period == 0;
@@ -165,36 +166,48 @@ while (! eof $ih) {
 # Now we have category and position data for each feature sorted by sequence.
 # For each list, we sort by start position and figure out what qualifies as a couple.
 # The couples are counted in this hash, which is keyed by "element1\telement2".
+open(my $oh, ">coupleDebug.log") || die "Could not open debug file: $!"; ##TODO debug
 my %couples;
 print STDERR scalar(keys %contigs) . " contigs ready to examine.\n" if $debug;
+my ($contigCount, $fidCount) = (0,0);
 for my $contig (sort keys %contigs) {
+    $contigCount++;
     my @features = sort { $a->[1] <=> $b->[1] } @{$contigs{$contig}};
-    print STDERR "Processing $contig with " . scalar(@features) . " features.\n" if $debug;
     # We process one feature at a time, and stop when there are none left
     # to couple with it.
     my $feat = shift @features;
     while (scalar @features) {
-        my $cat1 = $feat->[0];
-        $catCounts{$cat1}++;
+        $fidCount++;
+        my ($cat1, $start, $end, $fid) = @$feat;
         # Compute the latest start position that qualifies as a couple.
-        my $limit = $feat->[2] + $maxGap;
+        my $limit = $end + $maxGap;
         # Loop through the remaining features until we hit the limit.
         for my $other (@features) { last if $other->[1] > $limit;
-            if ($cat1 ne $other->[0]) {
-                my $couple = join("\t", sort ($cat1, $other->[0]));
+            my ($cat2, $s2, $e2, $fid2) = @$other;
+            if ($cat1 ne $cat2 && $fid ne $fid2) {
+                my $couple = join("\t", sort ($cat1, $cat2));
+                if ($couple eq "LighHarvLhiiAlph8\tLighHarvLhiiBeta8") { print $oh "$fid and $fid2 at $start and $s2 on $contig.\n"; }
                 $couples{$couple}++;
             }
         }
         # Get the next feature.
         $feat = shift @features;
     }
+    print STDERR "$contigCount contigs processed with $fidCount features.\n" if $debug && $contigCount % 1000 == 0;
 }
 # Sort the couples and output them.
-print STDERR "Writing couples.\n" if $debug;
-my @couples = sort { $couples{$b} <=> $couples{$a} } grep { $couples{$_} >= $minCount } keys %couples;
+print STDERR "Analyzing couples.\n" if $debug;
+my @couples = grep { $couples{$_} >= $minCount } keys %couples;
 for my $couple (@couples) {
     my ($cat1, $cat2) = split /\t/, $couple;
     my $count = $couples{$couple};
     my $total = ($catCounts{$cat1} + $catCounts{$cat2}) / 2;
-    P3Utils::print_cols([$couple, $count, Math::Round::nearest(0.01, $count * 100 / $total)]);
+    $couples{$couple} = [$count, Math::Round::nearest(0.01, $count * 100 / $total), $catCounts{$cat1}, $catCounts{$cat2}];
+}
+print STDERR "Sorting couples.\n" if $debug;
+@couples = sort { $couples{$b}[1] <=> $couples{$a}[1] } @couples;
+print STDERR "Writing couples.\n" if $debug;
+for my $couple (@couples) {
+    my $line = $couples{$couple};
+    P3Utils::print_cols([$couple, @$line]);
 }

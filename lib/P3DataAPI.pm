@@ -644,7 +644,6 @@ sub retrieve_contigs_in_genomes {
 
 }
 
-
 =item B<lookup_sequence_data>
 
 Given a list of MD5s, retrieve the corresponding sequence data.

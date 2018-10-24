@@ -150,12 +150,12 @@ sub ProcessGto {
         # Get the lineage ID list.
         my $taxResults = [[$geo->lineage || []]];
         $refID = _FindRef($taxResults, \%refMap, $genomeID);
-        if ($refID) {
-            my $gHash = GEO->CreateFromPatric([$refID], %geoOptions);
-            my $refGeo = $gHash->{$refID};
-            if ($refGeo) {
-                $geo->AddRefGenome($refGeo);
-            }
+    }
+    if ($refID) {
+        my $gHash = GEO->CreateFromPatric([$refID], %geoOptions);
+        my $refGeo = $gHash->{$refID};
+        if ($refGeo) {
+            $geo->AddRefGenome($refGeo);
         }
     }
     # Open the output file for the quality data.
