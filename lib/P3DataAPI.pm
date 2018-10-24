@@ -88,7 +88,14 @@ __PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
 sub new {
     my ( $class, $url, $token, $params ) = @_;
 
-    if (!$token)
+    if ($token)
+    {
+	if (ref($token) eq 'P3AuthToken')
+	{
+	    $token = $token->token();
+	}
+    }
+    else
     {
         if ($have_p3auth)
         {
