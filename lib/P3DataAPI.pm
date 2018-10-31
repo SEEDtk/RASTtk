@@ -85,15 +85,19 @@ __PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
                              debug redis
                             ));
 
+our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
+                  '+' => '%43', '/' => '%47',               '{' => '%7B', '|' => '%7C', '}' => '%7D',
+                  '^' => '%94', '`' => '%96');
+
 sub new {
     my ( $class, $url, $token, $params ) = @_;
 
     if ($token)
     {
-	if (ref($token) eq 'P3AuthToken')
-	{
-	    $token = $token->token();
-	}
+        if (ref($token) eq 'P3AuthToken')
+        {
+            $token = $token->token();
+        }
     }
     else
     {
@@ -253,8 +257,10 @@ sub query
         #			     Content => $q);
         my $end;
         $start = gettimeofday if $self->{benchmark};
-        $q =~ s/\|/\%7C/g;
-        $q =~ tr/ /+/; # Form url-encoding
+        # Form url-encoding
+        $q =~ s/([<>"#\%+\/{}\|\\\^\[\]`])/$P3DataAPI::EncodeMap{$1}/gs;
+        $q =~ tr/ /+/;
+        # POST query
         $self->_log("$url?$q\n");
         my $resp = $ua->post($url,
                              Accept => "application/json",

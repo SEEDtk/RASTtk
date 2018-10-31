@@ -108,7 +108,7 @@ if ($queryNeeded && $debug) {
 $catCol = P3Utils::find_column($catCol, $outHeaders);
 # Form the full header set and write it out.
 if (! $opt->nohead) {
-    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count', 'percent', 'found1', 'found2');
+    my @headers = ("$outHeaders->[$catCol]1", "$outHeaders->[$catCol]2", 'count', 'percent', 'found1');
     P3Utils::print_cols(\@headers);
 }
 # These are used for status messages.
@@ -166,15 +166,18 @@ while (! eof $ih) {
 # Now we have category and position data for each feature sorted by sequence.
 # For each list, we sort by start position and figure out what qualifies as a couple.
 # The couples are counted in this hash, which is keyed by "element1\telement2".
-open(my $oh, ">coupleDebug.log") || die "Could not open debug file: $!"; ##TODO debug
 my %couples;
+open(my $oh, ">coupleDebug.log") || die "Could not open debug file: $!"; ##TODO debug
 print STDERR scalar(keys %contigs) . " contigs ready to examine.\n" if $debug;
 my ($contigCount, $fidCount) = (0,0);
 for my $contig (sort keys %contigs) {
     $contigCount++;
     my @features = sort { $a->[1] <=> $b->[1] } @{$contigs{$contig}};
     # We process one feature at a time, and stop when there are none left
-    # to couple with it.
+    # to couple with it.  For each feature, we need a list of the couplings.
+    # This hash is keyed by {fid}{couple}.
+    my %counts;
+    # Loop through the features on the contig.
     my $feat = shift @features;
     while (scalar @features) {
         $fidCount++;
@@ -185,15 +188,22 @@ for my $contig (sort keys %contigs) {
         for my $other (@features) { last if $other->[1] > $limit;
             my ($cat2, $s2, $e2, $fid2) = @$other;
             if ($cat1 ne $cat2 && $fid ne $fid2) {
-                my $couple = join("\t", sort ($cat1, $cat2));
-                if ($couple eq "LighHarvLhiiAlph8\tLighHarvLhiiBeta8") { print $oh "$fid and $fid2 at $start and $s2 on $contig.\n"; }
-                $couples{$couple}++;
+                $counts{$fid}{"$cat1\t$cat2"}++;
+                $counts{$fid2}{"$cat2\t$cat1"}++;
             }
         }
         # Get the next feature.
         $feat = shift @features;
     }
     print STDERR "$contigCount contigs processed with $fidCount features.\n" if $debug && $contigCount % 1000 == 0;
+    # From the counts hash, we do the actual couple counts. This insures we don't double-count when a frame shift has
+    # split a role across two adjacent proteins.
+    for my $fid (keys %counts) {
+        my $coupleH = $counts{$fid};
+        for my $couple (keys %$coupleH) {
+            $couples{$couple}++;
+        }
+    }
 }
 # Sort the couples and output them.
 print STDERR "Analyzing couples.\n" if $debug;
@@ -201,11 +211,10 @@ my @couples = grep { $couples{$_} >= $minCount } keys %couples;
 for my $couple (@couples) {
     my ($cat1, $cat2) = split /\t/, $couple;
     my $count = $couples{$couple};
-    my $total = ($catCounts{$cat1} + $catCounts{$cat2}) / 2;
-    $couples{$couple} = [$count, Math::Round::nearest(0.01, $count * 100 / $total), $catCounts{$cat1}, $catCounts{$cat2}];
+    $couples{$couple} = [$count, Math::Round::nearest(0.01, $count * 100 / $catCounts{$cat1}), $catCounts{$cat1}];
 }
 print STDERR "Sorting couples.\n" if $debug;
-@couples = sort { $couples{$b}[1] <=> $couples{$a}[1] } @couples;
+@couples = sort { $couples{$b}[1] <=> $couples{$a}[1] || $couples{$b}[0] <=> $couples{$a}[0] } @couples;
 print STDERR "Writing couples.\n" if $debug;
 for my $couple (@couples) {
     my $line = $couples{$couple};
