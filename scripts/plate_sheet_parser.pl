@@ -25,6 +25,7 @@ use Spreadsheet::ParseExcel;
 use File::Copy::Recursive;
 use IC50;
 use Excel::Writer::XLSX;
+use Math::Round;
 
 
 =head1 Parse Dose Response Spreadsheets
@@ -62,6 +63,10 @@ The command-line options are as follows.
 
 Erase the output directory before starting.
 
+=item smooth
+
+Compute the control growth by averaging all the values on the spreadsheet.
+
 =back
 
 =cut
@@ -71,7 +76,8 @@ use constant LOG10 => log(10.0);
 $| = 1;
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('sheetDir outDir',
-        ['clear', 'erase the output directory before starting']
+        ['clear', 'erase the output directory before starting'],
+        ['smooth', 'average the control growth rates in each sheet']
         );
 # Check the parameters.
 my ($sheetDir, $outDir) = @ARGV;
@@ -146,18 +152,34 @@ for my $sheet (@sheets) {
     } else {
         # Get the cell line.
         my $rawData = $workbook->worksheet('Raw data');
-        if (! $rawData) {
+        my $p1Data = $workbook->worksheet('PL1');
+        if (! $rawData || ! $p1Data) {
             print "Invalid spreadsheet $sheet -- skipping.\n";
         } else {
             my $cell_line = IC50::clean(cell_value($rawData, 1, 1));
             print "Processing $sheet for $cell_line.\n";
-            # Extract the default growth and the starting growth for each drug.
+            # Extract the baseline value.
+            my $baseline = int(cell_value($p1Data, 20, 1));
+            # Extract the default growth for each drug.
+            # Because there are faulty results in the control pits, we need to
+            # weed those out and take an average.
             my (%baseline, %growth);
+            my ($gTotal, $gCount) = (0, 0);
             for (my $r = 0; $r < @drugs; $r++) {
                 for (my $c = 0; $c < 2; $c++) {
                     my $drug = $drugs[$r][$c];
-                    $baseline{$drug} = cell_value($rawData, $r + 17, 26);
-                    $growth{$drug} = cell_value($rawData, $r + 17, $c + 24) - $baseline{$drug};
+                    $baseline{$drug} = $baseline;
+                    my $control = cell_value($rawData, $r + 17, $c + 24);
+                    $growth{$drug} = $control - $baseline;
+                    $gTotal += $growth{$drug};
+                    $gCount++;
+                }
+            }
+            if ($opt->smooth) {
+                # Smoothing:  average out the growths.
+                my $gMean = $gTotal / $gCount;
+                for my $drug (keys %growth) {
+                    $growth{$drug} = $gMean;
                 }
             }
             # Write the growth for each dosage.
