@@ -2075,6 +2075,7 @@ sub translate {
         ($offset, $code, $start) = ($code, $start, $extra);
     } else {
         $dna = \$seq;
+        $offset = 0;
     }
 
     if (! defined($code)) {
@@ -2398,8 +2399,8 @@ sub compute_metrics {
             if ($cumul >= $thresh{$type}) {
                 # We have the desired metric. Save it in the return array.
                 $retVal{$type} = $len;
-		(my $ltype = $type) =~ s/^N/L/;
-		$retVal{$ltype} = $i + 1; # Zero based..
+                (my $ltype = $type) =~ s/^N/L/;
+                $retVal{$ltype} = $i + 1; # Zero based..
                 # Ensure we don't test for it again.
                 delete $thresh{$type};
             }
