@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use P3Signatures;
 use TraceObject;
+use P3Utils;
 
 =head1 Compute Family Signatures
 
@@ -20,12 +21,10 @@ assigned function.
 
 =head2 Parameters
 
+There are no positional parameters.  The parameters in L<P3Utils/col_options> can be used to specify the key column
+in both input files.  The following additional parameters are also supported.
+
 =over 4
-
-=item col
-
-Specifies the (1-based) column index or name of the genome ID column in the two
-genome input files. The default is C<0>, indicating the last colummn.
 
 =item gs1
 
@@ -56,7 +55,7 @@ Write progress messages to STDERR.
 
 =cut
 
-my $opt = P3Utils::script_opts('',
+my $opt = P3Utils::script_opts('', P3Utils::col_options(),
         ["gs1=s", "genomes with property"],
         ["gs2=s", "genomes without property"],
         ["min|m=f","minimum fraction of Gs1",{default => 0.8}],
@@ -74,9 +73,9 @@ if ($opt->verbose) {
     $tracer = TraceObject->new();
 }
 # Read in both sets of genomes.
-my $gHash = read_genomes($gs1);
+my $gHash = read_genomes($gs1, $opt);
 my @gs1 = sort keys %$gHash;
-my $gHash2 = read_genomes($gs2);
+my $gHash2 = read_genomes($gs2, $opt);
 my @gs2 = sort grep { ! $gHash->{$_} } keys %$gHash2;
 undef $gHash;
 undef $gHash2;
@@ -97,19 +96,18 @@ foreach my $fam (sort keys %$dataH) {
 }
 
 sub read_genomes {
-    my ($fileSpec) = @_;
-    my %retVal;
+    my ($fileSpec, $opt) = @_;
     my $gh;
     if (! $fileSpec) {
         $gh = \*STDIN;
     } else {
         open($gh, '<', $fileSpec) || die "Could not open genome file $fileSpec: $!";
     }
-    while (! eof $gh) {
-        my $line = <$gh>;
-        if ($line =~ /^(\d+\.\d+)/) {
-            $retVal{$1} = 1;
-        }
-    }
+    # Compute the key column.
+    my (undef, $keyCol) = P3Utils::process_headers($gh, $opt);
+    # Read it in.
+    my $gCol = P3Utils::get_col($gh, $keyCol);
+    # Form the output hash.
+    my %retVal = map { $_ => 1 } @$gCol;
     return \%retVal;
 }
