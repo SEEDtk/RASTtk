@@ -84,7 +84,6 @@ if (! @gs1) {
 } elsif (! @gs2) {
     die "No genomes found in group 2.";
 }
-
 # Compute the output hash.
 my $dataH = P3Signatures::Process(\@gs1, \@gs2, $min_in, $max_out, $tracer);
 # Print the header.

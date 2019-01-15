@@ -85,6 +85,9 @@ sub Process {
     # Copy both sets of genomes to a hash.
     my %gs1 = map { $_ => 1 } @$gs1;
     my %gs2 = map { $_ => 1 } @$gs2;
+    if ($jobObject) {
+        $jobObject->Progress(scalar(@$gs1) . " genomes in group 1, " . scalar(@$gs2) . " in group 2.");
+    }
     # This hash will count the number of times each family is found in the sets.
     # It is keyed by family ID, and each value is a sub-hash with keys "in" and "out"
     # pointing to counts.
