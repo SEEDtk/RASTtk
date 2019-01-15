@@ -1217,7 +1217,7 @@ the column indices for the named fields.
 
 =item ih
 
-Open input file handle.
+Open input file handle, or a reference to a list of headers.
 
 =item fileType
 
@@ -1239,8 +1239,13 @@ Returns a two-element list consisting of (0) a reference to a list of the header
 sub find_headers {
     my ($ih, $fileType, @fields) = @_;
     # Read the column headers from the file.
-    my $line = <$ih>;
-    my @headers = get_fields($line);
+    my @headers;
+    if (ref $ih eq 'ARRAY') {
+        @headers = @$ih;
+    } else {
+        my $line = <$ih>;
+        @headers = get_fields($line);
+    }
     # Get a hash of the field names.
     my %fieldH = map { $_ => undef } @fields;
     # Loop through the headers, saving indices.
