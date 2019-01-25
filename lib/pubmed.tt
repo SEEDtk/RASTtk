@@ -1,0 +1,43 @@
+<html><head>
+<style type="text/css">
+body {
+        font-family: Arial, sans-serif;
+        color: #333333;
+        font-weight: 200;
+        font-size: small;
+        background: #FCFCFC;
+}
+table.p3basic, table.p3basic th,
+table.p3basic td, table.p3basic tr {
+        border-style: inset;
+        border-collapse: collapse;
+        vertical-align: top;
+        padding: 3px;
+}
+table.p3basic th {
+        text-align: left;
+        background: #EEEEEE;
+}</style>
+<title>PUBMED Keyword Search</title>
+</head>
+<body>
+
+<h1>Results for keywords [% keyword_list %]</h1>
+
+<p>[% result_count %] results found.</p>
+
+<table class="p3basic">
+<tr>
+<th>PUBMED ID</th><th>Title</th><th>Abstract</th>
+</tr>
+[% FOR p IN papers %]
+<tr>
+<td><a href="https://www.ncbi.nlm.nih.gov/pubmed/[% p.id %]">[% p.id %]</a></td>
+<td>[% p.title %]</td>
+<td>[% p.abstract %]</td>
+</tr>
+[% END %]
+</table>
+
+</body>
+</html>
