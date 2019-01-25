@@ -294,6 +294,50 @@ sub check_genome {
     return $retVal;
 }
 
+=head3 distance
+
+    my $distance = $repGenome->distance($repGenome2);
+
+Compute the distance between to representative genome objects.  The distance is a number between 0 and 1 expressed as the number
+of distinct kmers not in common divided by the total number of distinct kmers in both sequences (difference over union).  This
+number is generally inverse of the similarity score normally used, but it is a true distance measure that forms the genomes into
+a metric space.
+
+=over 4
+
+=item repGenome2
+
+A L<RepGenome> object for the other genome to which this one is being compared.
+
+=item RETURN
+
+Returns a number between 0 and 1 indicating the distance between the two genomes.
+
+=back
+
+=cut
+
+sub distance {
+    my ($self, $repGenome2) = @_;
+    # Get the kmer hashes.
+    my $kMap = $self->{kMap};
+    my $kMap2 = $repGenome2->{kMap};
+    # We want to compute the union and intersection counts.  The union starts with the count in map 1.  We then run through
+    # map 2.  Each kmer in map 1 increments the intersection count.  Each kmer not in map 1 increments the union count.
+    my $union = scalar keys %$kMap;
+    my $intersection = 0;
+    for my $kmer (keys %$kMap2) {
+        if ($kMap->{$kmer}) {
+            $intersection++;
+        } else {
+            $union++;
+        }
+    }
+    # Compute the distance.
+    my $retVal = ($union - $intersection) / $union;
+    return $retVal;
+}
+
 =head3 rep_list
 
     my $repList = $repGenome->rep_list();
