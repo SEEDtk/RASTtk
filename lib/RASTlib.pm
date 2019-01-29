@@ -221,7 +221,7 @@ sub Submit {
         domain => $domain,
     );
     if ($path) {
-        $parms{path} = $path;
+        $parms{path} = "$path/$name";
     }
     my $url = URI->new(RAST_URL . '/submit/GenomeAnnotation');
     $url->query_form(%parms);
