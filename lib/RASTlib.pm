@@ -28,6 +28,7 @@ package RASTlib;
     use URI;
     use P3DataAPI;
     use Crypt::RC4;
+    use FastA;
 
 =head1 Annotate a Genome Using RAST
 
@@ -349,10 +350,39 @@ sub retrieve {
     return $retVal;
 }
 
+=head3 read_fasta
+
+    my $triples = RASTlib::read_fasta($fastaFile)'
+
+Read the FASTA triples from a caller-specified file.  This is used to convert a file name into the input for L</Submit>.
+
+=over 4
+
+=item fastaFile
+
+The name of the input file to be read in.
+
+=item RETURN
+
+Returns a reference to a list of 3-tuples, each consisting of (0) a sequence ID, (1) an empty string, and (2) the sequence text.
+
+=back
+
+=cut
+
+sub read_fasta {
+    my ($fastaFile) = @_;
+    my $fh = FastA->new($fastaFile);
+    my @retVal;
+    while ($fh->next) {
+        push @retVal, [$fh->id, '', $fh->left];
+    }
+    return \@retVal;
+}
 
 =head3 auth_header
 
-    my $header = auth_header($user, $pass);
+    my $header = RASTlib::auth_header($user, $pass);
 
 Create an authorization header for HTTP requests from the specified user ID and password.
 
