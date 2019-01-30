@@ -80,9 +80,13 @@ The following fields are usually passed in by the client.
 
 The number of distinct roles found in the genome.
 
+=item hypoCount
+
+The total number of hypothetical protein-encoding genes found in the genome.
+
 =item pegCount
 
-The total number of protein-encoding genes found in the genome.
+The total number of non-hypothetical protein-encoding genes found in the genome.
 
 =item nameMap
 
@@ -316,7 +320,7 @@ sub CreateFromPatric {
                 \@fCols);
         # These are used to count the pegs and roles.
         my %ckHash;
-        my $pegCount = 0;
+        my ($pegCount, $hypoCount) = (0, 0);
         # Build the role, protein, and location hashes in here.
         my (%roles, %proteins, %locs);
         for my $featureTuple (@$featureTuples) {
@@ -324,7 +328,11 @@ sub CreateFromPatric {
             # Note that some of these will be undef if we are at a low detail level.
             my ($fid, $function, $aaLen, $contig, $start, $len, $dir, $prot) = @$featureTuple;
             if ($fid =~ /\.peg\./) {
-                $pegCount++;
+                if (SeedUtils::hypo($function)) {
+                    $hypoCount++;
+                } else {
+                    $pegCount++;
+                }
             }
             # Only features with functions matter to us.
             if ($function) {
@@ -372,6 +380,7 @@ sub CreateFromPatric {
         $retVal{$genome}{roleFids} = \%roles;
         # Store the role counts.
         $retVal{$genome}{pegCount} = $pegCount;
+        $retVal{$genome}{hypoCount} = $hypoCount;
         $retVal{$genome}{roleCount} = scalar keys %ckHash;
         # Compute the good-seed flag.
         if (! $seedCount) {
@@ -806,13 +815,26 @@ sub id {
 
     my $genomeID = $geo->pegCount;
 
-Return the total number of protein-encoding genes in this genome.
+Return the total number of non-hypothetical protein-encoding genes in this genome.
 
 =cut
 
 sub pegCount {
     my ($self) = @_;
     return $self->{pegCount};
+}
+
+=head3 hypoCount
+
+    my $genomeID = $geo->hypoCount;
+
+Return the total number of hypothetical protein-encoding genes in this genome.
+
+=cut
+
+sub hypoCount {
+    my ($self) = @_;
+    return $self->{hypoCount};
 }
 
 =head3 roleCount
@@ -2090,7 +2112,7 @@ sub _BuildGeo {
     my $seedCount = 0;
     my $goodSeed = 1;
     # We need a hash to count role checksums and a counter for PEGs found.
-    my $pegCount = 0;
+    my ($pegCount, $hypoCount) = (0, 0);
     my %ckHash;
     # Create the role tables.
     my (%roles, %proteins, %locs);
@@ -2099,8 +2121,12 @@ sub _BuildGeo {
         $stats->Add(featureFoundFile => 1);
         my $fid = $feature->{id};
         my $function = $feature->{function};
-        if ($feature->{feature_type} =~ /^CDS|peg/) {
-            $pegCount++;
+        if ($feature->{type} =~ /^CDS|peg/) {
+            if (! $function || SeedUtils::hypo($function)) {
+                $hypoCount++;
+            } else {
+                $pegCount++;
+            }
         }
         # Only features with functions matter to us.
         if ($function) {
@@ -2156,6 +2182,7 @@ sub _BuildGeo {
     $retVal->{roleFids} = \%roles;
     $retVal->{roleCount} = scalar keys %ckHash;
     $retVal->{pegCount} = $pegCount;
+    $retVal->{hypoCount} = $hypoCount;
     # Compute the good-seed flag.
     if (! $seedCount) {
         $stats->Add(seedNotFound => 1);

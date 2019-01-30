@@ -41,7 +41,9 @@
 </tr><tr>
 <th>Total Distinct Roles</th><td>[% g.tot_roles %]</td>
 </tr><tr>
-<th>Number of Protein-Encoding Genes</th><td>[% g.tot_pegs %]</td>
+<th>Protein-Encoding Genes with Functional Assignment</th><td>[% g.tot_funs %]</td>
+</tr><tr>
+<th>Protein-Encoding Genes without Functional Assignment</th><td>[% g.tot_hypos %]</td>
 [% IF g.coverage %]
 </tr><tr>
 <th>Mean Coverage</th><td>[% g.coverage %]</td>
