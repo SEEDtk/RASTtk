@@ -283,6 +283,14 @@ A style tag for the good-seed cell, or a null string.
 
 The quality score for the bin.
 
+=item tot_pegs
+
+The total number of protein-encoding genes in the bin's genome.
+
+=item tot_roles
+
+The total number of distinct roles in the bin's genome.
+
 =back
 
 =item bad
@@ -590,6 +598,9 @@ sub Detail {
     }
     # Store the PPR count in the main descriptor.
     $gThing{ppr} = $pprs;
+    # Store the role counts.
+    $gThing{tot_pegs} = $geo->pegCount;
+    $gThing{tot_roles} = $geo->roleCount;
     # Now we need to create the contigs structure.
     my $contigCountH = $geo->contigReport;
     my @contigList = sort { $geo->contigLen($b) <=> $geo->contigLen($a) } keys %$contigCountH;

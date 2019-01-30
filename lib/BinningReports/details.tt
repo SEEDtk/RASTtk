@@ -38,6 +38,10 @@
 <th>Underpresent Roles</th><td>[% g.under_roles %]</td>
 </tr><tr>
 <th>Predicted Roles</th><td>[% g.pred_roles %]</td>
+</tr><tr>
+<th>Total Distinct Roles</th><td>[% g.tot_roles %]</td>
+</tr><tr>
+<th>Number of Protein-Encoding Genes</th><td>[% g.tot_pegs %]</td>
 [% IF g.coverage %]
 </tr><tr>
 <th>Mean Coverage</th><td>[% g.coverage %]</td>

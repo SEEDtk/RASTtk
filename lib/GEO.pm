@@ -76,6 +76,14 @@ The following fields are usually passed in by the client.
 
 =over 4
 
+=item roleCount
+
+The number of distinct roles found in the genome.
+
+=item pegCount
+
+The total number of protein-encoding genes found in the genome.
+
 =item nameMap
 
 Reference to a hash that maps role IDs to role names.
@@ -112,7 +120,7 @@ Reference to a hash that maps contig IDs to the relevant sequence IDs in PATRIC.
 
 =item gtoFile
 
-The absolute file name of the GTO file from which this object was created.
+The absolute file name of the GTO file from which this object was created (if any).
 
 =item quality
 
@@ -306,18 +314,25 @@ sub CreateFromPatric {
         _log($logH, "Reading features for $genome.\n");
         my $featureTuples = P3Utils::get_data($p3, feature => [['eq', 'genome_id', $genome]],
                 \@fCols);
+        # These are used to count the pegs and roles.
+        my %ckHash;
+        my $pegCount = 0;
         # Build the role, protein, and location hashes in here.
         my (%roles, %proteins, %locs);
         for my $featureTuple (@$featureTuples) {
             $stats->Add(featureFoundPatric => 1);
             # Note that some of these will be undef if we are at a low detail level.
             my ($fid, $function, $aaLen, $contig, $start, $len, $dir, $prot) = @$featureTuple;
+            if ($fid =~ /\.peg\./) {
+                $pegCount++;
+            }
             # Only features with functions matter to us.
             if ($function) {
                 my @roles = SeedUtils::roles_of_function($function);
                 my $mapped = 0;
                 for my $role (@roles) {
                     my $checkSum = RoleParse::Checksum($role);
+                    $ckHash{$checkSum}++;
                     $stats->Add(roleFoundPatric => 1);
                     my $rID = $cMap->{$checkSum};
                     if (! $rID) {
@@ -355,6 +370,9 @@ sub CreateFromPatric {
         }
         # Store the role map.
         $retVal{$genome}{roleFids} = \%roles;
+        # Store the role counts.
+        $retVal{$genome}{pegCount} = $pegCount;
+        $retVal{$genome}{roleCount} = scalar keys %ckHash;
         # Compute the good-seed flag.
         if (! $seedCount) {
             $stats->Add(seedNotFound => 1);
@@ -782,6 +800,32 @@ Return the ID of this genome.
 sub id {
     my ($self) = @_;
     return $self->{id};
+}
+
+=head3 pegCount
+
+    my $genomeID = $geo->pegCount;
+
+Return the total number of protein-encoding genes in this genome.
+
+=cut
+
+sub pegCount {
+    my ($self) = @_;
+    return $self->{pegCount};
+}
+
+=head3 roleCount
+
+    my $genomeID = $geo->roleCount;
+
+Return the number of distinct roles in this genome.
+
+=cut
+
+sub roleCount {
+    my ($self) = @_;
+    return $self->{roleCount};
 }
 
 =head3 lineage
@@ -2045,6 +2089,9 @@ sub _BuildGeo {
     }
     my $seedCount = 0;
     my $goodSeed = 1;
+    # We need a hash to count role checksums and a counter for PEGs found.
+    my $pegCount = 0;
+    my %ckHash;
     # Create the role tables.
     my (%roles, %proteins, %locs);
     _log($logH, "Processing features for $genome.\n");
@@ -2052,6 +2099,9 @@ sub _BuildGeo {
         $stats->Add(featureFoundFile => 1);
         my $fid = $feature->{id};
         my $function = $feature->{function};
+        if ($feature->{feature_type} =~ /^CDS|peg/) {
+            $pegCount++;
+        }
         # Only features with functions matter to us.
         if ($function) {
             my @roles = SeedUtils::roles_of_function($function);
@@ -2059,6 +2109,7 @@ sub _BuildGeo {
             my $prot = $feature->{protein_translation};
             for my $role (@roles) {
                 my $checkSum = RoleParse::Checksum($role);
+                $ckHash{$checkSum}++;
                 $stats->Add(roleFoundFile => 1);
                 my $rID = $cMap->{$checkSum};
                 if (! $rID) {
@@ -2101,8 +2152,10 @@ sub _BuildGeo {
             }
         }
     }
-    # Store the role map.
+    # Store the role map and statistics.
     $retVal->{roleFids} = \%roles;
+    $retVal->{roleCount} = scalar keys %ckHash;
+    $retVal->{pegCount} = $pegCount;
     # Compute the good-seed flag.
     if (! $seedCount) {
         $stats->Add(seedNotFound => 1);
