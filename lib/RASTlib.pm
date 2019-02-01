@@ -94,6 +94,10 @@ C<QuickData> is used.  The path must be fully-formed, with a leading slash and t
 
 The sleep interval in seconds while waiting for RAST to complete. The default is C<60>.
 
+=item noIndex
+
+If TRUE, the genome will not be indexed in PATRIC.
+
 =back
 
 =item RETURN
@@ -179,6 +183,10 @@ C<QuickData> is used.  The path must be fully-formed, with a leading slash and t
 If specified, an authorization header containing the user's credentials.  In this case, the B<user> and
 B<password> options are ignored.
 
+=item noIndex
+
+If TRUE, the genome will not be indexed in PATRIC.
+
 =back
 
 =item RETURN
@@ -209,6 +217,7 @@ sub Submit {
     my $domain = $options{domain} // 'B';
     my $geneticCode = $options{geneticCode} // 11;
     my $path = $options{path};
+    my $noIndex = $options{noIndex};
     # Create the contig string.
     my $contigString = join("", map { ">$_->[0] $_->[1]\n$_->[2]\n" } @$contigs );
     # Fix up the name.
@@ -223,6 +232,9 @@ sub Submit {
     );
     if ($path) {
         $parms{path} = "$path/$name";
+    }
+    if ($noIndex) {
+        $parms{skip_indexing} = 1;
     }
     my $url = URI->new(RAST_URL . '/submit/GenomeAnnotation');
     $url->query_form(%parms);
