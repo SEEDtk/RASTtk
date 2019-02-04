@@ -98,6 +98,10 @@ The sleep interval in seconds while waiting for RAST to complete. The default is
 
 If TRUE, the genome will not be indexed in PATRIC.
 
+=item robust
+
+If TRUE, errors will return C<undef> instead of failing outright.  A warning message will be printed to STDERR about the error,
+
 =back
 
 =item RETURN
@@ -119,13 +123,18 @@ sub Annotate {
     my $header = auth_header($options{user}, $options{password});
     # Submit the job.
     my $jobID = Submit($contigs, $taxonID, $name, %options, header => $header);
-    warn "Rast job ID is $jobID.\n";
-    # Begin spinning for a completion status.
-    while (! check($jobID, $header)) {
-        sleep $sleepInterval;
+    if ($jobID) {
+        print STDERR "Rast job ID is $jobID.\n";
+        # Begin spinning for a completion status.
+        while (! check($jobID, %options, header => $header)) {
+            sleep $sleepInterval;
+        }
+        # Get the results.
+        $retVal = retrieve($jobID, $header);
+        if (! $retVal && ! $options{robust}) {
+            die "Error retrieving RAST job $jobID.";
+        }
     }
-    # Get the results.
-    $retVal = retrieve($jobID, $header);
     # Return the GTO built.
     return $retVal;
 }
@@ -187,6 +196,10 @@ B<password> options are ignored.
 
 If TRUE, the genome will not be indexed in PATRIC.
 
+=item robust
+
+If TRUE, errors will return C<undef> instead of failing outright.  A warning message will be printed to STDERR about the error,
+
 =back
 
 =item RETURN
@@ -245,7 +258,12 @@ sub Submit {
     my $ua = LWP::UserAgent->new();
     my $response = $ua->request($request);
     if ($response->code ne 200) {
-        die "Error response for RAST submisssion: " . $response->message;
+        my $message = "Error response for RAST submisssion: " . $response->message;
+        if (! $options{robust}) {
+            die $message;
+        } else {
+            print STDERR "$message\n";
+        }
     } else {
         # Get the job ID.
         $retVal = $response->content;
@@ -257,7 +275,7 @@ sub Submit {
 
 =head3 check
 
-    my $completed = RASTlib::check($jobID, $user, $pass);
+    my $completed = RASTlib::check($jobID, %options);
 
 Return TRUE if the specified RAST job has completed, else FALSE. An error will be thrown if the job has failed.
 
@@ -267,30 +285,49 @@ Return TRUE if the specified RAST job has completed, else FALSE. An error will b
 
 ID of the job to check.
 
+=item options
+
+A hash containing one or more of the following keys.
+
+=over 8
+
 =item user
 
-The RAST user name, or alternatively, a pre-computed authorization header from L</auth_header>.
+The RAST user name.  If omitted, a stored value is found in a configuration file.
 
 =item password
 
-The RAST password.
+The RAST password.  If omitted, a stored value is found in a configuration file.
+
+=item header
+
+If specified, an authorization header containing the user's credentials.  In this case, the B<user> and
+B<password> options are ignored.
+
+=item robust
+
+If TRUE, errors will return TRUE instead of failing outright.  A warning message will be printed to STDERR about the error,
+
+=back
 
 =item RETURN
 
-Returns TRUE if the job has completed, else FALSE.
+Returns C<1> if the job has completed, C<-1> if it has failed, and C<0> if it is in progress.
 
 =back
 
 =cut
 
 sub check {
-    my ($jobID, $user, $pass) = @_;
+    my ($jobID, %options) = @_;
     # This will be the return value.
     my $retVal = 0;
     # Check for an authorization header.
-    my $header = $user;
-    if (ref $header ne 'HTTP::Headers') {
+    my $header = $options{header};
+    if (! $header) {
         $header = HTTP::Headers->new(Content_Type => 'text/plain');
+        my $user = $options{user};
+        my $pass = $options{password};
         my $userURI = "$user\@patricbrc.org";
         $header->authorization_basic($userURI, $pass);
     }
@@ -301,7 +338,13 @@ sub check {
     my $ua = LWP::UserAgent->new();
     my $response = $ua->request($request);
     if ($response->code ne 200) {
-        die "Error response for RAST status: " . $response->message;
+        my $message = "Error response for RAST status: " . $response->message;
+        if (! $options{robust}) {
+            die $message;
+        } else {
+            print STDERR "$message\n";
+            $retVal = -1;
+        }
     } else {
          my $status = $response->content;
          print STDERR "Status = $status.\n";
@@ -334,7 +377,7 @@ The authorization header returned by L</auth_header>.
 
 =item RETURN
 
-Returns an unblessed L<GenomeTypeObject> for the annotated genome.
+Returns an unblessed L<GenomeTypeObject> for the annotated genome, or C<undef> if an error occurred.
 
 =back
 
@@ -342,22 +385,25 @@ Returns an unblessed L<GenomeTypeObject> for the annotated genome.
 
 sub retrieve {
     my ($jobID, $header) = @_;
+    # This will be the return value.
+    my $retVal;
     # Ask for the GTO from PATRIC.
     my $ua = LWP::UserAgent->new();
     my $url = join("/", RAST_URL, $jobID, 'retrieve');
     my $request = HTTP::Request->new(GET => $url, $header);
     my $response = $ua->request($request);
     if ($response->code ne 200) {
-        die "Error response for RAST retrieval: " . $response->message;
+        print STDERR "Error response for RAST retrieval: " . $response->message;
+    } else {
+        my $json = $response->content;
+        $retVal = SeedUtils::read_encoded_object(\$json);
+        # Add the RAST information to the GTO.
+        my ($userH) = $header->authorization_basic();
+        if ($userH =~ /^(.+)\@patricbrc.org/) {
+            $userH = $1;
+        }
+        $retVal->{rast_specs} = { id => $jobID, user => $userH };
     }
-    my $json = $response->content;
-    my $retVal = SeedUtils::read_encoded_object(\$json);
-    # Add the RAST information to the GTO.
-    my ($userH) = $header->authorization_basic();
-    if ($userH =~ /^(.+)\@patricbrc.org/) {
-        $userH = $1;
-    }
-    $retVal->{rast_specs} = { id => $jobID, user => $userH };
     # Return it.
     return $retVal;
 }
