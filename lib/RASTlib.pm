@@ -351,7 +351,11 @@ sub check {
          if ($status eq 'completed') {
              $retVal = 1;
          } elsif ($status ne 'in-progress' && $status ne 'queued') {
-             die "Error status for RAST: $status.";
+             if (! $options{robust}) {
+                die "Error status for RAST: $status.";
+             } else {
+                 $retVal = -1;
+             }
          }
     }
     # Return the status.
@@ -375,6 +379,10 @@ The ID of the job that annotated the genome.
 
 The authorization header returned by L</auth_header>.
 
+=item raw (optional)
+
+If TRUE, then the GTO is returned as a JSON string instead of an object.
+
 =item RETURN
 
 Returns an unblessed L<GenomeTypeObject> for the annotated genome, or C<undef> if an error occurred.
@@ -384,7 +392,7 @@ Returns an unblessed L<GenomeTypeObject> for the annotated genome, or C<undef> i
 =cut
 
 sub retrieve {
-    my ($jobID, $header) = @_;
+    my ($jobID, $header, $raw) = @_;
     # This will be the return value.
     my $retVal;
     # Ask for the GTO from PATRIC.
@@ -396,7 +404,11 @@ sub retrieve {
         print STDERR "Error response for RAST retrieval: " . $response->message;
     } else {
         my $json = $response->content;
-        $retVal = SeedUtils::read_encoded_object(\$json);
+        if ($raw) {
+            $retVal = $json;
+        } else {
+            $retVal = SeedUtils::read_encoded_object(\$json);
+        }
         # Add the RAST information to the GTO.
         my ($userH) = $header->authorization_basic();
         if ($userH =~ /^(.+)\@patricbrc.org/) {
