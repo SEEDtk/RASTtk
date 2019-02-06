@@ -34,7 +34,7 @@ use P3Utils;
 use Stats;
 use File::Copy::Recursive;
 
-
+$| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('genome1 genome2 ... genomeN', P3Utils::ih_options(), P3Utils::col_options(),
         ['outDir|o=s', 'output directory name', { default => '.'} ],
