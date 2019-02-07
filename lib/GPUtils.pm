@@ -356,7 +356,35 @@ Returns TRUE (C<1>) if the genome is good, else FALSE (C<0>).
 
 sub good_seed {
     my ($gto) = @_;
-    my $retVal = 0;
+    my $prot = get_seed($gto);
+    return ($prot ? 1 : 0);
+}
+
+
+=head3 get_seed
+
+    my $prot = GPUtils::get_seed($gto);
+
+Return the protein sequence for a genome's seed protein if it occurs exactly once in the specified genome and its length is within
+acceptable limits, else C<undef>
+
+=over 4
+
+=item gto
+
+A L<GenomeTypeObject> for the specified genome.
+
+=item RETURN
+
+Returns the seed protein if the genome is good, else C<undef>.
+
+=back
+
+=cut
+
+sub get_seed {
+    my ($gto) = @_;
+    my $retVal;
     my $flist = role_to_features($gto, 'Phenylalanyl-tRNA synthetase alpha chain');
     if (scalar @$flist == 1) {
         my $domain = $gto->{domain};
@@ -367,7 +395,7 @@ sub good_seed {
         my $aa = $flist->[0]{protein_translation};
         my $aaLen = length $aa;
         if ($aaLen >= $min && $aaLen <= $max) {
-            $retVal = 1;
+            $retVal = $aa;
         }
     }
     return $retVal;
