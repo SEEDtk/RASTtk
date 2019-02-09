@@ -30,6 +30,11 @@ Role name of the protein to use. The default is C<Phenylalanyl-tRNA synthetase a
 If specified, a C<6.1.1.20.dna.fasta> file will be produced in addition to the others, containing
 the DNA sequences of the proteins.
 
+=item binning
+
+If specified, a seed protein database suitable for binning will be produced with the specified name.
+(This is similar to the C<dna> option, but produces the comments in a slightly different format).
+
 =item debug
 
 If specified, status messages for the PATRIC3 API will be displayed.
@@ -55,6 +60,7 @@ my $opt = P3Utils::script_opts('outDir', P3Utils::col_options(), P3Utils::ih_opt
         ['clear', 'clear the output directory if it exists'],
         ['prot=s', 'name of the protein to use', { default => 'Phenylalanyl-tRNA synthetase alpha chain' }],
         ['dna', 'produce a DNA FASTA file in addition to the default files'],
+        ['binning=s', 'produce a SEED protein binning database in the named file'],
         ['debug', 'show P3 API messages']
         );
 # Get the output directory name.
@@ -73,6 +79,7 @@ my $dnaFile;
 if ($opt->dna) {
     $dnaFile = "$outDir/6.1.1.20.dna.fasta";
 }
+my $binning = $opt->binning;
 # Create the statistics object.
 my $stats = Stats->new();
 # Create a filter from the protein name.
@@ -81,18 +88,22 @@ my @filter = (['eq', 'product', $protName]);
 # Save the checksum for the seed role.
 my $roleCheck = RoleParse::Checksum($protName);
 # Create a list of the columns we want.
-
 my @cols = qw(genome_id genome_name patric_id aa_sequence_md5 product);
-if ($dnaFile) {
+my $dnaMode;
+if ($dnaFile || $binning) {
     push @cols, 'na_sequence_md5';
+    $dnaMode = 1;
 }
 # Open the output files.
 print "Setting up files.\n";
 open(my $gh, '>', "$outDir/complete.genomes") || die "Could not open genome output file: $!";
 open(my $fh, '>', "$outDir/6.1.1.20.fasta") || die "Could not open FASTA output file: $!";
-my $nh;
+my ($bh, $nh);
 if ($dnaFile) {
     open($nh, '>', $dnaFile) || die "Could not open DNA output file: $!";
+}
+if ($binning) {
+    open($bh, '>', $binning) || die "Could not open binning output file: $!";
 }
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
@@ -175,13 +186,19 @@ for my $genome (keys %proteins) {
     } else {
         print $gh "$genome\t$name\n";
         print $fh ">$genome\n$seq\n";
-        if ($nh && $dnaMd5) {
+        if ($dnaMd5) {
             my $dna = $md5Hash->{$dnaMd5};
             if (! $dna) {
                 $stats->Add(missingDna => 1);
             } else {
-                print $nh ">$genome\n$dna\n";
-                $stats->Add(dnaOut => 1);
+                if ($nh) {
+                    print $nh ">$genome\n$dna\n";
+                    $stats->Add(dnaOut => 1);
+                }
+                if ($bh) {
+                    print $bh ">fig|$genome.peg.X $genome\t$name\n$dna\n";
+                    $stats->Add(binDnaOut => 1);
+                }
             }
         }
     }
