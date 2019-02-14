@@ -1151,7 +1151,7 @@ sub ih_options {
 
 =head3 match
 
-    my $flag = P3Utils::match($pattern, $key);
+    my $flag = P3Utils::match($pattern, $key, %options);
 
 Test a match pattern against a key value and return C<1> if there is a match and C<0> otherwise.
 If the key is numeric, a numeric equality match is performed. If the key is non-numeric, then
@@ -1162,11 +1162,23 @@ The goal here is to more or less replicate the SOLR B<eq> operator.
 
 =item pattern
 
-The pattern to be matched.
+The pattern to be matched.  If C<undef>, then any nonblank key matches.
 
 =item key
 
 The value against which to match the pattern.
+
+=item options
+
+Zero or more of the following keys, which modify the match.
+
+=over 8
+
+=item exact
+
+If TRUE, then non-numeric matches are exact.
+
+=back
 
 =item RETURN
 
@@ -1177,13 +1189,23 @@ Returns C<1> if there is a match, else C<0>.
 =cut
 
 sub match {
-    my ($pattern, $key) = @_;
+    my ($pattern, $key, %options) = @_;
     # This will be the return value.
     my $retVal = 0;
     # Determine the type of match.
-    if ($pattern =~ /^\-?\d+(?:\.\d+)?$/) {
+    if (! defined $pattern) {
+        # Here we have a nonblank match.
+        if (defined $key && $key =~ /\S/) {
+            $retVal = 1;
+        }
+    } elsif ($pattern =~ /^\-?\d+(?:\.\d+)?$/) {
         # Here we have a numeric match.
         if ($pattern == $key) {
+            $retVal = 1;
+        }
+    } elsif ($options{exact}) {
+        # Here we have an exact match.
+        if ($pattern eq $key) {
             $retVal = 1;
         }
     } else {

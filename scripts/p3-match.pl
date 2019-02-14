@@ -26,6 +26,14 @@ If specified, only rows that do not match will be output.
 
 If specified, the name of a file to contain the records that do not match.
 
+=item exact
+
+If specified, even a non-numeric match will be exact.
+
+=item nonblank
+
+If specified, all non-blank column values match and the positional parameter is ignored.
+
 =back
 
 =cut
@@ -36,12 +44,22 @@ use P3Utils;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('match-value', P3Utils::ih_options(), P3Utils::col_options(),
         ['reverse|invert|v', 'output non-matching records'],
-        ['discards=s', 'name of file to contain discarded records']);
+        ['discards=s', 'name of file to contain discarded records'],
+        ['nonblank', 'match all nonblank column values'],
+        ['exact', 'always match exactly, case-sensitive']
+        );
 # Get the reverse-flag.
 my $reverse = ($opt->reverse ? 1 : 0);
+# Get the match options.
+my $nonblank = $opt->nonblank;
+my $exact = $opt->exact // 0;
 # Get the match pattern.
 my ($pattern) = @ARGV;
-die "No match pattern specified." if (! $pattern);
+if ($nonblank) {
+    $pattern = undef;
+} elsif (! $pattern) {
+    die "No match pattern specified.";
+}
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Process the headers and compute the key column index.
@@ -64,7 +82,7 @@ while (! eof $ih) {
         my ($key, $row) = @$couplet;
         # Perform a match. If we have a match and are NOT reversing, or we do NOT have a match and are reversing, we output
         # (XOR condition).
-        if (P3Utils::match($pattern, $key) ^ $reverse) {
+        if (P3Utils::match($pattern, $key, exact => $exact) ^ $reverse) {
             P3Utils::print_cols($row);
         } elsif ($dh) {
             P3Utils::print_cols($row, oh => $dh);
