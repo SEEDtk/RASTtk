@@ -1353,6 +1353,7 @@ sub scores {
     return @retVal;
 }
 
+
 =head3 role_similarity
 
     my $score = $geo->role_similarity($geo2);
@@ -1391,6 +1392,67 @@ sub role_similarity {
     }
     return $retVal;
 }
+
+=head3 uni_similarity
+
+    my $score = $geo->uni_similarity($geo2);
+
+Return the percent of universal roles in common between two genomes.
+
+=over 4
+
+=item geo2
+
+The L<GEO> of the genome to which this one is to be compared.
+
+=item RETURN
+
+Returns the percent of universal roles the two genomes have in common.
+
+=back
+
+=cut
+
+sub uni_similarity {
+    my ($self, $geo2) = @_;
+    my $rHash = $self->uniHash();
+    my $rHash2 = $geo2->uniHash();
+    my $retVal = 0;
+    my $union = scalar keys %$rHash2;
+    for my $role (keys %$rHash) {
+        if ($rHash2->{$role}) {
+            $retVal++;
+        } else {
+            $union++;
+        }
+    }
+    if ($union) {
+        $retVal = $retVal * 100 / $union;
+    }
+    return $retVal;
+}
+
+=head3 uniHash
+
+    my $roleH = $gto->uniHash();
+
+Return a reference to a hash keyed on the IDs of the universal roles in this genome.  A role is universal if it occurs exactly once.
+
+=cut
+
+sub uniHash {
+    my ($self) = @_;
+    my $rHash = $self->{roleFids};
+    my %retVal;
+    for my $role (keys %$rHash) {
+        my $fids = $rHash->{$role};
+        if (scalar(@$fids) == 1) {
+            $retVal{$role} = 1;
+        }
+    }
+    return \%retVal;
+}
+
 
 =head3 UpdateGTO
 
