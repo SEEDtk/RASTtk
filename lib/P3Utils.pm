@@ -53,7 +53,8 @@ use constant OBJECTS => {   genome => 'genome',
                             experiment => 'transcriptomics_experiment',
                             expression => 'transcriptomics_gene',
                             sample => 'transcriptomics_sample',
-                            sequence => 'feature_sequence' };
+                            sequence => 'feature_sequence',
+                            subsystemItem => 'subsystem' };
 
 =head3 FIELDS
 
@@ -71,7 +72,9 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             sample => ['eid', 'expid', 'genes', 'sig_log_ratio', 'sig_z_score', 'pmid', 'organism', 'strain', 'mutant', 'condition', 'timepoint', 'release_date'],
                             expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'],
                             taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank', 'genome_count', 'genome_length_mean'],
-                            sequence => ['md5', 'sequence_type', 'sequence'] };
+                            sequence => ['md5', 'sequence_type', 'sequence'],
+                            subsystemItem => ['id', 'subsystem_name', 'superclass', 'class', 'subclass', 'subsystem_name', 'role_name', 'active',
+                                        'patric_id', 'gene', 'product'] };
 
 =head3 IDCOL
 
@@ -89,7 +92,8 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             sample => 'expid',
                             expression => 'id',
                             taxonomy => 'taxon_id',
-                            sequence => 'md5' };
+                            sequence => 'md5',
+                            subsystemItem => 'id' };
 
 =head3 DERIVED
 
@@ -117,6 +121,8 @@ use constant DERIVED => {
             sample =>   {
                         },
             expression => {
+                        },
+            subsystemItem => {
                         }
 };
 
@@ -136,6 +142,8 @@ use constant DERIVED_MULTI => {
             sample =>   {
                         },
             expression => {
+                        },
+            subsystemItem => {
                         }
 };
 
