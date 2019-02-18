@@ -59,6 +59,14 @@ ID of the current node.
 
 ID of the next node.
 
+=item comment
+
+Comment of the current node.
+
+=item next_comment
+
+Comment of the next node.
+
 =back
 
 =head2 Special Methods
@@ -97,8 +105,9 @@ sub new {
     $retVal->{ih} = $ih;
     # Read the first header.
     my $line = <$ih>;
-    if ($line =~ /^>(\S+)/) {
+    if ($line =~ /^>(\S+)(?:\s+(\S.*))?/) {
         $retVal->{next_id} = $1;
+        $retVal->{next_comment} = $2 // '';
     }
     # Bless and return this object.
     bless $retVal, $class;
@@ -134,9 +143,10 @@ sub next {
             if (! defined $line) {
                 $self->{id} = $self->{next_id};
                 $done = 1;
-            } elsif ($line =~ /^>(\S+)/) {
+            } elsif ($line =~ /^>(\S+)(?:\s+(\S.*))?/) {
                 # Here we have a header for a new record.
                 ($self->{id}, $self->{next_id}) = ($self->{next_id}, $1);
+                ($self->{comment}, $self->{next_comment}) = ($self->{next_comment}, $2);
                 $done = 1;
             } else {
                 # Here we have sequence data.
@@ -178,7 +188,7 @@ sub at_end {
 
 =head3 Write
 
-    $fqhandle->Write($oh);
+    $fqhandle->Write($oh, $comment);
 
 Write the current record to the specified file handle in FASTA format.
 
@@ -190,7 +200,7 @@ An open file handle onto which the current record's sequences should be written.
 
 =item comment (optional)
 
-A comment to add to the output.
+A comment to add to the output.  If omitted and a comment is present in the object, it will be used.
 
 =back
 
@@ -201,6 +211,8 @@ sub Write {
     my $header = $self->id;
     if ($comment) {
         $header .= " $comment";
+    } elsif ($self->{comment}) {
+        $header .= " $self->{comment}";
     }
     print $oh ">$header\n$self->{left}\n";
 }
@@ -297,6 +309,19 @@ Return the right quality string.
 sub rqual {
     my ($self) = @_;
     return $self->{rqual};
+}
+
+=head3 comment
+
+    my $comment = $fqhandle->comment;
+
+Return the current record's comment.
+
+=cut
+
+sub comment {
+    my ($self) = @_;
+    return $self->{comment};
 }
 
 =head3 seqs
