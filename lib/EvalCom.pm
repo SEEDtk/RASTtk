@@ -76,7 +76,7 @@ A L<Stats> object for tracking statistics. If none is specified, one will be cre
 =cut
 
 sub new {
-    my ($class, $checkDir, %options) = @_;
+    my ($class, %options) = @_;
     # Process the options.
     my $stats = $options{stats} // Stats->new();
     my $logH = $options{logH};
@@ -117,7 +117,7 @@ sub Log {
 
 =head3 Choose
 
-    my ($group, $roleH) = $self->Choose($geo);
+    my ($group, $roleH) = $checker->Choose($geo);
 
 Select the evaluation group for this genome.  The group name and the universal role hash are returned.
 
@@ -140,6 +140,21 @@ Returns a two-element list consisting of (0) the name of the evaluation group an
 sub Choose {
     my ($self, $geo) = @_;
     die "Missing Choose function for $self.";
+}
+
+=head2 Query Methods
+
+=head3 stats
+
+    my $stats = $checker->stats;
+
+Return the embedded L<Stats> object.
+
+=cut
+
+sub stats {
+    my ($self) = @_;
+    return $self->{stats};
 }
 
 =head2 Public Manipulation Methods

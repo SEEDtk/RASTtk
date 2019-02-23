@@ -26,6 +26,7 @@ package EvalCom::Tax;
     use FIG_Config;
     use SeedUtils qw();
     use base qw(EvalCom);
+    use Data::Dumper;
 
 =head1 Evaluate Completeness Based on Taxonomic Groupings
 
@@ -138,8 +139,6 @@ sub new {
     }
     # This will be our map of taxonomic group IDs to role hashes.
     my %roleLists;
-    # This will map group IDs to total weight.
-    my %taxSizes;
     # This will map group IDs to names.
     my %taxNames;
     # This will map taxon IDs to group IDs.
@@ -374,7 +373,6 @@ sub Choose {
         $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
         # Get the group data.
-        my $roleHash;
         ($taxGroup, $roleHash) = $self->taxon_data($groupID);
         $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
     }

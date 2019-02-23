@@ -307,7 +307,7 @@ sub CreateFromPatric {
     # Now we retrieve the seed proteins.
     my %protHash;
     my $protTuples = P3Utils::get_data_keyed($p3, feature => [['eq', 'product', 'Phenylalanyl-tRNA synthetase alpha chain']],
-            ['genome_id', 'product', 'aa_sequence']);
+            ['genome_id', 'product', 'aa_sequence'], $genomes);
     for my $protTuple (@$protTuples) {
         my ($genome, $function, $prot) = @$protTuple;
         my @roles = SeedUtils::roles_of_function($function);
