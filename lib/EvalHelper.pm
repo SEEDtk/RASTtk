@@ -21,7 +21,7 @@ package EvalHelper;
     use strict;
     use warnings;
     use EvalCon;
-    use GenomeChecker;
+    use EvalCom::Tax;
     use P3DataAPI;
     use P3Utils;
     use BinningReports;
@@ -126,7 +126,7 @@ sub ProcessGto {
     # Create the completeness helper.
     my $checkDir = $options{checkDir} // "$FIG_Config::global/CheckG";
     my ($nMap, $cMap) = $evalCon->roleHashes;
-    my $evalG = GenomeChecker->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
+    my $evalG = EvalCom::Tax->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
     # Compute the detail level.
     my $detailLevel = (($options{deep} || $options{ref}) ? 2 : 1);
     # Set up the options for creating the GEOs.
@@ -278,7 +278,7 @@ sub Process {
     # Create the completeness helper.
     my $checkDir = $options{checkDir} // "$FIG_Config::global/CheckG";
     my ($nMap, $cMap) = $evalCon->roleHashes;
-    my $evalG = GenomeChecker->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
+    my $evalG = EvalCom::Tax->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
     # Compute the detail level.
     my $detailLevel = (($options{deep} || $options{ref}) ? 2 : 1);
     # Set up the options for creating the GEOs.

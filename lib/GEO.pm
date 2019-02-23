@@ -34,7 +34,7 @@ package GEO;
 
 =head1 Genome Evaluation Object
 
-This object is used by the genome evaluation libraries-- L<EvalCon>, L<GenomeChecker>, L<BinningReports>, and the various scripts that
+This object is used by the genome evaluation libraries-- L<EvalCon>, L<EvalCom::Tax>, L<BinningReports>, and the various scripts that
 use them. Methods are provided to construct the object from a GTO or from web queries to PATRIC itself.
 
 This object has the following fields.
@@ -69,6 +69,10 @@ The taxonomic grouping ID for the genome in question.
 
 Reference to a list of taxonomic grouping IDs, representing the complete lineage of the genome, in order from largest group
 to smallest.
+
+=item seed
+
+Seed protein sequence for the genome in question, if it has one.
 
 =back
 
@@ -196,12 +200,12 @@ Number of predicted roles.
 
 =item consistency_roles
 
-Reference to a hash that maps the ID of each role examined by L<GenomeChecker> to a 2-tuple consisting of (0) the predicted count
+Reference to a hash that maps the ID of each role examined by L<EvalCon> to a 2-tuple consisting of (0) the predicted count
 and (1) the actual count.
 
 =item completeness_roles
 
-Reference to a hash that maps the ID of each role examined by L<EvalCon> to a 2-tuple consisting of (0) the predicted count and
+Reference to a hash that maps the ID of each role examined by L<EvalCom::Tax> to a 2-tuple consisting of (0) the predicted count and
 (1) the actual count.
 
 =item role_comments
@@ -300,11 +304,28 @@ sub CreateFromPatric {
     _log($logH, "Requesting $gCount genomes from PATRIC.\n");
     my $genomeTuples = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'genome_name',
             'kingdom', 'taxon_id', 'taxon_lineage_ids'], $genomes);
+    # Now we retrieve the seed proteins.
+    my %protHash;
+    my $protTuples = P3Utils::get_data_keyed($p3, feature => [['eq', 'product', 'Phenylalanyl-tRNA synthetase alpha chain']],
+            ['genome_id', 'product', 'aa_sequence']);
+    for my $protTuple (@$protTuples) {
+        my ($genome, $function, $prot) = @$protTuple;
+        my @roles = SeedUtils::roles_of_function($function);
+        for my $role (@roles) {
+            my $checksum = RoleParse::Checksum($role);
+            if ($checksum eq 'WCzieTC/aZ6262l19bwqgw') {
+                my $oldseq = $protHash{$genome} // '';
+                if (length($prot) > length($oldseq)) {
+                    $protHash{$genome} = $prot;
+                }
+            }
+        }
+    }
     # Loop through the genomes found.
     for my $genomeTuple (@$genomeTuples) {
         my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon, lineage => ($lineage || []), binFlag => 0 };
+            taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome} };
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -861,6 +882,19 @@ Return a reference to a list of the IDs in the taxonomic lineage, or C<undef> if
 sub lineage {
     my ($self) = @_;
     return $self->{lineage};
+}
+
+=head3 seed
+
+    my $prot = $geo->seed;
+
+Return the amino acid sequence of the seed protein.
+
+=cut
+
+sub seed {
+    my ($self) = @_;
+    return ($self->{seed} // '');
 }
 
 =head3 roleCounts
@@ -1559,7 +1593,7 @@ information and the quality metrics.
 # Commands for processing the summary file headings.
 use constant HEADINGS => { 'Fine Consistency' => ['fine_consis', 'consistency_roles'],
                            'Coarse Consistency' => ['coarse_consis', 'consisency_roles'],
-                           'Group' => ['taxon', 'completeness_roles'],
+                           'Group' => ['group', 'completeness_roles'],
                            'Completeness' => ['complete', 'completeness_roles'],
                            'Contamination' => ['contam', 'completeness_roles']
 };
@@ -2173,6 +2207,7 @@ sub _BuildGeo {
     }
     my $seedCount = 0;
     my $goodSeed = 1;
+    my $bestSeedLen = 0;
     # We need a hash to count role checksums and a counter for PEGs found.
     my ($pegCount, $hypoCount) = (0, 0);
     my %ckHash;
@@ -2212,6 +2247,9 @@ sub _BuildGeo {
                         if ($rID eq 'PhenTrnaSyntAlph') {
                             $seedCount++;
                             my $aaLen = length $prot;
+                            if ($aaLen > $bestSeedLen) {
+                                $retVal->{seed} = $prot;
+                            }
                             if ($aaLen < $min) {
                                 $stats->Add(seedTooShort => 1);
                                 $goodSeed = 0;

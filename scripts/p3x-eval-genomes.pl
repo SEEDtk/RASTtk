@@ -32,7 +32,7 @@ The following additional command-line options are supported.
 
 =item checkDir
 
-The directory containing the completeness-checker input files (see L<GenomeChecker> for details). The default is
+The directory containing the completeness-checker input files (see L<EvalCom::Tax> for details). The default is
 C<CheckG> in the SEEDtk globals directory.
 
 =item clear
@@ -83,7 +83,7 @@ use P3DataAPI;
 use P3Utils;
 use BinningReports;
 use EvalCon;
-use GenomeChecker;
+use EvalCom::Tax;
 use GEO;
 use File::Copy::Recursive;
 use GPUtils;
@@ -194,7 +194,7 @@ my $evalCon = EvalCon->new_for_script($opt, \*STDERR);
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
-my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
+my $evalG = EvalCom::Tax->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
 my $timer = Math::Round::round(time - $start);
 $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.

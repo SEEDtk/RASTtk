@@ -16,7 +16,7 @@
 #
 
 
-package GenomeChecker;
+package EvalCom::Tax;
 
     use strict;
     use warnings;
@@ -25,13 +25,13 @@ package GenomeChecker;
     use Stats;
     use FIG_Config;
     use SeedUtils qw();
-    use Math::Round;
+    use base qw(EvalCom);
 
-=head1 Data Structures to Check Genomes for Completeness
+=head1 Evaluate Completeness Based on Taxonomic Groupings
 
-This object manages data structures to check genome for completeness and contamination. The algorithm is simple, and
-is based on files created by the scripts L<taxon_analysis.pl>, L<group_marker_roles.pl>, and L<compute_taxon_map.pl>
-plus the global role-mapping file C<roles.in.subsystems>.
+This object manages data structures to check genomes for completeness and contamination based on their taxonomic
+lineage. The algorithm is simple, and is based on files created by the scripts L<taxon_analysis.pl>,
+L<group_marker_roles.pl>, and L<compute_taxon_map.pl> plus the global role-mapping file C<roles.in.subsystems>.
 
 For each taxonomic group, there is a list of roles that appear singly in 97% of the genomes in that taxonomic grouping
 and an associated weight for each. Completeness is measured by the weighted percent of those roles that actually occur.
@@ -78,7 +78,7 @@ A hash mapping each taxonomic group ID to its total role weight.
 
 =head3 new
 
-    my $checker = GenomeChecker->new($checkDir, %options);
+    my $checker = EvalCom::Tax->new($checkDir, %options);
 
 Create a new genome-checker object.
 
@@ -122,8 +122,6 @@ A L<Stats> object for tracking statistics. If none is specified, one will be cre
 sub new {
     my ($class, $checkDir, %options) = @_;
     # Process the options.
-    my $stats = $options{stats} // Stats->new();
-    my $logH = $options{logH};
     my $roleFile = $options{rolesInSubsystems} // "$FIG_Config::global/roles.in.subsystems";
     # We will track the roles of interest in here. When we read roles.in.subsystems we will fill in the role names.
     my %nameMap;
@@ -147,10 +145,13 @@ sub new {
     # This will map taxon IDs to group IDs.
     my %taxonMap;
     # Create and bless the object.
-    my $retVal = { taxNames => \%taxNames, roleMap => $roleMap,
-            nameMap => $nameMap, taxSizes => \%taxSizes, stats => $stats,
-            roleLists => \%roleLists, logH => $logH };
-    bless $retVal, $class;
+    my $retVal = EvalCom::new($class, %options);
+    $retVal->{taxNames} = \%taxNames;
+    $retVal->{roleMap} = $roleMap;
+    $retVal->{nameMap} = $nameMap;
+    $retVal->{roleLists} = \%roleLists;
+    # Get the stats.
+    my $stats = $retVal->stats;
     # Get the roles.tbl file.
     $retVal->Log("Processing weighted.tbl.\n");
     open(my $rh, "<$checkDir/weighted.tbl") || die "Could not open weighted.tbl in $checkDir: $!";
@@ -158,7 +159,6 @@ sub new {
     while (! eof $rh) {
         my ($taxon, $size, $name) = ScriptUtils::get_line($rh);
         $taxNames{$taxon} = $name;
-        $taxSizes{$taxon} = $size;
         $stats->Add(taxGroupIn => 1);
         # Now we loop through the roles.
         my $done;
@@ -218,30 +218,6 @@ sub new {
     return $retVal;
 }
 
-
-=head3 Log
-
-    $checker->Log($message);
-
-Write a message to the log stream, if it exists.
-
-=over 4
-
-=item message
-
-Message string to write.
-
-=back
-
-=cut
-
-sub Log {
-    my ($self, $message) = @_;
-    my $logH = $self->{logH};
-    if ($logH) {
-        print $logH $message;
-    }
-}
 
 =head2 Query Methods
 
@@ -346,66 +322,41 @@ sub taxon_data {
 }
 
 
-=head2 Public Manipulation Methods
+=head2 Virtual Overrides
 
-=head3 Check
+=head3 Choose
 
-    my $dataH = $checker->Check($geo);
+    my ($group, $roleH) = $self->Choose($geo);
 
-Check a L<GEO> for completeness and contamination. A hash of the problematic roles will be returned as well.
+Select the evaluation group for this genome.  The group name and the universal role hash are returned.
+
+This method MUST be overridden by the subclass.
 
 =over 4
 
 =item geo
 
-The L<GenomeEvalObject> to be checked.
+The L<GEO> for the genome to evaluate.
 
 =item RETURN
 
-Returns a reference to a hash with the following keys.
-
-=over 8
-
-=item complete
-
-The percent completeness.
-
-=item contam
-
-The percent contamination.
-
-=item extra
-
-The percent of extra genomes. This is an attempt to mimic the checkM contamination value.
-
-=item roleData
-
-Reference to a hash mapping each marker role ID to the number of times it was found.
-
-=item taxon
-
-Name of the taxonomic group used.
-
-=back
+Returns a two-element list consisting of (0) the name of the evaluation group and (1) a hash mapping each universal role ID to its weight.
 
 =back
 
 =cut
 
-sub Check {
+sub Choose {
     my ($self, $geo) = @_;
     # These will be the return values.
     my ($complete, $contam, $multi);
     my $taxGroup = 'root';
+    my $roleHash;
     # Get the statistics object.
     my $stats = $self->{stats};
-    # This hash will count the roles.
-    my %roleData;
-    # Get the role map. We use this to compute role IDs from role names.
-    my $roleMap = $self->{roleMap};
     # Get the hash of role lists.
     my $roleLists = $self->{roleLists};
-    # Compute the appropriate taxonomic group for this GTO and get its role list.
+    # Compute the appropriate taxonomic group for this GEO and get the group's role list.
     my $lineage = $geo->lineage || [];
     my @taxons = @$lineage;
     my $groupID;
@@ -426,104 +377,8 @@ sub Check {
         my $roleHash;
         ($taxGroup, $roleHash) = $self->taxon_data($groupID);
         $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
-        # Fill the roleData hash from the role list.
-        %roleData = map { $_ => 0 } keys %$roleHash;
-        my $markers = scalar keys %roleData;
-        my $size = $self->{taxSizes}{$groupID};
-        $self->Log("$markers markers with total weight $size for group $groupID: $self->{taxNames}{$groupID}.\n");
-        # Get the role counts for the genome.
-        my $countsH = $geo->roleCounts;
-        # Now we count the markers.
-        my ($found, $extra, $total) = (0, 0, 0);
-        for my $roleID (keys %roleData) {
-            my $count = $countsH->{$roleID} // 0;
-            $roleData{$roleID} = $count;
-            if ($count >= 1) {
-                my $weight = $roleHash->{$roleID};
-                $found += $weight;
-                $extra += ($count - 1) * $weight;
-            }
-        }
-        # Compute the percentages.
-        $complete = $found * 100 / $size;
-        $contam = ($extra > 0 ? $extra * 100 / ($found + $extra) : 0);
-        $multi = $extra * 100 / $size;
     }
-    # Return the results.
-    my $retVal = { complete => $complete, contam => $contam, multi => $multi, roleData => \%roleData, taxon => $taxGroup };
-    return $retVal;
-}
-
-=head3 Check2
-
-    my ($complete, $contam, $taxon, $seedFlag) = $checker->Check2($geo, $oh);
-
-This performs the same job as L</Check> (evaluating a genome for completeness and contamination),
-but it returns a list of the key metrics in printable form. If an output file handle is
-provided, it will also write the results to the output file.
-
-=over 4
-
-=item geo
-
-The L<GEO> to be checked.
-
-=item oh (optional)
-
-If specified, an open file handle to which the output should be written. This consists of the labeled metrics
-followed by the (role, predicted, actual) tuples in tab-delimited format.
-
-=item RETURN
-
-Returns a list containing the percent completeness, percent contamination, the name of the taxonomic grouping
-used, and a flag that is 'Y' if the seed protein is good and 'N' otherwise. The two percentages will be rounded
-to the nearest tenth of a percent.
-
-=back
-
-=cut
-
-sub Check2 {
-    my ($self, $geo, $oh) = @_;
-    # Get the stats object.
-    my $stats = $self->{stats};
-    # Do the evaluation and format the output values.
-    my $evalH = $self->Check($geo);
-    my ($complete, $contam, $taxon) = (0, 100, 'N/F');
-    if (defined $evalH->{complete}) {
-        $complete = Math::Round::nearest(0.1, $evalH->{complete} // 0);
-        $contam = Math::Round::nearest(0.1, $evalH->{contam} // 100);
-        $taxon = $evalH->{taxon};
-    }
-    my $seedFlag = ($geo->good_seed ? 'Y' : '');
-    my $roleH = $evalH->{roleData};
-    # Update the statistics.
-    if (! $roleH) {
-        $stats->Add(evalGFailed => 1);
-    } else {
-        $stats->Add(genomeComplete => 1) if GEO::completeX($complete);
-        $stats->Add(genomeClean => 1) if GEO::contamX($contam);
-    }
-    if ($seedFlag) {
-        $stats->Add(genomeGoodSeed => 1);
-    } else {
-        $stats->Add(genomeBadSeed => 1);
-    }
-    if ($oh) {
-        # Output the check results.
-        print $oh "Good Seed: $seedFlag\n";
-        print $oh "Completeness: $complete\n";
-        print $oh "Contamination: $contam\n";
-        print $oh "Group: $taxon\n";
-        # Now output the role counts.
-        if ($roleH) {
-            for my $role (sort keys %$roleH) {
-                my $count = $roleH->{$role};
-                print $oh "$role\t1\t$count\n";
-            }
-        }
-    }
-    return ($complete, $contam, $taxon, $seedFlag);
+    return ($taxGroup, $roleHash);
 }
 
 

@@ -24,7 +24,7 @@ use ScriptUtils;
 use GenomeTypeObject;
 use File::Copy::Recursive;
 use Stats;
-use GenomeChecker;
+use EvalCom::Tax;
 use Math::Round;
 
 =head1 Check Completeness and Contamination for One or More GTOs
@@ -52,7 +52,7 @@ The name of the file containing the role ID mappings. This file is headerless an
 =item workDir
 
 The name of the directory containing the C<roles.tbl> and C<taxon_map.tbl> files produced by the data generation scripts
-(see L<GenomeChecker>). The default is C<CheckG> in the global data directory.
+(see L<EvalCom::Tax>). The default is C<CheckG> in the global data directory.
 
 =item missing
 
@@ -159,7 +159,7 @@ if ($evalFlag && $total > 1) {
 print "$total GTO files found.\n" if ! $quiet;
 print "Creating GTO Checker object.\n";
 my $log = ($quiet ? undef : \*STDOUT);
-my $checker = GenomeChecker->new($workDir, stats => $stats, roleFile => $roleFile, logH => $log);
+my $checker = EvalCom::Tax->new($workDir, stats => $stats, roleFile => $roleFile, logH => $log);
 # Loop through the GTO files.
 my $count = 0;
 for my $gtoFile (@inputs) {

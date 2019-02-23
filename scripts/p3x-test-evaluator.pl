@@ -32,7 +32,7 @@ use strict;
 use P3DataAPI;
 use P3Utils;
 use EvalCon;
-use GenomeChecker;
+use EvalCom::Tax;
 use GEO;
 use File::Copy::Recursive;
 use Bin;
@@ -74,7 +74,7 @@ my $evalCon = EvalCon->new_for_script($opt);
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
-my $evalG = GenomeChecker->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
+my $evalG = EvalCom::Tax->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
 my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => 2, binned => 1);
 # Now we find all the GTOs of interest.
