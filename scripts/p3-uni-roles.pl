@@ -118,7 +118,7 @@ if (! $resume) {
     # Now get all the genomes.
     my $all = P3Utils::get_col($ih, $keyCol);
     # Keep the new ones.
-    $genomes = [map { ! $skip{$_} } @$all];
+    $genomes = [grep { ! $skip{$_} } @$all];
     # Open for appending.
     $oh = IO::File->new(">>$outFile") || die "Could not open $outFile: $!";
 }
