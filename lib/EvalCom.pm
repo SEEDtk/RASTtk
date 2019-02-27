@@ -322,5 +322,46 @@ sub Check2 {
     return ($complete, $contam, $group, $seedFlag);
 }
 
+=head2 Subclass Methods
+
+=head3 read_weights
+
+    my $uniHash = $checker->read_weights($ih);
+
+Read role IDs and weights from the specified input stream and return a universal-role hash.
+
+=over 4
+
+=item ih
+
+An open input file handle.  The universal roles and weights will be read from this stream.
+
+=item RETURN
+
+Returns a reference to a hash mapping each universal role ID to its weight.
+
+=back
+
+=cut
+
+sub read_weights {
+    my ($self, $ih) = @_;
+    my $stats = $self->stats;
+    my %retVal;
+    my $done;
+    while (! $done && ! eof $ih) {
+        my $line = <$ih>;
+        chomp $line;
+        if ($line eq '//') {
+            $done = 1;
+        } else {
+            my ($role, $weight) = split /\t/, $line;
+            $retVal{$role} = $weight;
+            $stats->Add(groupRoleIn => 1);
+        }
+    }
+    $stats->Add(groupWeightsIn => 1);
+    return \%retVal;
+}
 
 1;

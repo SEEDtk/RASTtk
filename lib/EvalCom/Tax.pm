@@ -67,10 +67,6 @@ Handle of a log file for status messages, or C<undef> if no status messages shou
 A hash mapping each taxonomic group ID to a hash of the identifying role IDs and their weights. (In other words, the key of
 the sub-hash is role ID and the value is the role weight).
 
-=item taxSizes
-
-A hash mapping each taxonomic group ID to its total role weight.
-
 =back
 
 =cut
@@ -156,25 +152,17 @@ sub new {
     open(my $rh, "<$checkDir/weighted.tbl") || die "Could not open weighted.tbl in $checkDir: $!";
     # Loop through the taxonomic groups.
     while (! eof $rh) {
-        my ($taxon, $size, $name) = ScriptUtils::get_line($rh);
+        my ($taxon, $name) = ScriptUtils::get_line($rh);
         $taxNames{$taxon} = $name;
         $stats->Add(taxGroupIn => 1);
         # Now we loop through the roles.
-        my $done;
-        my %weights;
-        while (! eof $rh && ! $done) {
-            my ($role, $weight) = ScriptUtils::get_line($rh);
-            if ($role eq '//') {
-                $done = 1;
-            } else {
-                # We need to track the roles in the name map as well as the group's role hash.
-                # Later the name map is used to fill in the role names for the roles we need.
-                $nameMap{$role} = $role;
-                $weights{$role} = $weight;
-                $stats->Add(taxRoleIn => 1);
-            }
+        my $weights = $retVal->read_weights($rh);
+        $roleLists{$taxon} = $weights;
+        # We need to track the roles in the name map as well as the group's role hash.
+        # Later the name map is used to fill in the role names for the roles we need.
+        for my $role (keys %$weights) {
+            $nameMap{$role} = $role;
         }
-        $roleLists{$taxon} = \%weights;
     }
     close $rh; undef $rh;
     my $markerCount = scalar keys %nameMap;
@@ -348,7 +336,6 @@ Returns a two-element list consisting of (0) the name of the evaluation group an
 sub Choose {
     my ($self, $geo) = @_;
     # These will be the return values.
-    my ($complete, $contam, $multi);
     my $taxGroup = 'root';
     my $roleHash;
     # Get the statistics object.

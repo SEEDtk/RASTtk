@@ -47,7 +47,7 @@ $| = 1;
 my $opt = P3Utils::script_opts('outFile', P3Utils::col_options(), P3Utils::ih_options(),
         ['roleFile|rolefile|r=s', 'roles.in.subsystems file containing the roles of interest',
                 { default => "$FIG_Config::global/roles.in.subsystems" }],
-        ['resume=s', 'restart an interrupted job, starting after the specified genome ID']
+        ['resume', 'restart an interrupted job']
         );
 # Get the output file.
 my ($outFile) = @ARGV;
@@ -101,19 +101,24 @@ if (! $resume) {
         P3Utils::print_cols(['genome', 'seed_prot', 'roles'], oh => $oh);
     }
 } else {
-    # Loop until we find the last one processed.
-    my $found;
-    while (! eof $ih && ! $found) {
-        my ($gid) = P3Utils::get_cols($ih, [$keyCol]);
-        $found = ($gid eq $resume);
+    # First, read the old file.
+    print "Reading $outFile for resume processing.\n";
+    open(my $xh, '<', $outFile) || die "Could not open $outFile for input: $!";
+    # Skip the header.
+    my $line = <$xh>;
+    # Memorize the old genomes.
+    my %skip;
+    while (! eof $xh) {
+        $line = <$xh>;
+        my ($genome) = split /\t/, $line;
+        $skip{$genome} = 1;
     }
-    # If we found it, get the rest. Otherwise it's an error.
-    if (! $found) {
-        die "Could not find $resume in input file.";
-    } else {
-        # Get the rest of the genomes.
-        $genomes = P3Utils::get_col($ih, $keyCol);
-    }
+    print scalar(keys %skip) . " genomes already processed.\n";
+    close $xh;
+    # Now get all the genomes.
+    my $all = P3Utils::get_col($ih, $keyCol);
+    # Keep the new ones.
+    $genomes = [map { ! $skip{$_} } @$all];
     # Open for appending.
     $oh = IO::File->new(">>$outFile") || die "Could not open $outFile: $!";
 }

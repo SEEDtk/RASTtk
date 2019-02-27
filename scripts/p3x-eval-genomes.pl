@@ -33,7 +33,8 @@ The following additional command-line options are supported.
 =item checkDir
 
 The directory containing the completeness-checker input files (see L<EvalCom::Tax> for details). The default is
-C<CheckG> in the SEEDtk globals directory.
+C<CheckG> in the SEEDtk globals directory.  If the directory contains a C<REP> file, L<EvalCom::Rep> will be used
+instead, and the REP file must contain the kmer size.
 
 =item clear
 
@@ -84,6 +85,7 @@ use P3Utils;
 use BinningReports;
 use EvalCon;
 use EvalCom::Tax;
+use EvalCom::Rep;
 use GEO;
 use File::Copy::Recursive;
 use GPUtils;
@@ -194,7 +196,17 @@ my $evalCon = EvalCon->new_for_script($opt, \*STDERR);
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
-my $evalG = EvalCom::Tax->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDERR, stats => $stats);
+my %evalOptions = (logH => \*STDERR, stats => $stats);
+my $evalCom;
+my $checkDir = $opt->checkdir;
+if (-s "$checkDir/REP") {
+    open(my $xh, '<', "$checkDir/REP") || die "Could not open REP file: $!";
+    my $k = <$xh>;
+    chomp $k;
+    $evalCom = EvalCom::Rep->new($checkDir, %evalOptions, K => $k);
+} else {
+    $evalCom = EvalCom::Tax->new($checkDir, %evalOptions, roleHashes=> [$nMap, $cMap]);
+}
 my $timer = Math::Round::round(time - $start);
 $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
@@ -340,7 +352,7 @@ eval {
                 open($oh, ">$outFile") || die "Could not open $outFile: $!";
             }
             # Compute the consistency and completeness. This also writes the output file.
-            my ($complete, $contam, $taxon, $seedFlag) = $evalG->Check2($geo, $oh);
+            my ($complete, $contam, $taxon, $seedFlag) = $evalCom->Check2($geo, $oh);
             # Store the evaluation results.
             $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
             # Add this genome to the evalCon matrix.
