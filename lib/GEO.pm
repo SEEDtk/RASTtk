@@ -1382,7 +1382,7 @@ sub scores {
     if (! $qData) {
         @retVal = (0, 0, 0, 100, '');
     } else {
-        @retVal = ($qData->{coarse_consis}, $qData->{fine_consis}, $qData->{complete}, $qData->{contam}, $qData->{taxon});
+        @retVal = ($qData->{coarse_consis}, $qData->{fine_consis}, $qData->{complete}, $qData->{contam}, $qData->{group});
     }
     return @retVal;
 }

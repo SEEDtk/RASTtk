@@ -57,7 +57,7 @@ my $exact = $opt->exact // 0;
 my ($pattern) = @ARGV;
 if ($nonblank) {
     $pattern = undef;
-} elsif (! $pattern) {
+} elsif (! defined $pattern) {
     die "No match pattern specified.";
 }
 # Open the input file.

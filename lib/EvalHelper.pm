@@ -22,6 +22,7 @@ package EvalHelper;
     use warnings;
     use EvalCon;
     use EvalCom::Tax;
+    use EvalCom::Rep;
     use P3DataAPI;
     use P3Utils;
     use BinningReports;
@@ -126,7 +127,16 @@ sub ProcessGto {
     # Create the completeness helper.
     my $checkDir = $options{checkDir} // "$FIG_Config::global/CheckG";
     my ($nMap, $cMap) = $evalCon->roleHashes;
-    my $evalG = EvalCom::Tax->new($checkDir, roleHashes=> [$nMap, $cMap], stats => $stats);
+    my %evalOptions = (stats => $stats);
+    my $evalG;
+    if (-s "$checkDir/REP") {
+        open(my $xh, '<', "$checkDir/REP") || die "Could not open REP file: $!";
+        my $k = <$xh>;
+        chomp $k;
+        $evalG = EvalCom::Rep->new($checkDir, %evalOptions, K => $k);
+    } else {
+        $evalG = EvalCom::Tax->new($checkDir, %evalOptions, roleHashes=> [$nMap, $cMap]);
+    }
     # Compute the detail level.
     my $detailLevel = (($options{deep} || $options{ref}) ? 2 : 1);
     # Set up the options for creating the GEOs.
