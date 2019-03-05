@@ -15,9 +15,11 @@ are indicated by a slash-n (C</n>) at the end of the column index or name. So,
 
 Would indicate two key columns, the second of which is to be sorted numerically.
 
+Use C</p> to sort in PEG order, which means the column contains FIG feature IDs.
+
 To sort in reverse, add C</r> for reverse string sort and C</nr> for reverse numeric sort.
 
-The standard input can be overriddn using the options in L<P3Utils/ih_options>.
+The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
 The following additional options are suppported.
 
@@ -41,6 +43,7 @@ Only include one output line for each key value.
 
 use strict;
 use P3Utils;
+use SeedUtils qw(by_fig_id);
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
@@ -57,7 +60,7 @@ if (! @ARGV) {
     @sortTypes = 0;
 } else {
     for my $sortCol (@ARGV) {
-        if ($sortCol =~ /^(.+)\/(r|n|nr)$/) {
+        if ($sortCol =~ /^(.+)\/(r|n|nr|p|pr)$/) {
             push @sortCols, $1;
             push @sortTypes, $2;
         } else {
@@ -126,6 +129,10 @@ sub tab_cmp {
             $retVal = $b[$i] <=> $a[$i];
         } elsif ($sortTypes[$i] eq 'r') {
             $retVal = $b[$i] cmp $a[$i];
+        } elsif ($sortTypes[$i] eq 'p') {
+            $retVal = by_fig_id($a[$i], $b[$i]);
+        } elsif ($sortTypes[$i] eq 'pr') {
+            $retVal = by_fig_id($b[$i], $a[$i]);
         } else {
             $retVal = $a[$i] cmp $b[$i];
         }

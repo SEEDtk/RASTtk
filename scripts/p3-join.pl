@@ -34,6 +34,15 @@ If specified, the files are assumed to not have headers.
 
 The number of records to read in each group from the first file.  The default is C<10>.
 
+=item only
+
+If specified, a comma-delimited list of column names or indices (1-based) from the second file.  Only these fields will be included in
+the output.
+
+=item nonblank
+
+If specified, lines with blank keys will be removed from the files.
+
 =back
 
 =cut
@@ -46,11 +55,15 @@ my $opt = P3Utils::script_opts('file1 file2', P3Utils::ih_options(),
         ['nohead', 'input files have no headers'],
         ['batchSize=i', 'hidden', { default => 10 }],
         ['key1|k1|1=s', 'key field for file 1', { default => 0 }],
-        ['key2|k2|2=s', 'key field for file 2']
+        ['key2|k2|2=s', 'key field for file 2'],
+        ['only=s', 'columns for file 2'],
+        ['nonblank', 'ignore lines with missing keys']
         );
 # Get the key field parameters.
 my $key1 = $opt->key1;
 my $key2 = $opt->key2 // $key1;
+# Get the nonblank option.
+my $blankOK = ! $opt->nonblank;
 # Get the two file names.
 my ($file1, $file2) = @ARGV;
 if (! $file1) {
@@ -69,14 +82,34 @@ if ($file2) {
 # Compute the key column for file 2.
 my ($headers2) = P3Utils::process_headers($ih, $opt, 1);
 my $col2 = P3Utils::find_column($key2, $headers2);
-# Remove the key column from the headers.
-splice @$headers2, $col2, 1;
+my $file2Cols = [];
+if (! $opt->only) {
+    for (my $i = 0; $i < @$headers2; $i++) {
+        if ($i != $col2) {
+            push @$file2Cols, $i;
+        }
+    }
+} else {
+    my @cols2 = split /,/, $opt->only;
+    (undef, $file2Cols) = P3Utils::find_headers($headers2, file2 => @cols2);
+}
+# Form the second file's kept headers.
+my @head2;
+for my $i (@$file2Cols) {
+    push @head2, $headers2->[$i];
+}
 # Loop through the file, filling the hash.
 while (! eof $ih) {
     my $line = <$ih>;
     my @fields = P3Utils::get_fields($line);
-    my ($key) = splice @fields, $col2, 1;
-    push @{$file2{$key}}, \@fields;
+    my $key = $fields[$col2];
+    if ($key || $blankOK) {
+        my @cols2;
+        for my $i (@$file2Cols) {
+            push @cols2, $fields[$i];
+        }
+        push @{$file2{$key}}, \@cols2;
+    }
 }
 close $ih; undef $ih;
 # Now we open up the first file and get the headers.
@@ -85,7 +118,7 @@ my ($headers1) = P3Utils::process_headers($ih, $opt, 1);
 my $col1 = P3Utils::find_column($key1, $headers1);
 # Output the headers.
 if (! $opt->nohead) {
-    my @outHeaders = (@$headers1, @$headers2);
+    my @outHeaders = (@$headers1, @head2);
     P3Utils::print_cols(\@outHeaders);
 }
 # Loop through the first file, joining with the second file.
