@@ -43,6 +43,10 @@ the output.
 
 If specified, lines with blank keys will be removed from the files.
 
+=item left
+
+If specified, all lines from the first file will be included in the output, even if there is not a matching copy of the second file.
+
 =back
 
 =cut
@@ -57,7 +61,8 @@ my $opt = P3Utils::script_opts('file1 file2', P3Utils::ih_options(),
         ['key1|k1|1=s', 'key field for file 1', { default => 0 }],
         ['key2|k2|2=s', 'key field for file 2'],
         ['only=s', 'columns for file 2'],
-        ['nonblank', 'ignore lines with missing keys']
+        ['nonblank', 'ignore lines with missing keys'],
+        ['left', 'include all lines from first file']
         );
 # Get the key field parameters.
 my $key1 = $opt->key1;
@@ -98,6 +103,11 @@ my @head2;
 for my $i (@$file2Cols) {
     push @head2, $headers2->[$i];
 }
+my (@extra, $left);
+if ($opt->left) {
+    @extra = map { '' } @head2;
+    $left = 1;
+}
 # Loop through the file, filling the hash.
 while (! eof $ih) {
     my $line = <$ih>;
@@ -130,6 +140,10 @@ while (! eof $ih) {
         my $joinList = $file2{$key} // [];
         for my $joinLine (@$joinList) {
             P3Utils::print_cols([@$line, @$joinLine]);
+        }
+        # Check to see if we want to print this line even if there are no corresponding file2 lines.
+        if ($left && ! @$joinList) {
+            P3Utils::print_cols([@$line, @extra]);
         }
     }
 }
