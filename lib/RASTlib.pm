@@ -407,6 +407,9 @@ sub retrieve {
         if ($raw) {
             $retVal = $json;
         } else {
+            if ($json =~ /^<html>/) {
+                print STDERR "HTML response for RAST retrieval: $json.\n";
+            }
             $retVal = SeedUtils::read_encoded_object(\$json);
         }
         # Add the RAST information to the GTO.
