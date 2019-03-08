@@ -149,8 +149,6 @@ sub print_unseen {
         if (! $seenH->{$key}) {
             print $line;
             $seenH->{$key} = 1;
-        } else {
-            print STDERR $line; ##DEBUG
         }
     }
 }
