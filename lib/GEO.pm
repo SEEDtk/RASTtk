@@ -447,7 +447,7 @@ Create a genome evaluation object from an in-memory L<GenomeTypeObject>.
 
 =item gto
 
-A L<GenomeTypeObject> from which the GEO is to be created.
+A L<GenomeTypeObject> from which the GEO is to be created, or the name of a file containing the object in JSON form.
 
 =item options
 
@@ -506,6 +506,10 @@ sub CreateFromGto {
     my $logH = $options{logH};
     my ($nMap, $cMap) = _RoleMaps($options{roleHashes}, $logH, $stats);
     my $p3 = $options{p3} // P3DataAPI->new();
+    # Verify that we have a real GTO.
+    if (! ref $gto) {
+        $gto = GenomeTypeObject->create_from_file($gto);
+    }
     # Create the GEO and bless it.
     my $retVal = _BuildGeo($gto, $p3, $nMap, $cMap, $stats, \%options);
     bless $retVal, $class;
