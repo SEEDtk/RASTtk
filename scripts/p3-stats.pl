@@ -11,7 +11,18 @@ The positional parameter is the name of the column to be analyzed. It must conta
 
 The standard input can be overriddn using the options in L<P3Utils/ih_options>.
 
-Additional command-line options are those given in L<P3Utils/col_options> (to specify the key column).
+Additional command-line options are the following.
+
+=over 4
+
+=item col
+
+The index (1-based) or name of the key column used to divide the file into groups.  The default is C<0>, indicating the
+last column.  If C<none> is specified, then all of the rows are put into a single group.
+
+=item nohead
+
+If specified, then it is assumed there are no headers.
 
 =cut
 
@@ -21,44 +32,59 @@ use P3Utils;
 
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('statCol', P3Utils::col_options(), P3Utils::ih_options(),
+my $opt = P3Utils::script_opts('statCol', P3Utils::ih_options(),
+        ['col|c=s', 'grouping column (or "none")', { default => 0 }],
+        ['nohead', 'input has no headers']
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
-# Read the incoming headers.
-my ($inHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-# Compute the location of the target column.
+# Get the target column spec.
 my ($statCol) = @ARGV;
 if (! defined $statCol) {
     die "No target column specified."
 }
-my $targetCol = P3Utils::find_column($statCol, $inHeaders);
-# Form the full header set and write it out.
-my $colName = ($opt->nohead ? 'key' : $inHeaders->[$keyCol]);
-my @outHeaders = ($colName, qw(count average min max stdev));
-P3Utils::print_cols(\@outHeaders);
+# Read the incoming headers and find the key and target columns.
+my $colName = 'key';
+my ($keyCol, $targetCol);
+if ($opt->nohead) {
+    # Here there is no header line.
+    $targetCol = $statCol - 1;
+    if ($opt->col ne 'none') {
+        $keyCol = $opt->col - 1;
+    }
+} else {
+    my $line = <$ih>;
+    my @headers = P3Utils::get_fields($line);
+    $targetCol = P3Utils::find_column($statCol, \@headers);
+    if ($opt->col ne 'none') {
+        $keyCol = P3Utils::find_column($opt->col, \@headers);
+        $colName = $headers[$keyCol];
+    }
+    # Form the full header set and write it out.
+    my @outHeaders = ($colName, qw(count average min max stdev));
+    P3Utils::print_cols(\@outHeaders);
+}
 # This is our tally hash. For each key value, it will contain [count, sum, min, max, square-sum].
 my %tally;
 # Loop through the input.
 while (! eof $ih) {
-    my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
-    for my $couplet (@$couplets) {
-        my ($key, $line) = @$couplet;
-        my $value = $line->[$targetCol];
-        if (! exists $tally{$key}) {
-            $tally{$key} = [1, $value, $value, $value, $value*$value];
-        } else {
-            my $tallyL = $tally{$key};
-            $tallyL->[0]++;
-            $tallyL->[1] += $value;
-            if ($value < $tallyL->[2]) {
-                $tallyL->[2] = $value;
-            }
-            if ($value > $tallyL->[3]) {
-                $tallyL->[3] = $value;
-            }
-            $tallyL->[4] += $value * $value;
+    my $line = <$ih>;
+    my @fields = P3Utils::get_fields($line);
+    my $value = $fields[$targetCol];
+    my $key = (defined $keyCol ? $fields[$keyCol] : 'all');
+    if (! exists $tally{$key}) {
+        $tally{$key} = [1, $value, $value, $value, $value*$value];
+    } else {
+        my $tallyL = $tally{$key};
+        $tallyL->[0]++;
+        $tallyL->[1] += $value;
+        if ($value < $tallyL->[2]) {
+            $tallyL->[2] = $value;
         }
+        if ($value > $tallyL->[3]) {
+            $tallyL->[3] = $value;
+        }
+        $tallyL->[4] += $value * $value;
     }
 }
 # Now loop through the tally hash, producing output.

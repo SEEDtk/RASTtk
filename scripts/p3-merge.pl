@@ -36,6 +36,10 @@ The output should contain all lines from either file. This is the default.
 
 The output should contain lines from the first file not found in the second. This is mutually exclusive with C<and> and C<diff>.
 
+=item input
+
+If specified, the name of a tab-delimited file containing the names of the files to merge in its first column.
+
 =back
 
 =cut
@@ -47,13 +51,19 @@ use Digest::MD5;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('file1 file2 ... fileN', P3Utils::ih_options(),
         ['nohead', 'input files do not have headers'],
-        ['mode' => hidden => { one_of => [['and', 'output lines in both files'],
-                                          ['or', 'output lines in either file'],
-                                          ['diff', 'output lines only in first']],
-                               default => 'or' }]
+        ['mode' => hidden => { one_of => [['and|all', 'output lines in both files'],
+                                          ['or|union', 'output lines in either file'],
+                                          ['diff|difference|minus', 'output lines only in first']],
+                               default => 'or' }],
+        ['input=s', 'name of file containing input file names']
         );
 # Get the input file names.
 my @files = @ARGV;
+if ($opt->input) {
+    open(my $ih, '<', $opt->input) || die "Could not open file-name input: $!";
+    my $fileList = P3Utils::get_col($ih, 0);
+    push @files, @$fileList;
+}
 # Validate the file names.
 if (! @files) {
     die "At least one file name must be specified.";
