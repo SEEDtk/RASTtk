@@ -92,7 +92,7 @@ for my $genome (@$genomes) {
     if (! $gName) {
         print STDERR "No data found for $genome.\n" if $debug;
     } else {
-        my @line = ($genome, $gName, map { 0 } @$groupCount);
+        my @line = ($genome, $gName, map { 0 } @$groupList);
         for my $group (keys %counts) {
             $line[$groups{$group}] = $counts{$group};
         }
