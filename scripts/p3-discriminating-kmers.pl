@@ -56,6 +56,7 @@ use File::Basename;
 use FastA;
 use TabFile;
 
+$| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('file1 file2 ... fileN', P3Utils::col_options(),
         ['fasta', 'input files are FASTA, not tab-delimited'],
