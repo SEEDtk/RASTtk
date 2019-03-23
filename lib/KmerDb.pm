@@ -467,12 +467,12 @@ sub count_hits {
                 # Translate it.
                 my $psequence = SeedUtils::translate($frame, $xlateH);
                 # Accumulate the hits.
-                $self->accumulate_hits($psequence, $counts);
+                $self->accumulate_hits($psequence, $counts, $stride);
                 # Get the other strand and translate it. The proteins should NOT be mirrored, ever!
                 SeedUtils::rev_comp(\$frame);
                 $psequence = SeedUtils::translate($frame, $xlateH);
                 # Accumulate those hits.
-                $self->accumulate_hits($psequence, $counts);
+                $self->accumulate_hits($psequence, $counts, $stride);
             }
         }
     }
