@@ -395,10 +395,12 @@ sub groups_of {
     # Get the group list. We return an empty list if the kmer is not in the hash.
     my $hash = $kmerH->{$kmer};
     my $retVal;
-    if ($hash) {
-        $retVal = [keys %$hash];
-    } else {
+    if (! $hash) {
         $retVal = [];
+    } elsif ($self->{finalized}) {
+        $retVal = [@$hash];
+    } else {
+        $retVal = [keys %$hash];
     }
     # Return the result.
     return $retVal;

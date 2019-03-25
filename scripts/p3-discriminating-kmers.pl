@@ -88,6 +88,7 @@ for (my $i = 0; $i < $fileCount; $i++) {
         my $name = $groups[$i];
         if (! $name) {
             ($name) = fileparse($file);
+            $name =~ s/\.\w+$//;
             $groups[$i] = $name;
         }
         if (!$groups{$name}) {
