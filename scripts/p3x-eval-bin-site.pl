@@ -99,7 +99,7 @@ for my $sample (@samples) {
 }
 # Create the master page from the template.
 print "Creating master index.\n";
-$master{samples} = [ sort { $b->{good} <=> $a->{good} or $a->{total} <=> $b->{total} or $a cmp $b } @s];
+$master{samples} = [ sort { $b->{good} <=> $a->{good} or $b->{total} <=> $a->{total} or $a cmp $b } @s];
 my $templateEngine = Template->new(ABSOLUTE => 1);
 my $middle = '';
 $templateEngine->process($opt->templates . "/master.tt", \%master, \$middle) || die "Error in HTML template: " . $templateEngine->error();

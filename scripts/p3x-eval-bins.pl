@@ -89,7 +89,7 @@ my @samples;
 if ($opt->recursive) {
     # Here we are processing all the subdirectories.
     opendir(my $dh, $binDir) || die "Could not open directory $binDir: $!";
-    @samples = map { "$binDir/$_" } sort grep { -s "$binDir/$_/bins.rast.json" } readdir $dh;
+    @samples = map { "$binDir/$_" } sort grep { -f "$binDir/$_/bins.rast.json" } readdir $dh;
     closedir $dh;
     print scalar(@samples) . " sample directories found in $binDir.\n";
 } else {
@@ -187,18 +187,18 @@ for my $sample (@samples) {
                 }
             }
         }
+        # Create the output directory.
+        my $outDir = "$sample/Eval";
+        if (! -d $outDir) {
+            File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
+        } else {
+            File::Copy::Recursive::pathempty($outDir) || die "Could not erase $outDir: $!";
+        }
         # Only proceed if we have something to do.
         if (! @binGeos) {
             print "No bins found to evaluate in $sample.\n";
             $stats->Add(sampleEmpty => 1);
         } else {
-            # Create the output directory.
-            my $outDir = "$sample/Eval";
-            if (! -d $outDir) {
-                File::Copy::Recursive::pathmk($outDir) || die "Could not create $outDir: $!";
-            } else {
-                File::Copy::Recursive::pathempty($outDir) || die "Could not erase $outDir: $!";
-            }
             # If we need to do evaluations, we do them here.
             if (@evalGeos) {
                 # Start the predictor matrix for the consistency checker. We use the sample directory
@@ -225,42 +225,42 @@ for my $sample (@samples) {
                     $geo->AddQuality("$outDir/$genome.out");
                 }
             }
-            # Now we need to produce the summary output file and the web pages.
-            open(my $oh, ">$outDir/index.tbl") || die "Could not create summary output file: $!";
-            P3Utils::print_cols(['Sample', 'Bin ID', 'Bin Name', 'Ref ID', 'Ref Name', 'Contigs', 'Base Pairs', 'N50', 'Coarse Consistency', 'Fine Consistency',
-                    'Completeness', 'Contamination', 'Taxonomic Grouping', 'Good PheS', 'Good'], oh => $oh);
-            for my $geo (@binGeos) {
-                my $genome = $geo->id;
-                # Create the detail page.
-                my $editHash;
-                if ($editURL) {
-                    $editHash = { gto => $geo->gtoFile, editScript => $editURL};
-                }
-                my $html = BinningReports::Detail(undef, $binHash, \$detailTT, $geo, $nMap, $editHash);
-                open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
-                print $wh $prefix . "<title>$genome</title></head><body>\n" . $html . $suffix;
-                close $wh;
-                # Create the summary report line.
-                my $metrics = $geo->metrics;
-                my ($coarse, $fine, $complete, $contam, $group) = $geo->scores;
-                my $ref = $geo->bestRef;
-                my ($refID, $refName) = ('', '');
-                if ($ref) {
-                    ($refID, $refName) = ($ref->id, $ref->name);
-                }
-                my $seedFlag = ($geo->good_seed ? 1 : 0);
-                my $goodFlag = ($geo->is_good ? 1 : 0);
-                P3Utils::print_cols([$sName, $genome, $geo->name, $refID, $refName, $geo->contigCount, $metrics->{totlen}, $metrics->{N50}, $coarse,
-                        $fine, $complete, $contam, $group, $seedFlag, $goodFlag], oh => $oh);
-            }
-            close $oh; undef $oh;
-            # Now we need to create the summary page. First we need to create URLs for the bins.
-            my %urlMap = map { $_->id => ($_->id . ".html") } @binGeos;
-            open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
-            my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@binGeos, \%urlMap);
-            print $oh $prefix . "<title>$sample</title></head><body>" . $html . $suffix;
-            close $oh;
         }
+        # Now we need to produce the summary output file and the web pages.
+        open(my $oh, ">$outDir/index.tbl") || die "Could not create summary output file: $!";
+        P3Utils::print_cols(['Sample', 'Bin ID', 'Bin Name', 'Ref ID', 'Ref Name', 'Contigs', 'Base Pairs', 'N50', 'Coarse Consistency', 'Fine Consistency',
+                'Completeness', 'Contamination', 'Taxonomic Grouping', 'Good PheS', 'Good'], oh => $oh);
+        for my $geo (@binGeos) {
+            my $genome = $geo->id;
+            # Create the detail page.
+            my $editHash;
+            if ($editURL) {
+                $editHash = { gto => $geo->gtoFile, editScript => $editURL};
+            }
+            my $html = BinningReports::Detail(undef, $binHash, \$detailTT, $geo, $nMap, $editHash);
+            open(my $wh, ">$outDir/$genome.html") || die "Could not open $genome HTML file: $!";
+            print $wh $prefix . "<title>$genome</title></head><body>\n" . $html . $suffix;
+            close $wh;
+            # Create the summary report line.
+            my $metrics = $geo->metrics;
+            my ($coarse, $fine, $complete, $contam, $group) = $geo->scores;
+            my $ref = $geo->bestRef;
+            my ($refID, $refName) = ('', '');
+            if ($ref) {
+                ($refID, $refName) = ($ref->id, $ref->name);
+            }
+            my $seedFlag = ($geo->good_seed ? 1 : 0);
+            my $goodFlag = ($geo->is_good ? 1 : 0);
+            P3Utils::print_cols([$sName, $genome, $geo->name, $refID, $refName, $geo->contigCount, $metrics->{totlen}, $metrics->{N50}, $coarse,
+                    $fine, $complete, $contam, $group, $seedFlag, $goodFlag], oh => $oh);
+        }
+        close $oh; undef $oh;
+        # Now we need to create the summary page. First we need to create URLs for the bins.
+        my %urlMap = map { $_->id => ($_->id . ".html") } @binGeos;
+        open($oh, ">$outDir/index.html") || die "Could not open summary page for $sample: $!";
+        my $html = BinningReports::Summary($sName, { contigs => "$sName/contigs.fasta" }, $binHash, $summaryTFile, '', \@binGeos, \%urlMap);
+        print $oh $prefix . "<title>$sample</title></head><body>" . $html . $suffix;
+        close $oh;
     }
     $sampDone++;
     print "$sampDone of $sampTot samples processed.\n";
