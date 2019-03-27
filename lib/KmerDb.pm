@@ -47,7 +47,8 @@ the hash. A value of C<0> indicates no kmers will be considered common.
 
 =item kmerHash
 
-Reference to a hash mapping each kmer to a list reference of the groups to which it belongs.
+Reference to a hash mapping each kmer to a hash reference.  The key of the hash is the group ID and the value is the
+number of hits found.
 
 =item groupHash
 
@@ -55,8 +56,7 @@ Reference to a hash mapping each group ID to the group name.
 
 =item finalized
 
-TRUE if the object has been finalized, else FALSE. Finalizing the object removes kmers considered too common
-to be useful.
+TRUE if the object has been finalized, else FALSE. Finalizing the object removes kmers considered not useful.
 
 =item mirror
 
@@ -200,6 +200,47 @@ sub AddGroup {
     $groupHash->{$groupID} = $groupName;
 }
 
+=head3 DeleteGroup
+
+    my $count = $kmerdb->DeleteGroup($groupID);
+
+Delete all kmers belonging to the specified group from the kmer hash.
+
+=over 4
+
+=item groupID
+
+The ID of the group whose kmers should be deleted.
+
+=item RETURN
+
+Returns the number of kmers deleted.
+
+=back
+
+=cut
+
+sub DeleteGroup {
+    my ($self, $groupID) = @_;
+    # Get the kmer hash.
+    my $kHash = $self->{kmerHash};
+    # Get the final flag.  If we are finalized, each kmer points to a list instead of a hash.
+    my $final = $self->{finalized};
+    # This will count the deletions.
+    my $retVal = 0;
+    # Loop through it.
+    my @kmers = keys %$kHash;
+    for my $kmer (@kmers) {
+        my $kVal = $kHash->{$kmer};
+        if ($kVal->{$groupID}) {
+            delete $kHash->{$kmer};
+            $retVal++;
+        }
+    }
+    return $retVal;
+}
+
+
 =head3 Finalize
 
     $kmerdb->Finalize();
@@ -225,9 +266,6 @@ sub Finalize {
         if ($maxFound && $count > $maxFound) {
             # No, it is too common.
             delete $kmerHash->{$kmer};
-        } else {
-            # Yes. Remove the duplicates.
-            $kmerHash->{$kmer} = [keys %$groupHash];
         }
     }
     # Denote this database is finalized.
@@ -263,9 +301,6 @@ sub xref {
     for my $kmer (keys %$kmerHash) {
         # Get this kmer's hash. If we are finalized, we must convert it from a list.
         my $groupHash = $kmerHash->{$kmer};
-        if (ref $groupHash eq 'ARRAY') {
-            $groupHash = map { $_ => 1 } @$groupHash;
-        }
         # Loop through the groups. Note we have a nested loop.
         for (my $i = 0; $i < $n; $i++) {
             my $groupI = $groups[$i];
@@ -305,10 +340,7 @@ sub ComputeDiscriminators {
         my $groupHash = $kmerHash->{$kmer};
         my @groups = keys %$groupHash;
         # Is this kmer in only one group?
-        if (scalar @groups == 1) {
-            # Yes, keep it.
-            $kmerHash->{$kmer} = \@groups;
-        } else {
+        if (scalar @groups > 1) {
             # No, delete it.
             delete $kmerHash->{$kmer};
         }
@@ -397,8 +429,6 @@ sub groups_of {
     my $retVal;
     if (! $hash) {
         $retVal = [];
-    } elsif ($self->{finalized}) {
-        $retVal = [@$hash];
     } else {
         $retVal = [keys %$hash];
     }
@@ -560,7 +590,7 @@ sub accumulate_hits {
         my $kmer = substr($sequence, $i, $kmerSize);
         my $groups = $kmerHash->{$kmer};
         if ($groups) {
-            for my $group (@$groups) {
+            for my $group (keys %$groups) {
                 $counts->{$group}++;
             }
         }
