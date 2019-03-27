@@ -3,7 +3,7 @@
     p3-genome-kmer-hits.pl [options] kmerDB
 
 This script takes as input a list of genome IDs and outputs a table of the number of kmer hits by group in each genome.  The output
-file will be tab-delimited, with the genome ID, the genome name, and then one column per kmer group.
+file will be tab-delimited, with the genome ID, the genome name, and then one line per kmer group (tab, group ID, group name, count).
 
 =head2 Parameters
 
@@ -15,10 +15,6 @@ Additional command-line options are those given in L<P3Utils/col_options> (to ch
 options.
 
 =over 4
-
-=item names
-
-If specified, the output column headers for the kmer counts will be group names.  The default is to use group IDs.
 
 =item prot
 
@@ -59,14 +55,8 @@ my $kmerDB = KmerDb->new(json => $kmerDBfile);
 my $groupList = $kmerDB->all_groups();
 my $groupCount = scalar @$groupList;
 print STDERR "$groupCount kmer groups found.\n";
-# This will be  a hash mapping each group ID to an output column number.
-my %groups;
 # Format the output headers and fill in the group hash.
-my @headers = qw(genome_id genome_name);
-for my $group (@$groupList) {
-    $groups{$group} = scalar @headers;
-    push @headers, ($names ? $kmerDB->name($group) : $group);
-}
+my @headers = qw(genome_id genome_name/group_id group_name hits);
 P3Utils::print_cols(\@headers);
 # Read the incoming headers and get the genome ID key column.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
@@ -88,14 +78,13 @@ for my $genome (@$genomes) {
         $gName = $contig->[1];
         $kmerDB->count_hits($contig->[2], \%counts, $geneticCode);
     }
-    # Write the genome's output line.
+    # Write the genome's output data.
     if (! $gName) {
         print STDERR "No data found for $genome.\n" if $debug;
     } else {
-        my @line = ($genome, $gName, map { 0 } @$groupList);
-        for my $group (keys %counts) {
-            $line[$groups{$group}] = $counts{$group};
+        P3Utils::print_cols([$genome, $gName]);
+        for my $group (sort keys %counts) {
+            P3Utils::print_cols(['', $group, $kmerDB->name($group), $counts{$group}]);
         }
-        P3Utils::print_cols(\@line);
     }
 }
