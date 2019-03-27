@@ -3,7 +3,7 @@
     p3-genome-kmer-hits.pl [options] kmerDB
 
 This script takes as input a list of genome IDs and outputs a table of the number of kmer hits by group in each genome.  The output
-file will be tab-delimited, with the genome ID, the genome name, and then one line per kmer group (tab, group ID, group name, count).
+file will be tab-delimited, with the genomeID, the sequence ID, the group ID, the group name, and the kmer hit count.
 
 =head2 Parameters
 
@@ -19,6 +19,11 @@ options.
 =item prot
 
 If specified, the kmers are assumed to be protein kmers.
+
+=item pegs
+
+If specified, the kmer hits will be counted against the genome's proteins, not the genome itself.  This implies
+C<--prot>.
 
 =item verbose
 
@@ -36,27 +41,35 @@ use KmerDb;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('kmerDB', P3Utils::col_options(), P3Utils::ih_options(),
-        ['names|N', 'use group names for column headers'],
         ['prot', 'kmer database contains proteins'],
-        ['verbose|debug|v', 'print progress to STDERR']
+        ['verbose|debug|v', 'print progress to STDERR'],
+        ['pegs', 'count hits against protein features, not whole genomes']
         );
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Get the options.
-my $names = $opt->names;
-my $geneticCode = ($opt->prot ? 11 : undef);
+my $pegFlag = $opt->pegs;
+my $geneticCode = ($opt->prot && ! $pegFlag ? 11 : undef);
 my $debug = $opt->verbose;
 # Get the kmer database.
 my ($kmerDBfile) = @ARGV;
 print STDERR "Loading kmers from $kmerDBfile.\n" if $debug;
 my $kmerDB = KmerDb->new(json => $kmerDBfile);
-my $groupList = $kmerDB->all_groups();
-my $groupCount = scalar @$groupList;
-print STDERR "$groupCount kmer groups found.\n";
-# Format the output headers and fill in the group hash.
-my @headers = qw(genome_id genome_name/group_id group_name hits);
+# Format the output headers and fill in the group hash.  We also set the query parameters here.
+my ($object, $fields);
+my @headers = qw(genome_id);
+if ($pegFlag) {
+    push @headers, 'peg_id';
+    $object = 'feature';
+    $fields = ['patric_id', 'aa_sequence'];
+} else {
+    push @headers, 'contig_id';
+    $object = 'contig';
+    $fields = ['sequence_id', 'sequence'];
+}
+push @headers, qw(group_id group_name hits);
 P3Utils::print_cols(\@headers);
 # Read the incoming headers and get the genome ID key column.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
@@ -66,25 +79,16 @@ print STDERR scalar(@$genomes) . " genomes found.\n" if $debug;
 # Loop through the input.
 for my $genome (@$genomes) {
     print STDERR "Processing $genome.\n" if $debug;
-    # Get the contigs for this genome.
-    my $contigList = P3Utils::get_data($p3, contig => [['eq','genome_id',$genome]], ['genome_id', 'genome_name', 'sequence']);
-    print STDERR scalar(@$contigList) . " contigs found in genome.\n" if $debug;
-    # The genome name will be put in here.
-    my $gName;
-    # The group counts will be put in here.
-    my %counts;
-    # Loop through the contigs.
-    for my $contig (@$contigList) {
-        $gName = $contig->[1];
-        $kmerDB->count_hits($contig->[2], \%counts, $geneticCode);
-    }
-    # Write the genome's output data.
-    if (! $gName) {
-        print STDERR "No data found for $genome.\n" if $debug;
-    } else {
-        P3Utils::print_cols([$genome, $gName]);
+    # Get the sequences for this genome.
+    my $seqList = P3Utils::get_data($p3, $object => [['eq','genome_id',$genome]], $fields);
+    print STDERR scalar(@$seqList) . " sequences found in genome.\n" if $debug;
+    # Loop through the sequences.
+    for my $seqData (@$seqList) {
+        my %counts;
+        my ($id, $seq) = @$seqData;
+        $kmerDB->count_hits($seq, \%counts, $geneticCode);
         for my $group (sort keys %counts) {
-            P3Utils::print_cols(['', $group, $kmerDB->name($group), $counts{$group}]);
+            P3Utils::print_cols([$genome, $id, $group, $kmerDB->name($group), $counts{$group}]);
         }
     }
 }
