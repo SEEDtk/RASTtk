@@ -147,7 +147,10 @@ sub next {
                 # Here we have a header for a new record.
                 ($self->{id}, $self->{next_id}) = ($self->{next_id}, $1);
                 ($self->{comment}, $self->{next_comment}) = ($self->{next_comment}, $2);
-                $done = 1;
+                # Note we skip empty sequences.
+                if (@seqs) {
+                    $done = 1;
+                }
             } else {
                 # Here we have sequence data.
                 $line =~ s/[\r\n]+$//;
