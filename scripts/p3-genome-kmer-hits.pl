@@ -55,6 +55,9 @@ my $geneticCode = ($opt->prot && ! $pegFlag ? 11 : undef);
 my $debug = $opt->verbose;
 # Get the kmer database.
 my ($kmerDBfile) = @ARGV;
+if (! $kmerDBfile) {
+    die "No KmerDb file specified.";
+}
 print STDERR "Loading kmers from $kmerDBfile.\n" if $debug;
 my $kmerDB = KmerDb->new(json => $kmerDBfile);
 # Format the output headers and fill in the group hash.  We also set the query parameters here.
