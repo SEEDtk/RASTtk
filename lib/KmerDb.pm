@@ -47,8 +47,9 @@ the hash. A value of C<0> indicates no kmers will be considered common.
 
 =item kmerHash
 
-Reference to a hash mapping each kmer to a hash reference.  The key of the hash is the group ID and the value is the
-number of hits found.
+Reference to a hash mapping each kmer to a hash reference.  The key of the hash is the group ID and the value is a
+2-tuple [number of hits found, total distance from hit to end-of-sequence].  After finalization, the second list
+element will be the mean distance.
 
 =item groupHash
 
@@ -164,7 +165,14 @@ sub AddSequence {
     for my $seq (@seqs) {
         for (my $i = 0; $i < $last; $i++) {
             my $kmer = substr($seq, $i, $klen);
-            $kmerHash->{$kmer}{$groupID}++;
+            my $groupHash = $kmerHash->{$kmer};
+            if (! $groupHash) {
+                $groupHash = {};
+                $kmerHash->{$kmer} = $groupHash;
+            }
+            $groupHash->{$groupID} //= [0,0];
+            $groupHash->{$groupID}[0]++;
+            $groupHash->{$groupID}[1] += $i;
         }
     }
     # Process the group name if we got one.
@@ -260,12 +268,15 @@ sub Finalize {
         my $groupHash = $kmerHash->{$kmer};
         my $count = 0;
         for my $group (keys %$groupHash) {
-            $count += $groupHash->{$group};
+            $count += $groupHash->{$group}[0];
         }
         # Are we keeping it? Note we keep everything if $maxFound is zero.
         if ($maxFound && $count > $maxFound) {
             # No, it is too common.
             delete $kmerHash->{$kmer};
+        } else {
+            # Yes, fix the counts.
+            _CleanCounts($groupHash);
         }
     }
     # Denote this database is finalized.
@@ -343,6 +354,9 @@ sub ComputeDiscriminators {
         if (scalar @groups > 1) {
             # No, delete it.
             delete $kmerHash->{$kmer};
+        } else {
+            # Yes, fix the counts.
+            _CleanCounts($groupHash);
         }
     }
     # Denote this database is finalized.
@@ -482,11 +496,6 @@ sub count_hits {
     if (! $genetic_code) {
         # No translation. Accumulate the hits on the forward strand.
         $self->accumulate_hits($nsequence, $counts, $stride);
-        # If we are NOT mirrored, get the other strand and accumulate those hits.
-        if (! $mirror) {
-            SeedUtils::rev_comp($nsequence);
-            $self->accumulate_hits($nsequence, $counts, $stride);
-        }
     } else {
         # Yes. Gget the genetic code.
         my $xlateH = SeedUtils::genetic_code($genetic_code);
@@ -508,6 +517,73 @@ sub count_hits {
             }
         }
     }
+}
+
+=head3 best_group
+
+    my ($groupID, $score) = $kmerdb->best_group($sequence);
+
+Compute the best group for the specified sequence.  The best group is determined by the longest sequence of kmer hits in the proper
+order.  If two groups are tied, no group is returned.
+
+=over 4
+
+=item sequence
+
+The sequence to be examined for kmers.
+
+=item genetic_code
+
+If specified, then the kmers are assumed to be proteins and the incoming sequence DNA.  The specified code will be used to translate
+the DNA to proteins.
+
+=item RETURN
+
+Returns a two-element list, consisting of (0) the best group ID, and (1) the hit score.
+
+=back
+
+=cut
+
+sub best_group {
+    my ($self, $sequence) = @_;
+    # This hash will track the current score for each group.  It will contain a 2-tuple [# hits, last location];
+    my %scores;
+    # Get the kmer length and the hash.
+    my $kmerSize = $self->{kmerSize};
+    my $kmerHash = $self->{kmerHash};
+    # Loop through the kmers.
+    my $n = length($sequence) - $kmerSize;
+    for (my $i = 0; $i <= $n; $i++) {
+        my $kmer = substr($sequence, $i, $kmerSize);
+        my $groups = $kmerHash->{$kmer};
+        if ($groups) {
+            for my $group (keys %$groups) {
+                my $loc = $groups->{$group}[1];
+                if (! $scores{$group}) {
+                    $scores{$group} = [1, $loc]
+                } elsif ($scores{$group}[1] <= $loc) {
+                    $scores{$group}[0]++;
+                    $scores{$group}[1] = $loc;
+                } else {
+                    delete $scores{$group};
+                }
+            }
+        }
+    }
+    # Pick the best score.
+    my $bestGroup = undef;
+    my $bestScore = 0;
+    for my $group (keys %scores) {
+        my $newScore = $scores{$group}[0];
+        if ($newScore > $bestScore) {
+            $bestGroup = $group;
+            $bestScore = $newScore;
+        } elsif ($newScore == $bestScore) {
+            $bestGroup = undef;
+        }
+    }
+    return ($bestGroup, $bestScore);
 }
 
 
@@ -593,6 +669,34 @@ sub accumulate_hits {
             for my $group (keys %$groups) {
                 $counts->{$group}++;
             }
+        }
+    }
+}
+
+=head3 _CleanCounts
+
+    $kmerdb->_CleanCounts(\%gHash);
+
+This will clean up the counts in a kmer-group hash for a finalized database.  Each count is a number of hits and a total distance.
+The total distance is converted to a mean distance.
+
+=over 4
+
+=item gHash
+
+A hash mapping group IDs to 2-tuples.  Each tuple consists of (0) a hit count and (1) the total of the distances from the hit locations
+to the end of the sequence.
+
+=back
+
+=cut
+
+sub _CleanCounts {
+    my ($self, $gHash) = @_;
+    for my $group (keys %$gHash) {
+        my $tuple = $gHash->{$group};
+        if ($tuple->[0]) {
+            $tuple->[1] /= $tuple->[0];
         }
     }
 }
