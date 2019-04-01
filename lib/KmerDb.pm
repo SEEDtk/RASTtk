@@ -539,7 +539,7 @@ the DNA to proteins.
 
 =item RETURN
 
-Returns a two-element list, consisting of (0) the best group ID, and (1) the hit score.
+Returns a three-element list, consisting of (0) the best group ID, (1) the hit score, and (2) the number of hits.
 
 =back
 
@@ -547,8 +547,12 @@ Returns a two-element list, consisting of (0) the best group ID, and (1) the hit
 
 sub best_group {
     my ($self, $sequence) = @_;
-    # This hash will track the current score for each group.  It will contain a 2-tuple [# hits, last location];
+    # This hash will track the current run length for each group.  It will contain a 2-tuple [# hits, last location];
+    my %runs;
+    # This hash contains the length of the longest run for each group.
     my %scores;
+    # This hash contains the hit count for each group.
+    my %hits;
     # Get the kmer length and the hash.
     my $kmerSize = $self->{kmerSize};
     my $kmerHash = $self->{kmerHash};
@@ -559,14 +563,21 @@ sub best_group {
         my $groups = $kmerHash->{$kmer};
         if ($groups) {
             for my $group (keys %$groups) {
+                $hits{$group}++;
                 my $loc = $groups->{$group}[1];
-                if (! $scores{$group}) {
-                    $scores{$group} = [1, $loc]
-                } elsif ($scores{$group}[1] <= $loc) {
-                    $scores{$group}[0]++;
-                    $scores{$group}[1] = $loc;
+                if (! $runs{$group}) {
+                    $runs{$group} = [1, $loc];
+                    if (! $scores{$group}) {
+                        $scores{$group} = 1;
+                    }
+                } elsif ($runs{$group}[1] <= $loc) {
+                    my $score = ++$runs{$group}[0];
+                    $runs{$group}[1] = $loc;
+                    if ($score > $scores{$group}) {
+                        $scores{$group} = $score;
+                    }
                 } else {
-                    delete $scores{$group};
+                    delete $runs{$group};
                 }
             }
         }
@@ -574,16 +585,16 @@ sub best_group {
     # Pick the best score.
     my $bestGroup = undef;
     my $bestScore = 0;
+    my $bestHits = 0;
     for my $group (keys %scores) {
-        my $newScore = $scores{$group}[0];
-        if ($newScore > $bestScore) {
+        my $newScore = $scores{$group};
+        if ($newScore > $bestScore || $newScore == $bestScore && $hits{$group} > $bestHits) {
             $bestGroup = $group;
             $bestScore = $newScore;
-        } elsif ($newScore == $bestScore) {
-            $bestGroup = undef;
+            $bestHits = $hits{$group};
         }
     }
-    return ($bestGroup, $bestScore);
+    return ($bestGroup, $bestScore, $bestHits);
 }
 
 
