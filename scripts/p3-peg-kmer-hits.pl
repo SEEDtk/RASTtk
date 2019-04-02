@@ -50,7 +50,7 @@ print STDERR "Loading kmers from $kmerDBfile.\n" if $debug;
 my $kmerDB = KmerDb->new(json => $kmerDBfile);
 # Format the output headers and fill in the group hash.  We also set the query parameters here.
 my ($object, $fields);
-my @headers = qw(genome_id peg_id group_id group_name hits);
+my @headers = qw(genome_id peg_id group_id group_name score hits);
 P3Utils::print_cols(\@headers);
 # Read the incoming headers and get the genome ID key column.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
@@ -67,9 +67,9 @@ for my $genome (@$genomes) {
     for my $seqData (@$seqList) {
         my %counts;
         my ($id, $seq) = @$seqData;
-        my ($group, $hits) = $kmerDB->best_group($seq);
+        my ($group, $score, $hits) = $kmerDB->best_group($seq);
         if ($group) {
-            P3Utils::print_cols([$genome, $id, $group, $kmerDB->name($group), $hits]);
+            P3Utils::print_cols([$genome, $id, $group, $kmerDB->name($group), $score, $hits]);
         }
     }
 }

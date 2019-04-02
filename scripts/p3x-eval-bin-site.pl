@@ -57,9 +57,11 @@ my ($prefix, $suffix) = BinningReports::build_strings($opt);
 # These structures will contain the data for the master index page.
 my @s;
 my %master = (bad_count => 0, good_count => 0, sample_count => 0);
-# This will be the output file for the good genomes.
+# These will be the output files for the genome lists.
 open(my $gh, ">$webDir/good.tbl") || die "Could not open good.tbl: $!";
+open(my $ah, ">$webDir/all.tbl") || die "Could not open all.tbl: $!";
 print $gh "genome_id\tgenome_name\n";
+print $ah "genome_id\tgenome_name\n";
 # Get all the completed samples in the input directory.
 print "Searching $binDir.\n";
 opendir(my $dh, $binDir) || die "Could not open $binDir: $!";
@@ -88,6 +90,7 @@ for my $sample (@samples) {
         } else {
             $bad++;
         }
+        print $ah "$binID\t$binName\n";
     }
     # Copy the index file.
     File::Copy::Recursive::fcopy("$inDir/index.html", "$outDir/index.html") || die "Could not copy index for $sample: $!";

@@ -208,6 +208,19 @@ sub new {
 
 =head2 Query Methods
 
+=head3 roleHashes
+
+    my $roleHashes = $checker->roleHashes;
+
+Return a 2-tuple of hash references-- (0) a map of role IDs to names, and (1) a map of role checksums to IDs.
+
+=cut
+
+sub roleHashes {
+    my ($self) = @_;
+    return [$self->{nameMap}, $self->{roleMap}];
+}
+
 =head3 role_name
 
     my $name = $checker->role_name($role);
