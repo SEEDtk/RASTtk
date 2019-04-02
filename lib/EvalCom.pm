@@ -73,6 +73,8 @@ A L<Stats> object for tracking statistics. If none is specified, one will be cre
 
 =back
 
+=back
+
 =cut
 
 sub new {
