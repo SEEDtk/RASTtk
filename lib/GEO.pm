@@ -1529,7 +1529,7 @@ sub UpdateGTO {
     $gtoQ->{fine_consistency} = $quality->{fine_consis};
     $gtoQ->{completeness} = $quality->{complete};
     $gtoQ->{contamination} = $quality->{contam};
-    $gtoQ->{completeness_group} = $quality->{taxon};
+    $gtoQ->{completeness_group} = $quality->{group};
     $gtoQ->{genome_metrics} = $quality->{metrics};
     $ppr->{over_present} = $quality->{over_roles};
     $ppr->{under_present} = $quality->{under_roles};
@@ -2187,7 +2187,7 @@ sub _BuildGeo {
         $quality{fine_consis} = $gtoQ->{fine_consistency};
         $quality{complete} = $gtoQ->{completeness};
         $quality{contam} = $gtoQ->{contamination};
-        $quality{taxon} = $gtoQ->{completeness_group};
+        $quality{group} = $gtoQ->{completeness_group};
         $quality{metrics} = $gtoQ->{genome_metrics};
         # Get the problematic role scores and counts.
         my $ppr = $gtoQ->{problematic_roles_report};
