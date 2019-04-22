@@ -74,6 +74,10 @@ to smallest.
 
 Seed protein sequence for the genome in question, if it has one.
 
+=item gc
+
+Genetic code for the genome.
+
 =back
 
 The following fields are usually passed in by the client.
@@ -321,11 +325,13 @@ sub CreateFromPatric {
             }
         }
     }
-    # Loop through the genomes found.
+    # Loop through the genomes found.  We need to keep the tax IDs for finding the genetic code.
+    my %taxes;
     for my $genomeTuple (@$genomeTuples) {
         my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
+        push @{$taxes{$taxon}}, $genome;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome} };
+            taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome}, gc => 11 };
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -427,6 +433,15 @@ sub CreateFromPatric {
             }
             $retVal{$genome}{contigs} = \%contigs;
             $retVal{$genome}{proteins} = \%proteins;
+        }
+    }
+    # Read the taxonomy table to get the genetic codes.
+    my $taxTuples = P3Utils::get_data_keyed($p3, taxonomy => [], ['taxon_id', 'genetic_code'], [keys %taxes]);
+    for my $taxTuple (@$taxTuples) {
+        my ($taxID, $gc) = @$taxTuple;
+        my $genomes = $taxes{$taxID};
+        for my $genome (@$genomes) {
+            $retVal{$genome}{gc} = $gc;
         }
     }
     # Run through all the objects, blessing them.
@@ -834,6 +849,32 @@ Return the ID of this genome.
 sub id {
     my ($self) = @_;
     return $self->{id};
+}
+
+=head3 gc
+
+    my $genetic_code = $geo->gc
+
+Return the genetic code for this genome's proteins.
+
+=cut
+
+sub gc {
+    my ($self) = @_;
+    return $self->{gc};
+}
+
+=head3 domain
+
+    my $domain = $geo->domain
+
+Return the domain for this genome.
+
+=cut
+
+sub domain {
+    my ($self) = @_;
+    return $self->{domain};
 }
 
 =head3 pegCount
@@ -1386,7 +1427,7 @@ sub scores {
     if (! $qData) {
         @retVal = (0, 0, 0, 100, '');
     } else {
-        @retVal = ($qData->{coarse_consis}, $qData->{fine_consis}, $qData->{complete}, $qData->{contam}, $qData->{group});
+        @retVal = ($qData->{coarse_consis} // 0, $qData->{fine_consis} // 0, $qData->{complete} // 0, $qData->{contam} // 100, $qData->{group} // '');
     }
     return @retVal;
 }
@@ -2172,8 +2213,9 @@ sub _BuildGeo {
     my $name = $gto->{scientific_name};
     my $domain = $gto->{domain};
     my $taxon = $gto->{ncbi_taxonomy_id};
+    my $gc = $gto->{genetic_code};
     my $retVal = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-        taxon => $taxon };
+        taxon => $taxon, gc => $gc };
     # Get the options.
     my $rToUseH = $options->{rolesToUse};
     my $detail = $options->{detail} // 0;

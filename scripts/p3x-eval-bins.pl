@@ -134,13 +134,35 @@ for my $sample (@samples) {
         }
         # Now we find all the GTOs of interest.
         opendir(my $dh, $sample) || die "Could not open directory $sample: $!";
-        my @files = map { "$sample/$_" } grep { $_ =~ /^bin\d+.gto|\d+\.\d+\.json$/ } readdir $dh;
+        my %files;
+        my $done;
+        while (! $done) {
+            my $file = readdir $dh;
+            if (! defined $file) {
+                $done = 1;
+            } elsif ($file =~ /^(\d+\.\d+)\.json$/) {
+                $files{$1} = "$sample/$file";
+            } elsif ($file =~ /^bin(\d+)[A-Z]?\.gto$/) {
+                my $bin = $1;
+                my $newFile = "$sample/$file";
+                if (! $files{$bin} || $newFile gt $files{$bin}) {
+                    $files{$bin} = $newFile;
+               }
+            }
+        }
         closedir $dh;
+        my @files = sort values %files;
         print scalar(@files) . " genomes found in $sample.\n";
         # Create GEOs from them for evaluation.
         my $geoHash = GEO->CreateFromGtoFiles(\@files, %geoOptions);
-        # Map them by name.
-        my %nameMap = map { $geoHash->{$_}->name => $_ } keys %$geoHash;
+        # Map them by name.  We need to lop off the name modifier.
+        my %nameMap;
+        for my $geoID (keys %$geoHash) {
+            my $geo = $geoHash->{$geoID};
+            my ($name) = ($geo->name =~ /^(.+clonal population)/);
+            $name //= $geo->name;
+            $nameMap{$name} = $geoID;
+        }
         # We will save the GEOs to evaluate in this list.
         my @evalGeos;
         # The GEOs for bins will be saved in this list. Some of the GEOs are pre-evaluated,

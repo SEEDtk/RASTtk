@@ -318,6 +318,8 @@ Returns C<1> if the job has completed, C<-1> if it has failed, and C<0> if it is
 
 =cut
 
+use constant WAITING => { queued => 1, 'init' => 1, 'in-progress' => 1 };
+
 sub check {
     my ($jobID, %options) = @_;
     # This will be the return value.
@@ -350,7 +352,7 @@ sub check {
          print STDERR "Status = $status.\n";
          if ($status eq 'completed') {
              $retVal = 1;
-         } elsif ($status ne 'in-progress' && $status ne 'queued') {
+         } elsif (! WAITING->{$status}) {
              if (! $options{robust}) {
                 die "Error status for RAST: $status.";
              } else {
