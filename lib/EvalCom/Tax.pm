@@ -349,7 +349,7 @@ Returns a two-element list consisting of (0) the name of the evaluation group an
 sub Choose {
     my ($self, $geo) = @_;
     # These will be the return values.
-    my $taxGroup = 'root';
+    my $taxGroup;
     my $roleHash;
     # Get the statistics object.
     my $stats = $self->{stats};
@@ -368,13 +368,22 @@ sub Choose {
     if (! $taxon) {
         # No taxonomic data at all.
         $self->Log("No taxonomic information available for " . $geo->id . "\n");
-    } elsif (! defined $groupID) {
-        # Taxonomic data, but no group. We give up.
-        $self->Log("No taxonomic group in database that includes $taxon.\n");
     } else {
-        # Get the group data.
-        ($taxGroup, $roleHash) = $self->taxon_data($groupID);
-        $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
+        if (! defined $groupID) {
+            # Taxonomic data, but no group.
+            my $domain = $geo->domain;
+            $self->Log("No taxonomic group in database that includes $taxon.\n");
+            if ($domain eq 'Bacteria') {
+                $groupID = 2;
+            } elsif ($domain eq 'Archaea') {
+                $groupID = 2157;
+            }
+        }
+        if (defined $groupID) {
+            # Get the group data.
+            ($taxGroup, $roleHash) = $self->taxon_data($groupID);
+            $self->Log("Group $groupID: $taxGroup selected for $taxon.\n");
+        }
     }
     return ($taxGroup, $roleHash);
 }

@@ -28,6 +28,10 @@ The size of the desired runs.  The default is C<10>.  Only runs of the specified
 
 If specified, the input is FASTQ instead of FASTA.
 
+=item details
+
+If specified, the name of a file to contain the number of runs in each sequence.
+
 =back
 
 =cut
@@ -37,23 +41,30 @@ use P3DataAPI;
 use P3Utils;
 use FastA;
 use FastQ;
-use SeedUtils;
+use BadLetters;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('letter inFile inFile2',
         ['geneticCode|geneticcode|code|gc=i', 'genetic code for protein translation'],
         ['run=i', 'minimum run size', { default => 10 }],
-        ['reads|fastq', 'input is FASTQ, not FASTA']
+        ['reads|fastq', 'input is FASTQ, not FASTA'],
+        ['details=s', 'output the number of runs in each sequence']
         );
 # Compute the genetic code for protein mode.
 my $prot = $opt->geneticcode;
-if ($prot) {
-    $prot = SeedUtils::genetic_code($prot);
-}
+my $type = ($prot ? 'prots' : 'bases');
 # Get the run size.
 my $runSize = $opt->run;
 # Get the input mode.
 my $fastq = $opt->reads;
+# Set up for the details file.
+my $dh;
+if ($opt->details) {
+    my $dFile = $opt->details;
+    open($dh, '>', $dFile) || die "Could not open details file: $!";
+    P3Utils::print_cols(['sequence', 'count'], oh => $dh);
+    print "Run counts will be written to $dFile.\n";
+}
 # Validate the positional parameters.
 my ($letter, $inFile, $inFile2) = @ARGV;
 if (! $letter) {
@@ -78,6 +89,8 @@ unless (length $letter == 1) {
 unless (! $prot || $letter =~ /[ARNDCQEGHILKMFPOSUTWYV]/) {
     die "Invalid amino acid code.";
 }
+# Create the scanner.
+my $badLetters = BadLetters->new(gc => $prot, $type => { $letter => $runSize });
 # Open the input file.
 my $fh;
 if ($fastq) {
@@ -87,48 +100,26 @@ if ($fastq) {
 }
 # This will be the length and location of the largest run.
 my ($bestLen, $bestLoc) = ($runSize - 1, undef);
-# This is the initial search string.
-my $minimum = $letter x $runSize;
 # This will be the count.
 my $runCount = 0;
 # Loop through the contigs.
 while ($fh->next) {
     my $contigID = $fh->id;
+    my $count = 0;
     for my $fseq ($fh->left, $fh->right) {
-        my $rseq = SeedUtils::reverse_comp($fseq);
-        for my $seq ($fseq, $rseq) {
-            # The mode determines how we scan.  In protein mode there are three frames on each strand.
-            if ($prot) {
-                for my $frame (0, 1, 2) {
-                    my $aaString = SeedUtils::translate(\$seq, $frame, $prot);
-                    Scan($aaString, $contigID);
-                }
-            } else {
-                Scan($seq, $contigID);
-            }
+        my ($newCount, $newLen) = $badLetters->Scan($fseq);
+        $count += $newCount;
+        if ($newLen > $bestLen) {
+            ($bestLen, $bestLoc) = ($newLen, $contigID);
         }
     }
+    if ($dh && $count > 0) {
+        P3Utils::print_cols([$contigID, $count], oh => $dh);
+    }
+    $runCount += $count;
 }
 if (! $bestLoc) {
     print "No runs found.\n"
 } else {
     print "$runCount runs found.  Longest is $bestLen in $bestLoc.\n";
-}
-
-## Scan a sequence for runs.
-sub Scan {
-    my ($seq, $contigID) = @_;
-    # Start at the first position.
-    my $pos = index($seq, $minimum);
-    while ($pos >= 0) {
-        # Determine the run length.
-        my $pos0 = $pos++;
-        while (substr($seq, $pos, 1) eq $letter) { $pos++; }
-        my $runLen = $pos - $pos0;
-        if ($runLen > $bestLen) {
-            ($bestLen, $bestLoc) = ($runLen, $contigID);
-        }
-        $runCount++;
-        $pos = index($seq, $minimum, $pos);
-    }
 }

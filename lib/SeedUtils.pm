@@ -2399,6 +2399,7 @@ sub compute_metrics {
             if ($cumul >= $thresh{$type}) {
                 # We have the desired metric. Save it in the return array.
                 $retVal{$type} = $len;
+                # Create the L-version of the metric.
                 (my $ltype = $type) =~ s/^N/L/;
                 $retVal{$ltype} = $i + 1; # Zero based..
                 # Ensure we don't test for it again.

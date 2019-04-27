@@ -168,9 +168,14 @@ A reference to a hash of contig length metrics with the following fields.
 
 =over 12
 
+=item L50
+
+The L50 of the contigs, which is the smallest number of contigs that contain 50% or more of the DNA.
+
 =item N50
 
-The N50 of the contig lengths (see L</n_metric>).
+The N50 of the contig lengths, which is the largest contig such that 50% or more of the DNA is in contigs that size or
+larger.
 
 =item N70
 

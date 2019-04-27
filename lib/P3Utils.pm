@@ -1215,7 +1215,7 @@ sub match {
         }
     } elsif ($pattern =~ /^\-?\d+(?:\.\d+)?$/) {
         # Here we have a numeric match.
-        if ($pattern == $key) {
+        if ($key =~ /^\-?\d+(?:\.\d+)?$/ && $pattern == $key) {
             $retVal = 1;
         }
     } elsif ($options{exact}) {
