@@ -40,25 +40,7 @@ This object contains the following fields.
 
 =item contigs
 
-Reference to a list of the contained contig IDs.
-
-=item len
-
-The total length of all the contigs in the bin.
-
-=item coverage
-
-A vector of coverage values, indicating how many times the bin's contigs were found in each of the input
-samples used to assemble the contigs.
-
-=item tetra
-
-A vector of tetranucleotide counts. For each possible tetranucleotide, the vector contains the
-number of times it occurred.
-
-=item tetraLen
-
-The length of the tetranucleotide vector, equal to the square root of the sum of the squares of the counts.
+Reference to a list of L<Bin/Contig> objects for the contained contigs.
 
 =item refGenomes
 
@@ -88,21 +70,13 @@ A bin containing a single contig can be read from a tab-delimited file. The file
 
 =item 1
 
-The contig ID followed by the contig length.
+The contig ID followed by the contig length and the mean coverage.
 
 =item 2
 
-The coverage vector values.
-
-=item 3
-
-The tetranucleotide counts.
-
-=item 4
-
 The close reference genome IDs.
 
-=item 5
+=item 3
 
 The IDs of the universal roles found in the contig.
 
@@ -140,7 +114,7 @@ sub new_from_file {
     # Get the parameters.
     my ($class, $ih) = @_;
     # Read the contig ID and length.
-    my ($id, $len) = SeedUtils::fields_of($ih);
+    my ($id, $len, $covg) = SeedUtils::fields_of($ih);
     # Read the coverage vector.
     my @coverage = SeedUtils::fields_of($ih);
     # Read the tetranucleotide counts.
@@ -150,16 +124,12 @@ sub new_from_file {
     # Read the universal protein IDs.
     my %uniProts = map { $_ => 1 } grep { $_ } SeedUtils::fields_of($ih);
     # Create the object to return.
+    my $contig = Bin::Contig->new($id, $len, $covg);
     my $retVal = {
-        contigs => [$id],
-        len => $len,
-        coverage => \@coverage,
-        tetra => \@tetra,
+        contigs => [$contig],
         refGenomes => [sort @genomes],
         uniProts => \%uniProts
     };
-    # Compute the tetranucleotide vector length.
-    _SetTetraLen($retVal);
     # Bless and return it.
     bless $retVal, $class;
     return $retVal;
@@ -192,6 +162,8 @@ sub new_from_json {
     }
     my $json = join("", @parts);
     my $retVal = SeedUtils::read_encoded_object(\$json);
+    # Bless the contig objects.
+    $retVal->{contigs} = [map { Bin::Contig->new(@$_) } @{$retVal->{contigs}}];
     # Bless and return it.
     bless $retVal, $class;
     return $retVal;
@@ -216,9 +188,8 @@ Bin object to copy.
 sub new_copy {
     my ($class, $bin2) = @_;
     # Copy the arrays.
-    my $covg = [ @{$bin2->coverage} ];
-    my $tetra = [ @{$bin2->tetra} ];
     my $refs = [ $bin2->refGenomes ];
+    my $contigs = [@{$bin2->{contigs}}];
     # Copy the hash.
     my $uniProts2 = $bin2->uniProts;
     my %uniProts;
@@ -227,11 +198,7 @@ sub new_copy {
     }
     # Create the object.
     my $retVal = {
-        contigs => [$bin2->contigs],
-        len => $bin2->len,
-        coverage => $covg,
-        tetra => $tetra,
-        tetraLen => $bin2->tetraLen,
+        contigs => $contigs,
         refGenomes => $refs,
         uniProts => \%uniProts
     };
@@ -242,7 +209,7 @@ sub new_copy {
 
 =head3 new
 
-    my $bin = Bin->new($contigID);
+    my $bin = Bin->new($contigID, $len, $covg);
 
 Create a new, blank bin for a single contig.
 
@@ -252,19 +219,23 @@ Create a new, blank bin for a single contig.
 
 ID of the single contig to be in this bin.
 
+=item len
+
+Length of the contig, in base pairs.
+
+=item covg
+
+Mean coverage of the contig.
+
 =back
 
 =cut
 
 sub new {
-    my ($class, $contigID) = @_;
+    my ($class, $contigID, $len, $covg) = @_;
     # Create the object.
     my $retVal = {
-        contigs => [$contigID],
-        len => 0,
-        coverage => [],
-        tetra => [],
-        tetraLen => 0,
+        contigs => [Bin::Contig->new($contigID, $len, $covg)],
         refGenomes => [],
         uniProts => {}
     };
@@ -400,7 +371,20 @@ Return the list of contigs in this bin.
 
 sub contigs {
     my ($self) = @_;
-    return @{$self->{contigs}};
+    return map { $_->id } @{$self->{contigs}};
+}
+
+=head3 all_contigs
+
+    my $contigObjs = $bin->all_contigs;
+
+Return a reference to the list of contig objects for this bin.
+
+=cut
+
+sub all_contigs {
+    my ($self) = @_;
+    return $self->{contigs};
 }
 
 =head3 contig1
@@ -413,7 +397,7 @@ Return the ID of the first contig in the bin. This is used as the bin ID.
 
 sub contig1 {
     my ($self) = @_;
-    return $self->{contigs}[0];
+    return $self->{contigs}[0]->id;
 }
 
 =head3 contigCount
@@ -439,64 +423,30 @@ Return the total length of the contigs in this bin.
 
 sub len {
     my ($self) = @_;
+    my $retVal = 0;
+    for my $contig (@{$self->{contigs}}) {
+        $retVal += $contig->len;
+    }
     return $self->{len};
 }
 
 =head3 coverage
 
-    my $coverageL = $bin->coverage;
+    my $coverage = $bin->coverage;
 
-Return the coverage vector for this bin, in the form of a reference to a list of coverage values.
+Return the mean coverage for this bin.
 
 =cut
 
 sub coverage {
     my ($self) = @_;
-    return $self->{coverage};
-}
-
-=head3 meanCoverage
-
-    my $covgMean = $bin->meanCoverage
-
-Mean coverage value for this bin. This is actually computed by totalling the coverages.
-
-=cut
-
-sub meanCoverage {
-    my ($self) = @_;
-    my $retVal = 0;
-    my $coverages = $self->coverage;
-    for my $coverage (@$coverages) {
-        $retVal += $coverage;
+    my ($retVal, $count) = (0, 0);
+    for my $contig (@{$self->{contigs}}) {
+        $retVal += $contig->covg;
+        $count++;
     }
+    if ($count > 0) { $retVal /= $count; }
     return $retVal;
-}
-
-=head3 tetra
-
-    my $tetraL = $bin->tetra;
-
-Return the tetranucleotide count vector for this bin, in the form of a reference to a list of tetranucleotide counts.
-
-=cut
-
-sub tetra {
-    my ($self) = @_;
-    return $self->{tetra};
-}
-
-=head3 tetraLen
-
-    my $tetraLen = $bin->tetraLen
-
-Return the magnitude of the tetranucleotide vector, equal to the square root of the sum of the squares of the counts.
-
-=cut
-
-sub tetraLen {
-    my ($self) = @_;
-    return $self->{tetraLen};
 }
 
 =head3 name
@@ -538,7 +488,7 @@ sub refGenomes {
     return @{$self->{refGenomes}};
 }
 
-=head3 hashits
+=head3 hasHits
 
     my $flag = $bin->hasHits;
 
@@ -585,30 +535,8 @@ Another L<Bin> object whose contigs are to be added to this bin.
 
 sub Merge {
     my ($self, $bin2) = @_;
-    # Get the DNA length of this bin and the other bin.
-    my ($len, $len2) = ($self->len, $bin2->len);
-    # Compute the combined length.
-    my $tlen = $len + $len2;
     # Add the other bin's contigs.
     push @{$self->{contigs}}, $bin2->contigs;
-    # Update the length.
-    $self->{len} = $tlen;
-    # Combine the coverages.
-    my ($i, $n);
-    my $coverages = $self->coverage;
-    my $coverages2 = $bin2->coverage;
-    $n = scalar @$coverages;
-    for ($i = 0; $i < $n; $i++) {
-        $coverages->[$i] = ($coverages->[$i] * $len + $coverages2->[$i] * $len2) / $tlen;
-    }
-    # Combine the tetranucleotide counts.
-    my $tetra = $self->tetra;
-    my $tetra2 = $bin2->tetra;
-    $n = scalar @$tetra;
-    for ($i = 0; $i < $n; $i++) {
-        $tetra->[$i] = $tetra->[$i] + $tetra2->[$i];
-    }
-    _SetTetraLen($self);
     # Combine the reference genomes.
     my %refs = map { $_ => 1 } ($self->refGenomes, $bin2->refGenomes);
     $self->{refGenomes} = [sort keys %refs];
@@ -618,27 +546,6 @@ sub Merge {
     for my $role (keys %$roles2) {
         $roles1->{$role} += $roles2->{$role};
     }
-}
-
-=head3 set_len
-
-    $bin->set_len($len);
-
-Store the contig length.
-
-=over 4
-
-=item len
-
-New proposed total length for the contigs.
-
-=back
-
-=cut
-
-sub set_len {
-    my ($self, $len) = @_;
-    $self->{len} = $len;
 }
 
 =head3 set_name
@@ -671,13 +578,21 @@ sub set_name {
 
     $bin->set_coverage(\@coverages);
 
-Store a new coverage vector.
+or
+
+    $bin->set_coverage($coverage);
+
+Store the mean coverage for this bin.
 
 =over 4
 
-=item coverages
+=item converages
 
-Reference to a list of coverage values, one per sample.
+Reference to a list of coverage numbers.  These are averaged together to get the mean.
+
+=item coverage
+
+The mean coverage to store.
 
 =back
 
@@ -685,29 +600,22 @@ Reference to a list of coverage values, one per sample.
 
 sub set_coverage {
     my ($self, $coverages) = @_;
-    $self->{coverage} = $coverages;
-}
-
-=head3 set_tetra
-
-    $bin->set_tetra(\@tetras);
-
-Store a new tetranucleotide count vector.
-
-=over 4
-
-=item tetras
-
-An unnormalized vector of tetranucleotide values.
-
-=back
-
-=cut
-
-sub set_tetra {
-    my ($self, $tetras) = @_;
-    $self->{tetra} = $tetras;
-    _SetTetraLen($self);
+    # Insure we have a vector.
+    if (! ref $coverages) {
+        $coverages = [$coverages];
+    }
+    my ($total, $count) = (0, 0);
+    for my $covg (@$coverages) {
+        $total += $covg;
+        $count++;
+    }
+    if ($count) {
+        $total /= $count;
+    }
+    # Assign this coverage to all the contigs.
+    for my $contig (@{$self->{contigs}}) {
+        $contig->set_coverage($total);
+    }
 }
 
 =head3 add_ref
@@ -868,6 +776,8 @@ sub Write {
     my ($self, $oh) = @_;
     # Get an unblessed version of this object.
     my $copy = { %$self };
+    # Unbless the contigs.
+    $copy->{contigs} = [map { [ @$_ ] } @{$self->{contigs}}];
     # Write it to the output.
     SeedUtils::write_encoded_object($copy, $oh);
     # Add a trailer.
@@ -893,43 +803,12 @@ An open output handle to which this object's exchange format representation shou
 sub WriteContig {
     my ($self, $oh) = @_;
     # Write the contig ID and the length.
-    print $oh join("\t", $self->contig1, $self->len) . "\n";
-    # Write the coverage vector values.
-    print $oh join("\t", @{$self->{coverage}}) . "\n";
-    # Write the tetranucleotide counts.
-    print $oh join("\t", @{$self->{tetra}}) . "\n";
+    print $oh join("\t", $self->contig1, $self->len, $self->coverage) . "\n";
     # Write the reference genome list.
     print $oh join("\t", @{$self->{refGenomes}}) . "\n";
     # Write the universal proteins.
     print $oh join("\t", keys %{$self->{uniProts}}) . "\n";
 }
 
-=head2 Internal Utility Methods
-
-=head3 _SetTetraLen
-
-    _SetTetraLen($bin);
-
-Compute and store the length of the tetranucleotide vector, for the purposes of computing dot products.
-
-=over 4
-
-=item bin
-
-A Bin object with an updated tetranucleotide vector. The C<tetraLen> member will be computed and set.
-
-=back
-
-=cut
-
-sub _SetTetraLen {
-    my ($bin) = @_;
-    my $tetras = $bin->{tetra};
-    my $squares = 0;
-    for my $tetra (@$tetras) {
-        $squares += $tetra * $tetra;
-    }
-    $bin->{tetraLen} = sqrt($squares);
-}
 
 1;

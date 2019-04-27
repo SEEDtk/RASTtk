@@ -108,14 +108,6 @@ A reference to a list of the IDs for the bin's reference genomes.
 
 The estimated taxonomic ID for the bin.
 
-=item tetra
-
-A reference to a vector of tetranucleotide counts for the bin's DNA.
-
-=item tetraLen
-
-The length of the tetranucleotide vector for the bin, used to normalize it.
-
 =item uniProts
 
 Reference to an empty hash.
