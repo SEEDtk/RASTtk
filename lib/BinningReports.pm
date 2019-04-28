@@ -834,7 +834,11 @@ sub copy_geo {
     $retVal{l50} = $metrics->{L50};
     $retVal{dna_bp} = $metrics->{totlen};
     $retVal{contigs} = $geo->contigCount;
-    ($retVal{over_roles}, $retVal{under_roles}, $retVal{pred_roles}) = $geo->roleStats;
+    ($retVal{over_roles}, $retVal{under_roles}, $retVal{pred_roles}, $retVal{comp_roles}) = $geo->roleStats;
+    # If the checkg_group contains a taxon ID, convert it to a link.
+    if ($retVal{checkg_group} =~ /^(.+)\s+\((\d+)\)/) {
+        $retVal{checkg_group} = qq(<a href="http://patricbrc.org/view/Taxonomy/$2">$1</a>);
+    }
     return %retVal;
 }
 

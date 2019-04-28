@@ -217,7 +217,7 @@ sub Check {
     my ($group, $roleHash) = $self->Choose($geo);
     # It's possible the genome is unclassifiable, so we only proceed if the choose worked.
     if (! $group) {
-        # Use defaults to cover the failure.
+        # Use defaults to cover a failure.
         $group = '<none>';
         $complete = 0;
         $contam = 100;

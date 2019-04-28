@@ -170,9 +170,9 @@ Completeness percentage.
 
 Contamination percentage.
 
-=item taxon
+=item group
 
-Name of the taxonomic grouping used to compute completeness and contamination.
+Name of the grouping used to compute completeness and contamination.
 
 =item metrics
 
@@ -346,11 +346,14 @@ sub CreateFromPatric {
     # Loop through the genomes found.  We need to keep the tax IDs for finding the genetic code.
     my %taxes;
     for my $genomeTuple (@$genomeTuples) {
-        my ($genome, $name, $domain, $taxon, $lineage, $cdsCount, $cdsRatio, $hypoRatio, $plfamRatio) = @$genomeTuple;
+        my ($genome, $name, $domain, $taxon, $lineage, $cdsRatio, $hypoRatio, $plfamRatio) = @$genomeTuple;
         push @{$taxes{$taxon}}, $genome;
+        my $cdsPercent = ($cdsRatio ? $cdsRatio * 100 : '');
+        my $hypoPercent = ($hypoRatio ? $hypoRatio * 100 : '');
+        my $plfamPercent = ($plfamRatio ? $plfamRatio * 100 : '');
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
             taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome}, gc => 11,
-            cdsPercent => $cdsRatio * 100, hypoPercent => $hypoRatio * 100, plfamPercent => $plfamRatio * 100};
+            cdsPercent => $cdsPercent, hypoPercent => $hypoPercent, plfamPercent => $plfamPercent};
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -1248,9 +1251,10 @@ sub protein {
 
 =head3 roleStats
 
-    my ($over, $under, $predictable) = $geo->roleStats;
+    my ($over, $under, $predictable, $comp) = $geo->roleStats;
 
-Return the number of roles over-represented, under-represented, and for which there are predictions. If no quality data is present, these will all be zero.
+Return the number of roles over-represented, under-represented, the number for which there are predictions, and the number used for the completeness check.
+If no quality data is present, these will all be zero.
 
 =cut
 
@@ -1260,8 +1264,10 @@ sub roleStats {
     my $qData = $self->{quality};
     if ($qData) {
         @retVal = ($qData->{over_roles}, $qData->{under_roles}, $qData->{pred_roles});
+        my $cRoles = $qData->{completeness_roles};
+        push @retVal, scalar keys %$cRoles;
     } else {
-        @retVal = (0, 0, 0);
+        @retVal = (0, 0, 0, 0);
     }
     return @retVal;
 }
@@ -1629,6 +1635,7 @@ sub UpdateGTO {
     $gtoQ->{completeness} = $quality->{complete};
     $gtoQ->{contamination} = $quality->{contam};
     $gtoQ->{completeness_group} = $quality->{group};
+    $gtoQ->{completeness_taxon} = $quality->{groupTaxon};
     $gtoQ->{genome_metrics} = $quality->{metrics};
     $ppr->{over_present} = $quality->{over_roles};
     $ppr->{under_present} = $quality->{under_roles};

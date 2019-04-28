@@ -63,6 +63,10 @@ table.p3basic th {
 </tr><tr>
 <th>Predicted Roles</th><td>[% g.pred_roles %]</td>
 </tr><tr>
+<th>Completeness Roles</th><td>[% g.comp_roles %]</td>
+</tr><tr>
+<th>Total Distinct Roles</th><td>[% g.tot_roles %]</td>
+</tr><tr>
 <th>Protein-Encoding Genes with Functional Assignment</th><td>[% g.tot_funs %]</td>
 </tr><tr>
 <th>Protein-Encoding Genes without Functional Assignment</th><td>[% g.tot_hypos %]</td>

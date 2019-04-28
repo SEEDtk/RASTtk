@@ -316,6 +316,8 @@ sub taxon_data {
     if ($name) {
         # We found it, so get the role hash, too.
         $roleHash = $self->{roleLists}{$taxonID};
+        # Add the tax ID to the name.
+        $name .= " ($taxonID)";
     }
     # Return the results.
     return ($name, $roleHash);
