@@ -96,6 +96,18 @@ The total number of hypothetical protein-encoding genes found in the genome.
 
 The total number of non-hypothetical protein-encoding genes found in the genome.
 
+=item cdsPercent
+
+The percent of features that are protein-encoding genes.
+
+=item hypoPercent
+
+The percent of features that are hypothetical.
+
+=item plfamPercent
+
+The percent of features that belong to local protein families.
+
 =item nameMap
 
 Reference to a hash that maps role IDs to role names.
@@ -312,7 +324,8 @@ sub CreateFromPatric {
     $stats->Add(genomesIn => $gCount);
     _log($logH, "Requesting $gCount genomes from PATRIC.\n");
     my $genomeTuples = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'genome_name',
-            'kingdom', 'taxon_id', 'taxon_lineage_ids'], $genomes);
+            'kingdom', 'taxon_id', 'taxon_lineage_ids', 'cds_ratio', 'hypothetical_cds_ratio',
+            'plfam_cds_ratio'], $genomes);
     # Now we retrieve the seed proteins.
     my %protHash;
     my $protTuples = P3Utils::get_data_keyed($p3, feature => [['eq', 'product', 'Phenylalanyl-tRNA synthetase alpha chain']],
@@ -333,10 +346,11 @@ sub CreateFromPatric {
     # Loop through the genomes found.  We need to keep the tax IDs for finding the genetic code.
     my %taxes;
     for my $genomeTuple (@$genomeTuples) {
-        my ($genome, $name, $domain, $taxon, $lineage) = @$genomeTuple;
+        my ($genome, $name, $domain, $taxon, $lineage, $cdsCount, $cdsRatio, $hypoRatio, $plfamRatio) = @$genomeTuple;
         push @{$taxes{$taxon}}, $genome;
         $retVal{$genome} = { id => $genome, name => $name, domain => $domain, nameMap => $nMap, checkMap => $cMap,
-            taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome}, gc => 11 };
+            taxon => $taxon, lineage => ($lineage || []), binFlag => 0, seed => $protHash{$genome}, gc => 11,
+            cdsPercent => $cdsRatio * 100, hypoPercent => $hypoRatio * 100, plfamPercent => $plfamRatio * 100};
         $stats->Add(genomeFoundPatric => 1);
         # Compute the aa-len limits for the seed protein.
         my ($min, $max) = (209, 405);
@@ -919,6 +933,45 @@ Return the number of distinct roles in this genome.
 sub roleCount {
     my ($self) = @_;
     return $self->{roleCount};
+}
+
+=head3 cdsPercent
+
+    my $genomeID = $geo->cdsPercent;
+
+Return the percent of features that are protein-encoding genes in this genome.
+
+=cut
+
+sub cdsPercent {
+    my ($self) = @_;
+    return $self->{cdsPercent};
+}
+
+=head3 hypoPercent
+
+    my $genomeID = $geo->hypoPercent;
+
+Return the percent of features that are hypothetical proteins in this genome.
+
+=cut
+
+sub hypoPercent {
+    my ($self) = @_;
+    return $self->{hypoPercent};
+}
+
+=head3 plfamPercent
+
+    my $genomeID = $geo->plfamPercent;
+
+Return the percent of features that are in local protein families in this genome.
+
+=cut
+
+sub plfamPercent {
+    my ($self) = @_;
+    return $self->{plfamPercent};
 }
 
 =head3 lineage
@@ -1958,6 +2011,35 @@ sub AddQuality {
     $self->AnalyzeQualityData();
 }
 
+=head3 FindBadContigs
+
+    my $badH = $geo->FindGoodContigs();
+
+Create a hash keyed on the bad contigs in this genome.  The L</AnalyzeQualityData> method must already have been called
+on this object to fill in the contig counts.
+
+A bad contig is one with no good features.  The return value will be a reference to a hash keyed on the IDs of these contigs.
+
+=cut
+
+sub FindBadContigs {
+    my ($self) = @_;
+    # This will be the return hash.
+    my %retVal;
+    # Get the contig quality hash.
+    if ($self->{quality}) {
+        my $contigs = $self->{quality}{contigs} // {};
+        # Loop through the contigs in the hash.
+        for my $contig (keys %$contigs) {
+            if (! $contigs->{$contig}[0]) {
+                $retVal{$contig} = 1;
+            }
+        }
+    }
+    # Return the results.
+    return \%retVal;
+}
+
 =head2 Internal Methods
 
 =head3 _format_comments
@@ -2246,6 +2328,10 @@ sub _BuildGeo {
         # To get a full role report ("role_comments" and "contigs"), you
         # need to call AnalyzeQualityData.
         $retVal->{quality} = \%quality;
+        # Now copy over the quality statistics.
+        $retVal->{cdsPercent} = $gtoQ->{cds_ratio} * 100;
+        $retVal->{hypoPercent} = $gtoQ->{hypothetical_cds_ratio} * 100;
+        $retVal->{plfamPercent} = $gtoQ->{plfam_cds_ratio} * 100;
     }
     # Check for a lineage.
     if ($gto->{ncbi_lineage}) {

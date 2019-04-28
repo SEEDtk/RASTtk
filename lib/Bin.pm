@@ -22,6 +22,7 @@ package Bin;
     use warnings;
     use SeedUtils;
     use Carp;
+    use Bin::Contig;
 
 =head1 Metagenomic Community Bin
 
@@ -115,10 +116,6 @@ sub new_from_file {
     my ($class, $ih) = @_;
     # Read the contig ID and length.
     my ($id, $len, $covg) = SeedUtils::fields_of($ih);
-    # Read the coverage vector.
-    my @coverage = SeedUtils::fields_of($ih);
-    # Read the tetranucleotide counts.
-    my @tetra = SeedUtils::fields_of($ih);
     # Read the close-reference genome IDs. Note that we need to deal with a blank line reading as a null string.
     my @genomes = grep { $_ } SeedUtils::fields_of($ih);
     # Read the universal protein IDs.
@@ -427,7 +424,7 @@ sub len {
     for my $contig (@{$self->{contigs}}) {
         $retVal += $contig->len;
     }
-    return $self->{len};
+    return $retVal;
 }
 
 =head3 coverage
@@ -536,7 +533,7 @@ Another L<Bin> object whose contigs are to be added to this bin.
 sub Merge {
     my ($self, $bin2) = @_;
     # Add the other bin's contigs.
-    push @{$self->{contigs}}, $bin2->contigs;
+    push @{$self->{contigs}}, @{$bin2->{contigs}};
     # Combine the reference genomes.
     my %refs = map { $_ => 1 } ($self->refGenomes, $bin2->refGenomes);
     $self->{refGenomes} = [sort keys %refs];
@@ -546,6 +543,38 @@ sub Merge {
     for my $role (keys %$roles2) {
         $roles1->{$role} += $roles2->{$role};
     }
+}
+
+=head3 AdjustContigList
+
+    $bin->AdjustContigList(\@contigIDs);
+
+Remove any contigs not in the provided contig list.
+
+=over 4
+
+=item contigIDs
+
+Reference to a list of contig IDs.
+
+=back
+
+=cut
+
+sub AdjustContigList {
+    my ($self, $contigIDs) = @_;
+    # This will be the new contig list.
+    my @newContigs;
+    # Create a hash of eligible contig IDs.
+    my %cHash = map { $_ => 1 } @$contigIDs;
+    # Loop through the old contig objects.
+    my $oldContigs = $self->{contigs};
+    for my $contig (@$oldContigs) {
+        if ($cHash{$contig->id}) {
+            push @newContigs, $contig;
+        }
+    }
+    $self->{contigs} = \@newContigs;
 }
 
 =head3 set_name

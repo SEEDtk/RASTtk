@@ -27,6 +27,7 @@ package BinningReports;
     use RoleParse;
     use SeedUtils;
     use GEO;
+    use Math::Round;
 
 =head1 Produce Binning Reports
 
@@ -247,6 +248,10 @@ The total number of DNA base pairs in the bin.
 
 The N50 statistical measure of contig lengths.
 
+=item l50
+
+The L50 statistical measure of the number of contigs.
+
 =item ppr
 
 A count of the problematic roles.
@@ -287,6 +292,18 @@ The total number of protein-encoding genes in the bin's genome without functiona
 
 The total number of distinct roles in the bin's genome.
 
+=item cds_pct
+
+The percent of features that are protein-encoding genes.
+
+=item hypo_pct
+
+The percent of features that are hypothetical proteins.
+
+=item plfam_pct
+
+The percent of features that are in local protein families.
+
 =back
 
 =item bad
@@ -325,7 +342,7 @@ sub Summary {
     my (@good, @bad);
     # First we are going to read through the bins and create a map of bin names to reference genome descriptors and coverages.
     # Each reference genome descriptor is a hash-ref with members "genome" and "url".
-    my $refGmap = parse_bins_json($bins_json);
+    my ($refGmap) = parse_bins_json($bins_json);
     # Now we loop through the gtos and create the genome descriptors for the good and bad lists.
     my @bins = sort { $b->qscore <=> $a->qscore } @$geos;
     for my $bin (@bins) {
@@ -337,9 +354,13 @@ sub Summary {
         my $genomeID = $bin->id;
         $gThing{report_url} = $report_url_map->{$bin->id};
         my $genomeName = $bin->name;
+        my $genomeKey = $genomeName;
+        if ($genomeName =~ /^(.+\sclonal population)/) {
+            $genomeKey = $1;
+        }
         my $genomeURL = join('/', URL_BASE, uri_escape($genomeID));
         my $pprRoleData = $bin->roleReport;
-        my $refData = $refGmap->{$genomeName};
+        my $refData = $refGmap->{$genomeKey};
         if (! $refData) {
             # No reference data. We have to build it from the GEO.
             $refData = BuildRefData($bin);
@@ -594,10 +615,13 @@ sub Detail {
     }
     # Store the PPR count in the main descriptor.
     $gThing{ppr} = $pprs;
-    # Store the role counts.
+    # Store the role counts and ratios.
     $gThing{tot_funs} = $geo->pegCount;
     $gThing{tot_hypos} = $geo->hypoCount;
     $gThing{tot_roles} = $geo->roleCount;
+    $gThing{cds_pct} = Math::Round::nearest(0.01, $geo->cdsPercent);
+    $gThing{hypo_pct} = Math::Round::nearest(0.01, $geo->hypoPercent);
+    $gThing{plfam_pct} = Math::Round::nearest(0.01, $geo->plfamPercent);
     # Now we need to create the contigs structure.
     my $contigCountH = $geo->contigReport;
     my @contigList = sort { $geo->contigLen($b) <=> $geo->contigLen($a) } keys %$contigCountH;
@@ -706,8 +730,8 @@ sub parse_bins_json {
                 my $refs = $binThing->{refGenomes};
                 my @refList = map { { genome => $_, url => join('/', URL_BASE , uri_escape($_)) } } @$refs;
                 my ($cov, $count) = (0, 0);
-                for my $covItem (@{$binThing->{coverage}}) {
-                    $cov += $covItem;
+                for my $covItem (@{$binThing->{contigs}}) {
+                    $cov += $covItem->[2];
                     $count++;
                 }
                 if ($count > 1) {
@@ -807,6 +831,7 @@ sub copy_geo {
     ($retVal{scikit_coarse}, $retVal{scikit_fine}, $retVal{checkg_completeness}, $retVal{checkg_contamination}, $retVal{checkg_group}) = $geo->scores;
     my $metrics = $geo->metrics;
     $retVal{n50} = $metrics->{N50};
+    $retVal{l50} = $metrics->{L50};
     $retVal{dna_bp} = $metrics->{totlen};
     $retVal{contigs} = $geo->contigCount;
     ($retVal{over_roles}, $retVal{under_roles}, $retVal{pred_roles}) = $geo->roleStats;

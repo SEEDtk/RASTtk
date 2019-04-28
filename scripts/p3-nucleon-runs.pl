@@ -86,7 +86,7 @@ unless ($prot || $letter =~ /[AGCTN\-]/) {
 unless (length $letter == 1) {
     die "Search target must be a single letter.";
 }
-unless (! $prot || $letter =~ /[ARNDCQEGHILKMFPOSUTWYV]/) {
+unless (! $prot || $letter =~ /[ARNDCQEGHILKMFPOSUTWYVX]/) {
     die "Invalid amino acid code.";
 }
 # Create the scanner.

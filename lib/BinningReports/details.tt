@@ -33,6 +33,8 @@
 </tr><tr>
 <th>Contigs N50 (bp)</th><td>[% g.n50 %]</td>
 </tr><tr>
+<th>Contigs L50</th><td>[% g.l50 %]</td>
+</tr><tr>
 <th>Overpresent Roles</th><td>[% g.over_roles %]</td>
 </tr><tr>
 <th>Underpresent Roles</th><td>[% g.under_roles %]</td>
@@ -44,6 +46,12 @@
 <th>Protein-Encoding Genes with Functional Assignment</th><td>[% g.tot_funs %]</td>
 </tr><tr>
 <th>Protein-Encoding Genes without Functional Assignment</th><td>[% g.tot_hypos %]</td>
+</tr><tr>
+<th>% Features that are Protein-Encoding</th><td>[% g.cds_pct %]</td>
+</tr><tr>
+<th>% Features that are Hypothetical</th><td>[% g.hypo_pct %]</td>
+</tr><tr>
+<th>% Features that are in Local Protein Families</th><td>[% g.plfam_pct %]</td>
 [% IF g.coverage %]
 </tr><tr>
 <th>Mean Coverage</th><td>[% g.coverage %]</td>
