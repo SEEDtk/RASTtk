@@ -19,21 +19,21 @@
 </tr><tr>
 <th>Coarse consistency (%)</th><td>[% g.scikit_coarse %]</td>
 </tr><tr>
-<th>Fine consistency (%)</th><td>[% g.scikit_fine %]</td>
+<th>Fine consistency (%)</th><td [% g.scikit_color %]>[% g.scikit_fine %]</td>
 </tr><tr>
-<th>Completeness (%)</th><td>[% g.checkg_completeness %]</td>
+<th>Completeness (%)</th><td [% g.completeness_color %]>[% g.checkg_completeness %]</td>
 </tr><tr>
-<th>Contamination (%)</th><td>[% g.checkg_contamination %]</td>
+<th>Contamination (%)</th><td [% g.contamination_color %]>[% g.checkg_contamination %]</td>
 </tr><tr>
 <th>Evaluation Group</th><td>[% g.checkg_group %]</td>
 </tr><tr>
-<th>Contig count</th><td>[% g.contigs %]</td>
+<th>Contig count</th><td [% g.contig_color %]>[% g.contigs %]</td>
 </tr><tr>
-<th>DNA size (bp)</th><td>[% g.dna_bp %]</td>
+<th>DNA size (bp)</th><td [% g.length_color %]>[% g.dna_bp %]</td>
 </tr><tr>
-<th>Contigs N50 (bp)</th><td>[% g.n50 %]</td>
+<th>Contigs N50 (bp)</th><td [% g.n50_color %]>[% g.n50 %]</td>
 </tr><tr>
-<th>Contigs L50</th><td>[% g.l50 %]</td>
+<th>Contigs L50</th><td [% g.l50_color %]>[% g.l50 %]</td>
 </tr><tr>
 <th>Overpresent Roles</th><td>[% g.over_roles %]</td>
 </tr><tr>
@@ -49,9 +49,9 @@
 </tr><tr>
 <th>Protein-Encoding Genes without Functional Assignment</th><td>[% g.tot_hypos %]</td>
 </tr><tr>
-<th>% Features that are Protein-Encoding</th><td>[% g.cds_pct %]</td>
+<th>% Protein-Encoding Feature Coverage</th><td [% g.cds_color %]>[% g.cds_pct %]</td>
 </tr><tr>
-<th>% Features that are Hypothetical</th><td>[% g.hypo_pct %]</td>
+<th>% Features that are Hypothetical</th><td [% g.hypo_color %]>[% g.hypo_pct %]</td>
 </tr><tr>
 <th>% Features that are in Local Protein Families</th><td>[% g.plfam_pct %]</td>
 [% IF g.coverage %]

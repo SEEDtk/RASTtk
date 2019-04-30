@@ -347,12 +347,12 @@ sub Summary {
     my @bins = sort { $b->qscore <=> $a->qscore } @$geos;
     for my $bin (@bins) {
         # Copy the quality entry. This copy will be made into the main object used to describe bins in the output reports.
-        my %gThing = copy_geo($bin);
+        my ($gThing, $good) = copy_geo($bin);
         # Compute the q-score.
-        $gThing{qscore} = int($bin->qscore * 10);
+        $gThing->{qscore} = int($bin->qscore * 10);
         # Get the matching ppr and refGmap entries.
         my $genomeID = $bin->id;
-        $gThing{report_url} = $report_url_map->{$bin->id};
+        $gThing->{report_url} = $report_url_map->{$bin->id};
         my $genomeName = $bin->name;
         my $genomeKey = $genomeName;
         if ($genomeName =~ /^(.+\sclonal population)/) {
@@ -366,9 +366,9 @@ sub Summary {
             $refData = BuildRefData($bin);
         }
         # Connect the coverage and reference genome data.
-        $gThing{refs} = $refData->{refs};
-        $gThing{coverage} = $refData->{coverage};
-        $gThing{genome_url} = $genomeURL;
+        $gThing->{refs} = $refData->{refs};
+        $gThing->{coverage} = $refData->{coverage};
+        $gThing->{genome_url} = $genomeURL;
         # Compute the ppr count.
         my $pprs = 0;
         for my $role (keys %$pprRoleData) {
@@ -379,37 +379,13 @@ sub Summary {
             }
         }
         # Store the PPR count in the main descriptor.
-        $gThing{ppr} = $pprs;
-        # Is this bin good or bad?
-        my $good = 1;
-        $gThing{scikit_color} = "";
-        $gThing{completeness_color} = "";
-        $gThing{contamination_color} = "";
-        $gThing{seed_color} = "";
-        if (! $bin->is_complete) {
-            $gThing{completeness_color} = WARN_COLOR;
-            $good = 0;
-        }
-        if (! $bin->is_consistent) {
-            $gThing{scikit_color} = WARN_COLOR;
-            $good = 0;
-        }
-        if (! $bin->is_clean) {
-            $gThing{contamination_color} = WARN_COLOR;
-            $good = 0;
-        }
-        $gThing{good_seed} = 'Y';
-        if (! $bin->good_seed) {
-            $good = 0;
-            $gThing{good_seed} = '&nbsp;';
-            $gThing{seed_color} = WARN_COLOR;
-        }
+        $gThing->{ppr} = $pprs;
         # Now we know.
         if ($good) {
-            push @good, \%gThing;
+            push @good, $gThing;
             $found{good}++;
         } else {
-            push @bad, \%gThing;
+            push @bad, $gThing;
             $found{bad}++;
         }
         # Update the total-bin count.
@@ -572,7 +548,7 @@ sub Detail {
     # Each reference genome descriptor is a hash-ref with members "genome" and "url".
     my $refGmap = parse_bins_json($bins_json);
     # Now we need to build the bin descriptor from the GTO.
-    my %gThing = copy_geo($geo);
+    my ($gThing) = copy_geo($geo);
     # Get the matching ppr and refGmap entries. Note there may not be a refGmap entry if there was no bins_json.
     my $genomeID = $geo->id;
     my $genomeName = $geo->name;
@@ -591,9 +567,9 @@ sub Detail {
     # This will hold the IDs of all the funky features.
     my %pprFids;
     # Connect the coverage and reference genome data.
-    $gThing{refs} = $refData->{refs};
-    $gThing{coverage} = $refData->{coverage};
-    $gThing{genome_url} = $genomeURL;
+    $gThing->{refs} = $refData->{refs};
+    $gThing->{coverage} = $refData->{coverage};
+    $gThing->{genome_url} = $genomeURL;
     # Create the ppr descriptor for the bin. This also nets us the ppr count.
     my $pprs = 0;
     for my $role (sort keys %$pprRoleData) {
@@ -614,14 +590,7 @@ sub Detail {
         }
     }
     # Store the PPR count in the main descriptor.
-    $gThing{ppr} = $pprs;
-    # Store the role counts and ratios.
-    $gThing{tot_funs} = $geo->pegCount;
-    $gThing{tot_hypos} = $geo->hypoCount;
-    $gThing{tot_roles} = $geo->roleCount;
-    $gThing{cds_pct} = Math::Round::nearest(0.01, $geo->cdsPercent);
-    $gThing{hypo_pct} = Math::Round::nearest(0.01, $geo->hypoPercent);
-    $gThing{plfam_pct} = Math::Round::nearest(0.01, $geo->plfamPercent);
+    $gThing->{ppr} = $pprs;
     # Now we need to create the contigs structure.
     my $contigCountH = $geo->contigReport;
     my @contigList = sort { $geo->contigLen($b) <=> $geo->contigLen($a) } keys %$contigCountH;
@@ -645,7 +614,7 @@ sub Detail {
     # Create the template engine.
     my $templateEngine = Template->new(ABSOLUTE => 1);
     my $retVal;
-    my $vars = { g => \%gThing, p => \@pprList, c => \@contigs, editform => $editFlag, gtoFile => $gtoFile, script => $editScript };
+    my $vars = { g => $gThing, p => \@pprList, c => \@contigs, editform => $editFlag, gtoFile => $gtoFile, script => $editScript };
     # print STDERR Dumper($vars->{g});
     $templateEngine->process($detail_tt, $vars, \$retVal) || die "Error in HTML template: " . $templateEngine->error();
     # Return the report.
@@ -762,9 +731,9 @@ sub BuildRefData {
     return $retVal;
 }
 
-=head3 copy_gto
+=head3 copy_geo
 
-    my %gHash = BinningReports::copy_gto($geo);
+    my (\%gHash, $good) = BinningReports::copy_gto($geo);
 
 Extract the quality data from a binning L<GEO>.
 
@@ -776,47 +745,8 @@ A L<GEO> object for the bin.
 
 =item RETURN
 
-Returns a hash containing the following keys.
-
-=over 8
-
-=item checkm_completeness
-
-The percent CheckM completeness score for the bin.
-
-=item checkm_contamination
-
-The percent CheckM contamination score for the bin.
-
-=item genome_id
-
-The genome ID for the bin.
-
-=item genome_name
-
-The name of the bin.
-
-=item contigs
-
-The number of contigs in the bin.
-
-=item dna_bp
-
-The size of the bin in DNA base pairs.
-
-=item n50
-
-The N50 statistical score for the contig sizes.
-
-=item scikit_coarse
-
-The coarse consistency.
-
-=item scikit_fine
-
-The fine consistency.
-
-=back
+Returns a reference to a hash containing the genome quality data for the templates and a TRUE/FALSE flag indicating whether
+the genome is good.
 
 =back
 
@@ -824,22 +754,78 @@ The fine consistency.
 
 sub copy_geo {
     my ($geo) = @_;
-    my %retVal = (
+    my %gThing = (
         genome_id => $geo->id,
         genome_name => $geo->name
     );
-    ($retVal{scikit_coarse}, $retVal{scikit_fine}, $retVal{checkg_completeness}, $retVal{checkg_contamination}, $retVal{checkg_group}) = $geo->scores;
-    my $metrics = $geo->metrics;
-    $retVal{n50} = $metrics->{N50};
-    $retVal{l50} = $metrics->{L50};
-    $retVal{dna_bp} = $metrics->{totlen};
-    $retVal{contigs} = $geo->contigCount;
-    ($retVal{over_roles}, $retVal{under_roles}, $retVal{pred_roles}, $retVal{comp_roles}) = $geo->roleStats;
-    # If the checkg_group contains a taxon ID, convert it to a link.
-    if ($retVal{checkg_group} =~ /^(.+)\s+\((\d+)\)/) {
-        $retVal{checkg_group} = qq(<a href="http://patricbrc.org/view/Taxonomy/$2">$1</a>);
+    ($gThing{scikit_coarse}, $gThing{scikit_fine}, $gThing{checkg_completeness},
+     $gThing{checkg_contamination}, $gThing{checkg_group}) = $geo->scores;
+    my $good = 1;
+    $gThing{scikit_color} = "";
+    $gThing{completeness_color} = "";
+    $gThing{contamination_color} = "";
+    $gThing{seed_color} = "";
+    if (! $geo->is_complete) {
+        $gThing{completeness_color} = WARN_COLOR;
+        $good = 0;
     }
-    return %retVal;
+    if (! $geo->is_consistent) {
+        $gThing{scikit_color} = WARN_COLOR;
+        $good = 0;
+    }
+    if (! $geo->is_clean) {
+        $gThing{contamination_color} = WARN_COLOR;
+        $good = 0;
+    }
+    $gThing{good_seed} = 'Y';
+    if (! $geo->good_seed) {
+        $good = 0;
+        $gThing{good_seed} = '&nbsp;';
+        $gThing{seed_color} = WARN_COLOR;
+    }
+    my $metrics = $geo->metrics;
+    $gThing{n50} = $metrics->{N50};
+    $gThing{l50} = $metrics->{L50};
+    $gThing{dna_bp} = $metrics->{totlen};
+    $gThing{contigs} = $geo->contigCount;
+    ($gThing{over_roles}, $gThing{under_roles}, $gThing{pred_roles}, $gThing{comp_roles}) = $geo->roleStats;
+    # Store the role counts and ratios.
+    $gThing{tot_funs} = $geo->pegCount;
+    $gThing{tot_hypos} = $geo->hypoCount;
+    $gThing{tot_roles} = $geo->roleCount;
+    $gThing{cds_pct} = Math::Round::nearest(0.01, $geo->cdsPercent);
+    $gThing{hypo_pct} = Math::Round::nearest(0.01, $geo->hypoPercent);
+    $gThing{plfam_pct} = Math::Round::nearest(0.01, $geo->plfamPercent);
+    # Set the colors for the non-critical quality numbers.
+    $gThing{contig_color} = "";
+    $gThing{length_color} = "";
+    $gThing{n50_color} = "";
+    $gThing{l50_color} = "";
+    $gThing{cds_color} = "";
+    $gThing{hypo_color} = "";
+    if ($gThing{contigs} > 1000) {
+        $gThing{contig_color} = WARN_COLOR;
+    }
+    if ($gThing{dna_bp} > 15000000 || $gThing{dna_bp} < 300000) {
+        $gThing{length_color} = WARN_COLOR;
+    }
+    if ($gThing{n50} < 5000) {
+        $gThing{n50_color} = WARN_COLOR;
+    }
+    if ($gThing{l50} > 500) {
+        $gThing{l50_color} = WARN_COLOR;
+    }
+    if ($gThing{cds_pct} < 50 || $gThing{cds_pct} > 150) {
+        $gThing{cds_color} = WARN_COLOR;
+    }
+    if ($gThing{hypo_pct} > 70) {
+        $gThing{hypo_color} = WARN_COLOR;
+    }
+    # If the checkg_group contains a taxon ID, convert it to a link.
+    if ($gThing{checkg_group} =~ /^(.+)\s+\((\d+)\)/) {
+        $gThing{checkg_group} = qq(<a href="http://patricbrc.org/view/Taxonomy/$2">$1</a>);
+    }
+    return (\%gThing, $good);
 }
 
 =head3 template_options
