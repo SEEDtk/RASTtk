@@ -29,6 +29,7 @@ package GEO;
     use SeedUtils;
     use URI::Escape;
     use File::Spec;
+    use RepGenome;
 #    use Data::Dumper;
 #    use Carp;
 
@@ -856,6 +857,80 @@ sub closest_protein {
         }
     }
     return ($id, $score);
+}
+
+=head3 FindBBHs
+
+    my (\@pairs, \@orphans1, \@orphans2) = GeoGroup::FindBBHs(\%prots1, \%prots2);
+
+Find the bidirectional best hits between two sets of proteins.
+
+=over 4
+
+=item prots1
+
+A reference to a hash mapping IDs to protein sequences.  This is the first set.
+
+=item prots2
+
+A reference to a hash mapping IDs to protein sequences.  This is the second set.
+
+=item RETURN
+
+Returns a three-element list, consisting of (0) a reference to a list of 3-tuples describing the bidirectional
+best hit pairs in the form [id1, id2, score], (1) a reference to a list of the IDs in the first set not having a match,
+and (2) a reference to a list of the IDs in the second set not having a match.
+
+=back
+
+=cut
+
+sub FindBBHs {
+    my ($prots1, $prots2) = @_;
+    # We start by computing all the pair-wise distances.
+    my %scores;
+    for my $id1 (keys %$prots1) {
+        my $rep1 = RepGenome->new($id1, prot => $prots1->{$id1});
+        for my $id2 (keys %$prots2) {
+            my $score = $rep1->check_genome($prots2->{$id2});
+            # Only store a nonzero score.
+            if ($score) {
+                $scores{$id1}{$id2} = $score;
+                $scores{$id2}{$id1} = $score;
+            }
+        }
+    }
+    # This will hold the best-match pairs.
+    my @pairs;
+    # These hashes track the orphans.
+    my %orphans1 = map { $_ => 1 } keys %$prots1;
+    my %orphans2 = map { $_ => 1 } keys %$prots2;
+    # Now we find the bidirectional best hits for each protein in set 1.
+    for my $id1 (keys %$prots1) {
+        # Get the best matches for this protein.
+        my ($bestId2L, $score) = _find_best_match($id1, \%scores);
+        # Now we loop through the IDs returned.  If one of them has us for a best match, we keep it.
+        my $done;
+        while (! $done) {
+            my $id2 = pop @$bestId2L;
+            if (! $id2) {
+                $done = 1;
+            } else {
+                my ($bestId1L) = _find_best_match($id2, \%scores);
+                if (grep { $_ eq $id1 } @$bestId1L) {
+                    push @pairs, [$id1, $id2, $score];
+                    $orphans1{$id1} = 0;
+                    $orphans2{$id2} = 0;
+                    $done = 1;
+                }
+            }
+        }
+    }
+    # The final step is to compute the orphans.
+    my @orphans1 = grep { $orphans1{$_} } keys %orphans1;
+    my @orphans2 = grep { $orphans2{$_} } keys %orphans2;
+    # Return the three lists.
+    return (\@pairs, \@orphans1, \@orphans2);
 }
 
 =head2 Query Methods
@@ -2048,6 +2123,59 @@ sub FindBadContigs {
 }
 
 =head2 Internal Methods
+
+=head3 _find_best_match
+
+    my (\@idList, $score) = GEO::_find_best_match($id, \%scores);
+
+This is a utility subroutine for the bidirectional-best-hit search.  Given an ID from one set and a distance matrix,
+it finds the IDs in the other set that have the highest score.
+
+=over 4
+
+=item id
+
+The ID of the item whose best matches are desired.
+
+=item scores
+
+A reference to a two-dimensional hash that maps pairs of IDs to scores.  The incoming ID must be available in the
+first dimension-- that is, it must have a sub-hash keyed on the other IDs.
+
+=item min (optional)
+
+The minimum score to permit.  The default is C<0>.
+
+=item RETURN
+
+Returns a list containing (0) a reference to a list of the IDs with the highest score for the incoming ID, and (2) the
+relevant match score.
+
+=back
+
+=cut
+
+sub _find_best_match {
+    my ($id, $scores, $min) = @_;
+    # Get the sub-hash for the incoming ID.  If there is none, we use an empty hash.
+    my $matches = $scores->{$id} // {};
+    # Default the minimum score.
+    $min //= 0;
+    # Start with an empty list and a score of 0.  There are no 0 scores in the matrix.
+    my ($bestScore, @retVal) = ($min);
+    # Loop through the scores.
+    for my $id2 (keys %$matches) {
+        my $score2 = $matches->{$id2};
+        if ($score2 > $bestScore) {
+            ($bestScore, @retVal) = ($score2, $id2);
+        } elsif ($score2 == $bestScore) {
+            push @retVal, $id2;
+        }
+    }
+    # Return the result.
+    return (\@retVal, $bestScore);
+}
+
 
 =head3 _format_comments
 
