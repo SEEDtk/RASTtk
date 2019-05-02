@@ -1448,9 +1448,71 @@ sub roleFids {
     return $retVal;
 }
 
+=head3 fidLoc
+
+    my $loc = $geo->fidLoc($fid);
+
+Return the location of a feature in the genome.  This only works at detail level 1 or better.
+
+=over 4
+
+=item fid
+
+The ID of the feature whose location is desired.
+
+=item RETURN
+
+Returns a L<BasicLocation> object for the feature, or C<undef> if the feature does not exist or the detail level is
+insufficient.
+
+=back
+
+=cut
+
+sub fidLoc {
+    my ($self, $fid) = @_;
+    my $retVal;
+    my $fidLocs = $self->{fidLocs};
+    if ($fidLocs) {
+        $retVal = $fidLocs->{$fid};
+    }
+    return $retVal;
+}
+
+=head3 fidProt
+
+    my $prot = $geo->fidPProt($fid);
+
+Return the protein sequence of a feature in the genome.  This only works at detail level 2 or better.
+
+=over 4
+
+=item fid
+
+The ID of the feature whose protein sequence is desired.
+
+=item RETURN
+
+Returns the amino acid sequence of the protein, or C<undef> if the feature does not exist or the detail level is
+insufficient.
+
+=back
+
+=cut
+
+sub fidProt {
+    my ($self, $fid) = @_;
+    my $retVal;
+    my $proteins = $self->{proteins};
+    if ($proteins) {
+        $retVal = $proteins->{$fid};
+    }
+    return $retVal;
+}
+
 =head3 is_consistent
 
-    my $goodFlag = $self->is_consistent;
+    my $goodFlag = $geo->is_consistent;
 
 Return TRUE if this genome's annotations are sufficiently consistent. If the quality data is not present, it will automatically return FALSE.
 
@@ -1468,7 +1530,7 @@ sub is_consistent {
 
 =head3 is_complete
 
-    my $goodFlag = $self->is_complete;
+    my $goodFlag = $geo->is_complete;
 
 Return TRUE if this genome is sufficiently complete. If the quality data is not present, it will automatically return FALSE.
 
@@ -1486,7 +1548,7 @@ sub is_complete {
 
 =head3 is_clean
 
-    my $goodFlag = $self->is_clean;
+    my $goodFlag = $geo->is_clean;
 
 Return TRUE if this genome is sufficiently free of contamination. If the quality data is not present, it will automatically return FALSE.
 
