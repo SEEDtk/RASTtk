@@ -19,6 +19,10 @@ The following additional options are supported.
 
 If specified, statistics about the genomes will be written to the standard error output.
 
+=item score
+
+Include a column for the score in the output.
+
 =back
 
 =cut
@@ -31,13 +35,17 @@ use Stats;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::ih_options(),
-        ['stats', 'write statistics to the standard error output']
+        ['stats', 'write statistics to the standard error output'],
+        ['score', 'include score column in output']
         );
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 my $stats = Stats->new();
+# Get the options.
+my $scoreCol = $opt->score;
 # Read the incoming headers.
 my ($outHeaders, $cols) = P3Utils::find_headers($ih, evalOutput => 'Good Seed', 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination');
+push @$outHeaders, 'Score' if $scoreCol;
 push @$outHeaders, 'Good Genome';
 # The input rows will be kept in here. The hash is two-level, {goodness}{qscore};
 my %rows = (0 => {}, 1 => {});
@@ -66,6 +74,7 @@ while (! eof $ih) {
         $stats->Add(bad => 1);
     }
     my $qScore = GEO::qscoreX($coarse, $fine, $complete, $contam);
+    push @fields, $qScore if $scoreCol;
     push @{$rows{$goodness}{$qScore}}, join("\t", @fields, $goodness) . "\n";
 }
 # Write the output.
