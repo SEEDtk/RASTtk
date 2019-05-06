@@ -861,7 +861,7 @@ sub closest_protein {
 
 =head3 FindBBHs
 
-    my (\@pairs, \@orphans1, \@orphans2) = GeoGroup::FindBBHs(\%prots1, \%prots2);
+    my (\@pairs, \@orphans1, \@orphans2) = GEO::FindBBHs(\%prots1, \%prots2);
 
 Find the bidirectional best hits between two sets of proteins.
 
@@ -1508,6 +1508,20 @@ sub fidProt {
         $retVal = $proteins->{$fid};
     }
     return $retVal;
+}
+
+=head3 protMap
+
+    my $protHash = $geo->protMap;
+
+Return a reference to a hash mapping each feature ID to its protein sequence.  This only works if we are at detail
+level 2.
+
+=cut
+
+sub protMap {
+    my ($self) = @_;
+    return $self->{proteins} // {};
 }
 
 =head3 is_consistent
