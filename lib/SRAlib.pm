@@ -299,17 +299,17 @@ sub download_runs {
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
         my $lCount = 0;
-        my $line;
-        while (! eof $ih && ! $error) {
+        my ($line, @left, @right);
+        while (! eof $ih) {
             $line = <$ih>;
             # Check for the left read.
             if ($line =~ /^\@(\S+)\.1\s/) {
-                # Found it. Echo the data and the quality to the left file.
+                # Found it. Save the data and the quality for the left file.
                 my $id = $1;
-                print $lh $line;
+                push @left, $line;
                 for my $idx (1,2,3) {
                     $line = <$ih>;
-                    print $lh $line;
+                    push @left, $line;
                 }
                 # Check for the right read.
                 $line = <$ih>;
@@ -317,8 +317,8 @@ sub download_runs {
                     my $idR = $1;
                     if ($idR ne $id) {
                         # Mismatched reads.
-                        $error = 1;
                         $self->_log("Bad run: right read does not match left read $id.\n");
+                        $error++;
                     } else {
                         # Echo to the right file.
                         print $rh $line;
@@ -326,36 +326,36 @@ sub download_runs {
                             $line = <$ih>;
                             print $rh $line;
                         }
+                        # Print to the left file.
+                        for $line (@left) {
+                            print $lh $line;
+                        }
                         $lCount++;
                         $self->_log("$lCount spots output.\n") if $lCount % 10000 == 0;
                     }
                 } else {
                     # No valid right read.
-                    $error = 1;
                     $self->_log("Bad run: no right read following left read $id.\n");
+                    $error++;
                 }
             } else {
                 # No valid left read.
-                $error = 1;
                 $self->_log("Bad run: left read not found when expected.\n");
+                $error++;
             }
         }
-        # Flush the piped command stream.
-        while (! eof $ih) {
-            $line = <$ih>;
-        }
-        close $ih;
     }
+    my $retVal = 1;
     # Clean up the files.
     close $lh; close $rh;
-    if ($error && $created) {
+    if ($error > 10000 && $created) {
         # Here we must remove the created directory.
-        $self->_log("Cleaning up $outDir.\n");
+        $self->_log("Too many errors: cleaning up $outDir.\n");
         File::Copy::Recursive::pathempty($outDir);
         rmdir $outDir;
+        $retVal = 0;
     }
     # Return the success flag.
-    my $retVal = ! $error;
     return $retVal;
 }
 
