@@ -299,7 +299,7 @@ sub download_runs {
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
         my $lCount = 0;
-        my ($line, @left, @right);
+        my ($line, @left);
         while (! eof $ih) {
             $line = <$ih>;
             # Check for the left read.
@@ -327,7 +327,7 @@ sub download_runs {
                             print $rh $line;
                         }
                         # Print to the left file.
-                        for $line (@left) {
+                        while ($line = shift @left) {
                             print $lh $line;
                         }
                         $lCount++;
