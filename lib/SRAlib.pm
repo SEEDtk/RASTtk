@@ -343,7 +343,7 @@ sub download_runs {
                 $self->_log("Bad run: left read not found when expected.\n");
                 $error++;
             }
-            while ($line !~ /^\@\S+\.1\s/) {
+            while (defined $line && $line !~ /^\@\S+\.1\s/) {
                 # Find the next left read.
                 $line = <$ih>;
             }
