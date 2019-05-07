@@ -319,6 +319,7 @@ sub download_runs {
                         # Mismatched reads.
                         $self->_log("Bad run: right read does not match left read $id.\n");
                         $error++;
+                        $stats->Add(rightMismatch => 1);
                     } else {
                         # Echo to the right file.
                         print $rh $line;
@@ -336,16 +337,19 @@ sub download_runs {
                 } else {
                     # No valid right read.
                     $self->_log("Bad run: no right read following left read $id.\n");
+                    $stats->Add(noRightRead => 1);
                     $error++;
                 }
             } else {
                 # No valid left read.
                 $self->_log("Bad run: left read not found when expected.\n");
+                $stats->Add(noLeftRead => 1);
                 $error++;
             }
             while (defined $line && $line !~ /^\@\S+\.1\s/) {
                 # Find the next left read.
                 $line = <$ih>;
+                $stats->Add(skippedLine => 1);
             }
         }
     }
