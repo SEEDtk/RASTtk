@@ -299,9 +299,9 @@ sub download_runs {
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
         my $lCount = 0;
-        my ($line, @left);
-        while (! eof $ih) {
-            $line = <$ih>;
+        my @left;
+        my $line = <$ih>;
+        while (defined $line) {
             # Check for the left read.
             if ($line =~ /^\@(\S+)\.1\s/) {
                 # Found it. Save the data and the quality for the left file.
@@ -342,6 +342,10 @@ sub download_runs {
                 # No valid left read.
                 $self->_log("Bad run: left read not found when expected.\n");
                 $error++;
+            }
+            while ($line !~ /^\@\S+\.1\s/) {
+                # Find the next left read.
+                $line = <$ih>;
             }
         }
     }
