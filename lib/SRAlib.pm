@@ -302,6 +302,7 @@ sub download_runs {
         my @left;
         my $line = <$ih>;
         while (defined $line) {
+            $stats->Add(runLineIn => 1);
             # Check for the left read.
             if ($line =~ /^\@(\S+)\.1\s/) {
                 # Found it. Save the data and the quality for the left file.
