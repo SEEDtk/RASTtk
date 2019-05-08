@@ -268,8 +268,9 @@ sub download_runs {
     my ($self, $runList, $outDir, $name) = @_;
     # Get the statistics object.
     my $stats = $self->{stats};
-    # This will be set to TRUE if we need to abort.
+    # This will be count the good lines and the bad lines.
     my $error = 0;
+    my $good = 0;
     # This will be set to TRUE if we create a directory.
     my $created = 0;
     # Insure we have an output directory.
@@ -318,7 +319,6 @@ sub download_runs {
                     my $idR = $1;
                     if ($idR ne $id) {
                         # Mismatched reads.
-                        $self->_log("Bad run: right read does not match left read $id.\n");
                         $error++;
                         $stats->Add(rightMismatch => 1);
                     } else {
@@ -333,19 +333,17 @@ sub download_runs {
                             print $lh $line;
                         }
                         $lCount++;
-                        $self->_log("$lCount spots output.\n") if $lCount % 10000 == 0;
+                        $self->_log("$lCount spots output.\n") if $lCount % 50000 == 0;
                         # Get the next left read.
                         $line = <$ih>;
                     }
                 } else {
                     # No valid right read.
-                    $self->_log("Bad run: no right read following left read $id.\n");
                     $stats->Add(noRightRead => 1);
                     $error++;
                 }
             } else {
                 # No valid left read.
-                $self->_log("Bad run: left read not found when expected.\n");
                 $stats->Add(noLeftRead => 1);
                 $error++;
             }
@@ -355,11 +353,12 @@ sub download_runs {
                 $stats->Add(skippedLine => 1);
             }
         }
+        $good += $lCount;
     }
     my $retVal = 1;
     # Clean up the files.
     close $lh; close $rh;
-    if ($error > 10000 && $created) {
+    if ($error > $good && $created) {
         # Here we must remove the created directory.
         $self->_log("Too many errors: cleaning up $outDir.\n");
         File::Copy::Recursive::pathempty($outDir);
