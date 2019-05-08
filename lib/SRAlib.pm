@@ -334,6 +334,8 @@ sub download_runs {
                         }
                         $lCount++;
                         $self->_log("$lCount spots output.\n") if $lCount % 10000 == 0;
+                        # Get the next left read.
+                        $line = <$ih>;
                     }
                 } else {
                     # No valid right read.
