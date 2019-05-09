@@ -469,7 +469,7 @@ sub _write_singleton {
          if (! $data2) {
              # Partial record.
              $stats->Add(partialDiscarded => 1);
-         } elsif ($sh) {
+         } elsif ($sh && $header =~ /^\@/) {
              # Here we can write the singleton.
              $retVal++;
              $stats->Add(singletonOut => 1);
