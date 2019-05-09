@@ -281,17 +281,20 @@ sub download_runs {
         File::Copy::Recursive::pathmk($outDir);
         $created = 1;
     }
+    # Count singletons here.
+    my $singles = 0;
     # Find the FASTQ-DUMP command.
     my $cmdPath = SeedAware::executable_for('fastq-dump');
-    # Create the FASTQ output files.
-    my ($lh, $rh);
-    my ($lfile, $rfile) = ("$outDir/${name}_1.fastq", "$outDir/${name}_2.fastq");
+    # Create the FASTQ output files.  Note the singleton file is not allowed in gzip mode.
+    my ($lh, $rh, $sh);
+    my ($lfile, $rfile, $sfile) = ("$outDir/${name}_1.fastq", "$outDir/${name}_2.fastq", "$outDir/${name}_s.fastq");
     if ($self->{gzip}) {
         $lh = new IO::Compress::Gzip("$lfile.gz");
         $rh = new IO::Compress::Gzip("$rfile.gz");
     } else {
         open($lh, '>', $lfile) || die "Could not open left FASTQ for $name: $!";
         open($rh, '>', $rfile) || die "Could not open right FASTQ for $name: $!";
+        open($sh, '>', $sfile) || die "Could not open singleton FASTQ for $name: $!";
     }
     # Loop through the runs.
     for my $run (@$runList) {
@@ -321,6 +324,7 @@ sub download_runs {
                         # Mismatched reads.
                         $error++;
                         $stats->Add(rightMismatch => 1);
+                        $singles += $self->_write_singleton($sh, \@left);
                     } else {
                         # Echo to the right file.
                         print $rh $line;
@@ -347,23 +351,29 @@ sub download_runs {
                 $stats->Add(noLeftRead => 1);
                 $error++;
             }
+            # Find the next left read.
+            my @skip;
             while (defined $line && $line !~ /^\@\S+\.1\s/) {
-                # Find the next left read.
+                push @skip, $line;
                 $line = <$ih>;
-                $stats->Add(skippedLine => 1);
             }
+            $singles += $self->_write_singleton($sh, \@skip);
         }
         $good += $lCount;
     }
     my $retVal = 1;
     # Clean up the files.
     close $lh; close $rh;
+    close $sh if $sh;
     if ($error > $good && $created) {
         # Here we must remove the created directory.
         $self->_log("Too many errors: cleaning up $outDir.\n");
         File::Copy::Recursive::pathempty($outDir);
         rmdir $outDir;
         $retVal = 0;
+    } elsif (-z $sfile) {
+        # Here we must delete an empty singleton file.
+        unlink $sfile || die "Could not delete singleton file $sfile: $!";
     }
     # Return the success flag.
     return $retVal;
@@ -415,6 +425,60 @@ sub _log {
     if ($lh) {
         print $lh $message;
     }
+}
+
+=head3 _write_singleton
+
+    my $count = $sraLib->_write_singleton($sh, \@lines);
+
+Write one or more records to the singleton FASTQ file.  If the file handle does not exist, the singletons are discarded.
+
+=over 4
+
+=item sh
+
+An open output file handle, or C<undef> to ignore the singletons.
+
+=item lines
+
+Reference to a list of the lines to write.
+
+=item RETURN
+
+Returns the number of records written.
+
+=back
+
+=cut
+
+sub _write_singleton {
+    my ($self, $sh, $lines) = @_;
+    # Get the stats object.
+    my $stats = $self->{stats};
+    # This will be the return value.
+    my $retVal = 0;
+    # Pop off the records one at a time.
+    my @stack = @$lines;
+    my ($header, $data1, $qhead, $data2);
+    while (scalar @stack) {
+         ($header, $data1, $qhead, $data2, @stack) = @stack;
+         if (! defined $data2) {
+             # Partial record.
+             $stats->Add(partialDiscarded => 1);
+         } elsif ($sh) {
+             # Here we can write the singleton.
+             $retVal++;
+             $stats->Add(singletonOut => 1);
+             print $sh $header;
+             print $sh $data1;
+             print $sh $qhead;
+             print $sh $data2;
+         } else {
+             $stats->Add(recordSkipped => 1);
+         }
+    }
+    # Return the number of records written.
+    return $retVal;
 }
 
 1;
