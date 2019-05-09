@@ -466,7 +466,7 @@ sub _write_singleton {
     my ($header, $data1, $qhead, $data2);
     while (scalar @stack) {
          ($header, $data1, $qhead, $data2, @stack) = @stack;
-         if (! defined $data2) {
+         if (! $data2) {
              # Partial record.
              $stats->Add(partialDiscarded => 1);
          } elsif ($sh) {
