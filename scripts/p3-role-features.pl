@@ -85,7 +85,7 @@ while (! eof $ih) {
         my $role2 = P3Utils::clean_value($role);
         # Get all the occurrences of the role.  Note we explicitly ask for genome ID and product.
         my $results = P3Utils::get_data($p3, feature => [['eq', 'product', $role2], @$filterList], ['genome_id', 'product', @$selectList]);
-        print STDERR scalar(@$results) . " found for $role.\n";
+        print STDERR scalar(@$results) . " found for $role.\n" if $debug;
         # Loop through the results.  We filter by genome (if requested) and by the role checksum, then write the output
         # if it passes.
         my ($count, $gCount, $rCount) = (0, 0, 0);
