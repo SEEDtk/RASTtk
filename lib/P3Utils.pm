@@ -719,7 +719,8 @@ Clean up a value for use in a filter specification.
 
 =item value
 
-Value to clean up. Cleaning involves removing parentheses and leading and trailing spaces.
+Value to clean up. Cleaning involves removing parentheses, illegal characters, and leading and
+trailing spaces.
 
 =item RETURN
 
@@ -735,6 +736,7 @@ sub clean_value {
     $value =~ s/\s+/ /g;
     $value =~ s/^\s+//;
     $value =~ s/\s+$//;
+    $value =~ s/'//;
     return $value;
 }
 
