@@ -325,7 +325,7 @@ sub download_runs {
                         $error++;
                         $stats->Add(rightMismatch => 1);
                         $singles += $self->_write_singleton($sh, \@left);
-                        $self->_log("$singles singletons output.\n") if ($singles % 1000 == 0);
+                        $self->_log("$singles singletons output.\n");
                     } else {
                         # Echo to the right file.
                         print $rh $line;
@@ -358,9 +358,10 @@ sub download_runs {
                 push @skip, $line;
                 $line = <$ih>;
             }
-            my $nSingles = $self->_write_singleton($sh, \@skip);
-            $singles += $nSingles;
-            $self->_log("$singles singletons output.\n") if $nSingles && ($singles % 1000 == 0);
+            if (scalar @skip) {
+                $singles += $self->_write_singleton($sh, \@skip);
+                $self->_log("$singles singletons output.\n");
+            }
         }
         $good += $lCount;
     }
