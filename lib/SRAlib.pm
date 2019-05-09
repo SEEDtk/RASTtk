@@ -325,7 +325,6 @@ sub download_runs {
                         $error++;
                         $stats->Add(rightMismatch => 1);
                         $singles += $self->_write_singleton($sh, \@left);
-                        $self->_log("$singles singletons output.\n");
                     } else {
                         # Echo to the right file.
                         print $rh $line;
@@ -360,7 +359,6 @@ sub download_runs {
             }
             if (scalar @skip) {
                 $singles += $self->_write_singleton($sh, \@skip);
-                $self->_log("$singles singletons output.\n");
             }
         }
         $good += $lCount;
@@ -462,11 +460,11 @@ sub _write_singleton {
     # This will be the return value.
     my $retVal = 0;
     # Pop off the records one at a time.
-    my @stack = @$lines;
-    my ($header, $data1, $qhead, $data2);
-    while (scalar @stack) {
-         ($header, $data1, $qhead, $data2, @stack) = @stack;
-         if (! $data2) {
+    my $n = scalar @$lines;
+    $self->_log("$n lines stacked for singleton write.\n");
+    for (my $i = 0; $i < $n; $i += 4) {
+         my $header = $lines->[$i];
+         if ($i + 3 >= $n) {
              # Partial record.
              $stats->Add(partialDiscarded => 1);
          } elsif ($sh && $header =~ /^\@/) {
@@ -474,9 +472,9 @@ sub _write_singleton {
              $retVal++;
              $stats->Add(singletonOut => 1);
              print $sh $header;
-             print $sh $data1;
-             print $sh $qhead;
-             print $sh $data2;
+             print $sh $lines->[$i+1];
+             print $sh $lines->[$i+2];
+             print $sh $lines->[$i+3];
          } else {
              $stats->Add(recordSkipped => 1);
          }
