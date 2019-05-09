@@ -42,9 +42,6 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options
 my $debug = $opt->verbose;
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
-if ($debug) {
-    $p3->debug_on(\*STDERR);
-}
 # Compute the output columns.
 my ($selectList, $newHeaders) = P3Utils::select_clause($p3, feature => $opt);
 # Compute the filter.
@@ -83,6 +80,7 @@ while (! eof $ih) {
         my $checksum = RoleParse::Checksum($role);
         # Clean the role for the query.
         my $role2 = P3Utils::clean_value($role);
+        print STDERR "Query for: $role.\n" if $debug;
         # Get all the occurrences of the role.  Note we explicitly ask for genome ID and product.
         my $results = P3Utils::get_data($p3, feature => [['eq', 'product', $role2], @$filterList], ['genome_id', 'product', @$selectList]);
         print STDERR scalar(@$results) . " found for $role.\n" if $debug;
