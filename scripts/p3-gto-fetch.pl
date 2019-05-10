@@ -56,7 +56,7 @@ use Stats;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('sourceDir targetDir', P3Utils::col_options(), P3Utils::ih_options(),
-        ['subDir', 'column containing subdirectory names'],
+        ['subCol=s', 'column containing subdirectory names'],
         ['clear', 'erase target before copying']);
 my $stats = Stats->new();
 # Get the directory names.
@@ -78,7 +78,7 @@ print "Source directory is $sourceDir. Target directory is $targetDir.\n";
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Check for a subdirectory column.
-my $subCol = $opt->subdir;
+my $subCol = $opt->subcol;
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Get the genome IDs and the output directory for each.  This is more complicated if we have a subdirectory column.
