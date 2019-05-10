@@ -233,6 +233,54 @@ sub get_stats {
     return ($spots, $bases);
 }
 
+=head3 get_meta
+
+    my $metaH = $sraLib->get_meta($srs_id);
+
+Extract the the source metadata hash for a specified sample.
+
+=over 4
+
+=item id
+
+The SRS ID for the sample (e.g. C<SRS015383>).
+
+=item RETURN
+
+Returns a reference to a hash containing the key and value for each metadata item attached to this sample.
+
+=back
+
+=cut
+
+sub get_meta {
+    my ($self, $id) = @_;
+    # This will be the return value.
+    my %retVal;
+    # Normalize the ID to upper case.
+    $id = uc $id;
+    # Retrieve the web page for this sample.
+    $self->_log("Fetching metadata for $id.\n");
+    my $url = "https://www.ncbi.nlm.nih.gov/biosample/?term=($id)%20AND%20biosample_sra[filter]&report=full&format=text";
+    my $response = $self->{ua}->get($url);
+    if (! $response->is_success) {
+        $self->_log_error($response);
+    } else {
+        # Here we have a valid web page to scrape.
+        my $content = $response->decoded_content;
+        my @lines = split /\n/, $content;
+        for my $line (@lines) {
+            if ($line =~ /\/([^=]+)="([^"]+)"/) {
+                $retVal{$1} = $2;
+            } elsif ($line =~ /^Organism:\s+(.+)/) {
+                $retVal{Organism} = $1;
+            }
+        }
+    }
+    # Return the results.
+    return \%retVal;
+}
+
 
 =head3 download_runs
 
