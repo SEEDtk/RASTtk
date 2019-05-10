@@ -130,7 +130,7 @@ sub Annotate {
             sleep $sleepInterval;
         }
         # Get the results.
-        $retVal = retrieve($jobID, $header);
+        $retVal = retrieve($jobID, $name, $header);
         if (! $retVal && ! $options{robust}) {
             die "Error retrieving RAST job $jobID.";
         }
@@ -377,6 +377,10 @@ Extract the GTO for an annotated genome from the RAST interface.
 
 The ID of the job that annotated the genome.
 
+=item name
+
+The name of the genome submitted.
+
 =item header
 
 The authorization header returned by L</auth_header>.
@@ -394,7 +398,7 @@ Returns an unblessed L<GenomeTypeObject> for the annotated genome, or C<undef> i
 =cut
 
 sub retrieve {
-    my ($jobID, $header, $raw) = @_;
+    my ($jobID, $name, $header, $raw) = @_;
     # This will be the return value.
     my $retVal;
     # Ask for the GTO from PATRIC.
@@ -406,20 +410,27 @@ sub retrieve {
         print STDERR "Error response for RAST retrieval: " . $response->message;
     } else {
         my $json = $response->content;
-        if ($raw) {
-            $retVal = $json;
+        if ($json =~ /^<html>/) {
+            print STDERR "HTML response for RAST retrieval: $json.\n";
         } else {
-            if ($json =~ /^<html>/) {
-                print STDERR "HTML response for RAST retrieval: $json.\n";
+            my $gto = SeedUtils::read_encoded_object(\$json);
+            my $retName = $gto->{scientific_name};
+            if (! $retName) {
+                print STDERR "Invalid or missing GTO return from RAST.\n";
+            } elsif ($retName ne $name) {
+                print STDERR "Submitted $name to RAST but got back $retName.\n";
+            } elsif ($raw) {
+                $retVal = $json;
+            } else {
+                $retVal = $gto;
+                # Add the RAST information to the GTO.
+                my ($userH) = $header->authorization_basic();
+                if ($userH =~ /^(.+)\@patricbrc.org/) {
+                    $userH = $1;
+                }
+                $gto->{rast_specs} = { id => $jobID, user => $userH };
             }
-            $retVal = SeedUtils::read_encoded_object(\$json);
         }
-        # Add the RAST information to the GTO.
-        my ($userH) = $header->authorization_basic();
-        if ($userH =~ /^(.+)\@patricbrc.org/) {
-            $userH = $1;
-        }
-        $retVal->{rast_specs} = { id => $jobID, user => $userH };
     }
     # Return it.
     return $retVal;
