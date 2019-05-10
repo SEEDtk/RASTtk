@@ -281,6 +281,67 @@ sub get_meta {
     return \%retVal;
 }
 
+=head3 compute_site
+
+    my ($project, $site) = $sraLib->compute_site($id);
+
+Compute the project and site for a sample based on its meta-data.
+
+=over 4
+
+=item id
+
+The SRS ID for the sample.
+
+=item RETURN
+
+Returns a list containing (0) the project code (usually C<NCBI>, but sometimes C<HMP>) and (1) the site name.
+
+=back
+
+=cut
+
+sub compute_site {
+    my ($self, $id) = @_;
+    # Get the stats.
+    my $stats = $self->{stats};
+    # These will be the return values.
+    my ($project, $site) = ('NCBI', 'unknown');
+    # Get the metadata hash.
+    my $metaH = $self->get_meta($id);
+    # Get the most important elements.
+    my $source = $metaH->{'isolation source'} // '';
+    my $organism = $metaH->{Organism} // '';
+    my $study = $metaH->{'study name'} // '';
+    # Parse the metadata.
+    if ($study =~ /^HMP\s/) {
+        $project = 'HMP';
+        if ($source =~ /^G_DNA_(.+)/) {
+            $site = lc $1;
+            $site =~ tr/ /_/;
+        } else {
+            $stats->Add('HMP-unknown' => 1);
+        }
+    } elsif ($organism =~ /^(human|gut|oral)\s+metagenome/) {
+        my $type = $1;
+        if ($source ne 'missing') {
+            $site = lc $source;
+            $site =~ tr/ /_/;
+        } elsif ($type eq 'gut') {
+            $site = 'stool';
+        } elsif ($type eq' oral') {
+            $site = 'saliva';
+        } else {
+            $stats->Add('NCBI-missing' => 1);
+        }
+    } elsif ($organism =~ /^(\S+)\s+metagenome/) {
+        $site = lc $1;
+    } else {
+        $stats->Add('NCBI-unknown' => 1);
+        $project = 'N/A';
+    }
+    return ($project, $site);
+}
 
 =head3 download_runs
 
