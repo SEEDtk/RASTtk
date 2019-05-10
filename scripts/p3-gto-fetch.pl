@@ -39,6 +39,11 @@ Additional command-line options are the following.
 
 Erase the target directory if it already exists.
 
+=item subCol
+
+If specified, the index (1-based) or name of a column containing subdirectory names.  The GTOs will be copied into
+a subdirectory of the target with the same name as the value in the column.
+
 =back
 
 =cut
@@ -51,6 +56,7 @@ use Stats;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('sourceDir targetDir', P3Utils::col_options(), P3Utils::ih_options(),
+        ['subDir', 'column containing subdirectory names'],
         ['clear', 'erase target before copying']);
 my $stats = Stats->new();
 # Get the directory names.
@@ -71,15 +77,32 @@ if (! $sourceDir) {
 print "Source directory is $sourceDir. Target directory is $targetDir.\n";
 # Open the input file.
 my $ih = P3Utils::ih($opt);
+# Check for a subdirectory column.
+my $subCol = $opt->subdir;
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-# Read the genome IDs.
-my $genomes = P3Utils::get_col($ih, $keyCol);
-my $genomeCount = scalar @$genomes;
+# Get the genome IDs and the output directory for each.  This is more complicated if we have a subdirectory column.
+my %gHash;
+if (defined $subCol) {
+    $subCol = P3Utils::find_column($subCol, $outHeaders);
+    # Read the genome IDs and the subdirectories.
+    while (! eof $ih) {
+        my ($genome, $subDir) = P3Utils::get_cols($ih, [$keyCol, $subCol]);
+        my $outDir = "$targetDir/$subDir";
+        if (! -d $outDir) {
+            print "Creating $outDir.\n";
+            File::Copy::Recursive::pathmk($outDir) || die "Could not create target directory: $!";
+        }
+        $gHash{$genome} = $outDir;
+    }
+} else {
+    # Read the genome IDs only.
+    my $genomes = P3Utils::get_col($ih, $keyCol);
+    %gHash = map { $_ => $targetDir } @$genomes;
+}
+my $genomeCount = scalar keys %gHash;
 my $genomeFound = 0;
 print "$genomeCount genomes to find in $sourceDir.\n";
-# Set up a hash to filter the genomes we want.
-my %gHash = map { $_ => 1 } @$genomes;
 # Now we search the source directories for the GTOs.
 my @stack = ($sourceDir);
 while (my $dir = pop @stack) {
@@ -96,7 +119,7 @@ while (my $dir = pop @stack) {
             if (! $gHash{$1}) {
                 $stats->Add(sourceGtoSkipped => 1);
             } else {
-                my ($source, $target) = map { "$_/$member" } ($dir, $targetDir);
+                my ($source, $target) = map { "$_/$member" } ($dir, $gHash{$1});
                 File::Copy::Recursive::fcopy($source, $target);
                 $stats->Add(sourceGtoCopied => 1);
                 $genomeFound++;
