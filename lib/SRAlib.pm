@@ -334,6 +334,10 @@ sub compute_site {
         } else {
             $stats->Add('NCBI-missing' => 1);
         }
+    } elsif ($organism eq 'human gut metagenome') {
+        $site = 'stool';
+    } elsif ($organism =~ /sediment metagenome/) {
+        $site = 'soil';
     } elsif ($organism =~ /^(\S+)\s+metagenome/) {
         $site = lc $1;
     } else {
