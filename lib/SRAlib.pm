@@ -336,6 +336,12 @@ sub compute_site {
         }
     } elsif ($organism eq 'human gut metagenome') {
         $site = 'stool';
+    } elsif ($organism eq 'human skin metagenome') {
+        $site = 'human_skin';
+    } elsif ($organism =~ /^human (\S+) metagenome$/) {
+        $site = $1;
+    } elsif ($organism eq 'hot springs metagenome') {
+        $site = 'hot_springs';
     } elsif ($organism =~ /sediment metagenome/) {
         $site = 'soil';
     } elsif ($organism =~ /^(\S+)\s+metagenome/) {
