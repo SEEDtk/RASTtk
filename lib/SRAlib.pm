@@ -324,7 +324,7 @@ sub compute_site {
         }
     } elsif ($organism =~ /^(human|gut|oral)\s+metagenome/) {
         my $type = $1;
-        if ($source ne 'missing') {
+        if ($source && $source ne 'missing') {
             $site = lc $source;
             $site =~ tr/ /_/;
         } elsif ($type eq 'gut') {
