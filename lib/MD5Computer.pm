@@ -185,6 +185,39 @@ sub new_from_fasta {
     return $retVal;
 }
 
+=head3 new_from_gto
+
+    my $descriptor = MD5Computer->new_from_fasta($fileName);
+
+Create a fully-functional genome descriptor from a L<GenomeTypeObject>.
+
+=over 4
+
+=item gto
+
+A (possibly-unblessed) L<GenomeTypeObject> containing all of a genome's contigs and
+annotations.
+
+=back
+
+=cut
+
+sub new_from_gto {
+    my ($class, $gto) = @_;
+    # Start with a blank descriptor.
+    my $retVal = new($class);
+    # Loop through the contigs of the GTO.
+    my $contigList = $gto->{contigs};
+    for my $contigObj (@$contigList) {
+        my $contigID = $contigObj->{id};
+        my $seq = $contigObj->{dna};
+        $retVal->ProcessContig($contigID, [$seq]);
+    }
+    # Denote we've processed all the contigs.
+    $retVal->CloseGenome();
+    return $retVal;
+}
+
 =head2 Genome Descriptor Methods
 
 =head3 StartContig

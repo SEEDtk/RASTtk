@@ -29,6 +29,7 @@ package RASTlib;
     use P3DataAPI;
     use Crypt::RC4;
     use FastA;
+    use MD5Computer;
 
 =head1 Annotate a Genome Using RAST
 
@@ -122,7 +123,7 @@ sub Annotate {
     # Create the authorization header.
     my $header = auth_header($options{user}, $options{password});
     # Submit the job.
-    my $jobID = Submit($contigs, $taxonID, $name, %options, header => $header);
+    my ($jobID, $checksum) = Submit($contigs, $taxonID, $name, %options, header => $header);
     if ($jobID) {
         print STDERR "Rast job ID is $jobID.\n";
         # Begin spinning for a completion status.
@@ -130,7 +131,7 @@ sub Annotate {
             sleep $sleepInterval;
         }
         # Get the results.
-        $retVal = retrieve($jobID, $name, $header);
+        $retVal = retrieve($jobID, $checksum, $header);
         if (! $retVal && ! $options{robust}) {
             die "Error retrieving RAST job $jobID.";
         }
@@ -141,7 +142,7 @@ sub Annotate {
 
 =head3 Submit
 
-    my $jobID = RASTlib::Submit(\@contigs, $taxonID, $name, %options);
+    my ($jobID, $checksum) = RASTlib::Submit(\@contigs, $taxonID, $name, %options);
 
 Submit an annotation to RAST and return the job ID.
 
@@ -204,7 +205,8 @@ If TRUE, errors will return C<undef> instead of failing outright.  A warning mes
 
 =item RETURN
 
-Returns an unblessed L<GenomeTypeObject> for the annotated genome.
+Returns a two-element list consisting of (0) an unblessed L<GenomeTypeObject> for the annotated genome and (1) a
+checksum of the contig IDs.
 
 =back
 
@@ -233,6 +235,12 @@ sub Submit {
     my $noIndex = $options{noIndex};
     # Create the contig string.
     my $contigString = join("", map { ">$_->[0] $_->[1]\n$_->[2]\n" } @$contigs );
+    # Build the checksum.
+    my $md5Thing = MD5Computer->new();
+    for my $triple (@$contigs) {
+        $md5Thing->ProcessContig($triple->[0], [$triple->[2]]);
+    }
+    my $checksum = $md5Thing->CloseGenome();
     # Fix up the name.
     unless ($name =~ /^\S+\s+\S+/) {
         $name = "Unknown sp. $name";
@@ -268,8 +276,8 @@ sub Submit {
         # Get the job ID.
         $retVal = $response->content;
     }
-    # Return the job ID.
-    return $retVal;
+    # Return the job ID and the checksum.
+    return ($retVal, $checksum);
 }
 
 
@@ -367,7 +375,7 @@ sub check {
 
 =head3 retrieve
 
-    my $gto = RASTlib::retrieve($jobID, $header);
+    my $gto = RASTlib::retrieve($jobID, $checksum, $header, $row);
 
 Extract the GTO for an annotated genome from the RAST interface.
 
@@ -377,9 +385,9 @@ Extract the GTO for an annotated genome from the RAST interface.
 
 The ID of the job that annotated the genome.
 
-=item name
+=item checksum
 
-The name of the genome submitted.
+The contig checksum returned by L</Submit>.
 
 =item header
 
@@ -398,7 +406,7 @@ Returns an unblessed L<GenomeTypeObject> for the annotated genome, or C<undef> i
 =cut
 
 sub retrieve {
-    my ($jobID, $name, $header, $raw) = @_;
+    my ($jobID, $checksum, $header, $raw) = @_;
     # This will be the return value.
     my $retVal;
     # Ask for the GTO from PATRIC.
@@ -414,11 +422,10 @@ sub retrieve {
             print STDERR "HTML response for RAST retrieval: $json.\n";
         } else {
             my $gto = SeedUtils::read_encoded_object(\$json);
-            my $retName = $gto->{scientific_name};
-            if (! $retName) {
-                print STDERR "Invalid or missing GTO return from RAST.\n";
-            } elsif ($retName ne $name) {
-                print STDERR "Submitted $name to RAST but got back $retName.\n";
+            my $md5Thing = MD5Computer->new_from_gto($gto);
+            my $checkValue = $md5Thing->genomeMD5();
+            if ($checkValue ne $checksum) {
+                print STDERR "Contigs checksum of returned genome does not match input genome.\n";
             } elsif ($raw) {
                 $retVal = $json;
             } else {
