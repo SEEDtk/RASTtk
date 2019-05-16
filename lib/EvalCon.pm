@@ -234,7 +234,7 @@ sub new_for_script {
 
 =head3 LoadRoleHashes
 
-    my ($nMap, $cMap) = EvalCon::LoadRoleHashes($roleFile, $stats);
+    my ($nMap, $cMap) = EvalCon::LoadRoleHashes($roleFile, $stats, \@rolesToUse);
 
 Load the role hashes from the C<roles.in.subsystems> file.
 
@@ -248,6 +248,11 @@ The file containing the role IDs, names, and checksums. This file is tab-delimit
 
 A L<Stats> object for tracking statistics.
 
+=item rolesToUse (optional)
+
+If specified, a reference to a list of role IDs.  Only those roles will be included in the hashes.  The default is to
+include all roles.
+
 =item RETURN
 
 Returns a two-element list containing (0) a reference to a hash from role IDs to role names, and (1) a reference to a hash from role checksums to role IDs.
@@ -257,17 +262,25 @@ Returns a two-element list containing (0) a reference to a hash from role IDs to
 =cut
 
 sub LoadRoleHashes {
-    my ($roleFile, $stats) = @_;
+    my ($roleFile, $stats, $rolesToUse) = @_;
+    # Get the stats object.
     $stats //= Stats->new();
+    # Compute the role-filter hash.
+    my $filterH;
+    if ($rolesToUse) {
+        $filterH = { map { $_ => 1 } @$rolesToUse };
+    }
     open(my $rh, "<$roleFile") || die "Could not open $roleFile: $!";
     my (%nMap, %cMap);
     while (! eof $rh) {
         my $line = <$rh>;
         chomp $line;
         my ($id, $checksum, $name) = split /\t/, $line;
-        $nMap{$id} = $name;
-        $cMap{$checksum} = $id;
-        $stats->Add(subsysRole => 1);
+        if (! $filterH || $filterH->{$id}) {
+            $nMap{$id} = $name;
+            $cMap{$checksum} = $id;
+            $stats->Add(subsysRole => 1);
+        }
     }
     close $rh; undef $rh;
     return (\%nMap, \%cMap);

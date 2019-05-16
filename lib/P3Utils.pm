@@ -1381,7 +1381,7 @@ Split a tab-delimited line into fields.
 
 =item line
 
-Input line to split.
+Input line to split, or an open file handle from which to get the next line.
 
 =item RETURN
 
@@ -1393,6 +1393,10 @@ Returns a list of the fields in the line.
 
 sub get_fields {
     my ($line) = @_;
+    # Read the file, if any.
+    if (ref $line eq 'GLOB') {
+        $line = <$line>;
+    }
     # Split the line.
     my @retVal = split /\t/, $line;
     # Remove the EOL.

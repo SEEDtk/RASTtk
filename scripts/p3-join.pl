@@ -10,9 +10,10 @@ will be skipped.
 =head2 Parameters
 
 The positional parameters are the names of the two files. If only one file is specified, the second file
+will be taken from the standard input.  If a hyphen C<-> is used for the first parameter, the first file
 will be taken from the standard input.
 
-The standard input can be overriddn using the options in L<P3Utils/ih_options>.
+The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
 Additional command-line options are the following.
 
@@ -123,7 +124,11 @@ while (! eof $ih) {
 }
 close $ih; undef $ih;
 # Now we open up the first file and get the headers.
-open($ih, '<', $file1) || die "Could not open $file1: $!";
+if ($file1 eq '-') {
+    $ih = \*STDIN;
+} else {
+    open($ih, '<', $file1) || die "Could not open $file1: $!";
+}
 my ($headers1) = P3Utils::process_headers($ih, $opt, 1);
 my $col1 = P3Utils::find_column($key1, $headers1);
 # Output the headers.
