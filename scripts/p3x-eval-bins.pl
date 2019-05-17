@@ -54,6 +54,10 @@ of an evaluation already performed.
 
 If specified, a URL to use for contig editing.
 
+=item noIndex
+
+If specified, the binned genomes are presumed to not be indexed in PATRIC.
+
 =back
 
 =cut
@@ -75,7 +79,8 @@ my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), Eva
         ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::p3data/CheckG" }],
         ['missing', 'skip processed samples'],
         ['deep', 'show full details'],
-        ['editURL=s', 'URL to use for editing contigs']
+        ['editURL=s', 'URL to use for editing contigs'],
+        ['noIndex', 'if specified, the bin genomes are not indexed in PATRIC']
         );
 # Get the parameters.
 my ($binDir) = @ARGV;
@@ -114,7 +119,8 @@ my ($nMap, $cMap) = $evalCon->roleHashes;
 my $evalG = EvalCom::Tax->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
 my $detail = ($opt->deep ? 2 : 1);
-my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, binned => 1, stats => $stats);
+my $contigOptions = ($opt->noindex ? 'external' : 'binned');
+my %geoOptions = (roleHashes => [$nMap, $cMap], logH => \*STDOUT, detail => $detail, $contigOptions => 1, stats => $stats);
 # Check for an editor URL.
 my $editURL = $opt->editurl;
 # Loop through the samples.
