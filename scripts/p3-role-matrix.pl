@@ -47,7 +47,7 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outFile', P3Utils::col_options(), P3Utils::ih_options(),
         ['roleFile|rolefile|r=s', 'roles.in.subsystems file containing the roles of interest',
-                { default => "$FIG_Config::global/roles.in.subsystems" }],
+                { default => "$FIG_Config::p3data/roles.in.subsystems" }],
         ['resume=s', 'restart an interrupted job, starting after the specified genome ID']
         );
 # Get the output file.

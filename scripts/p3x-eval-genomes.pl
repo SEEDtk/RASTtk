@@ -98,7 +98,7 @@ my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(),
         EvalCon::role_options(), BinningReports::template_options(),
-        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
+        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::p3data/CheckG" }],
         ['clear', 'clear output directory before starting'],
         ['web', 'create web pages as well as output files for evaluations'],
         ['deep', 'perform detailed analysis of missing and redundant proteins (implies web)'],

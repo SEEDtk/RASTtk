@@ -173,7 +173,7 @@ for my $pkg (@pkgs) {
             File::Copy::Recursive::fmove("$newDir/evaluate.log", "$newDir/EvalByCheckm/evaluate.log");
             print "Running SciKit.\n";
             $outDir = "$newDir/EvalBySciKit";
-            $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::global/FunctionPredictors $FIG_Config::global/roles.in.subsystems $FIG_Config::global/roles.to.use";
+            $cmd = "gto_consistency $newDir/bin.gto $outDir $FIG_Config::p3data/FunctionPredictors $FIG_Config::p3data/roles.in.subsystems $FIG_Config::p3data/roles.to.use";
             SeedUtils::run($cmd);
             print "Package $pkg transformed to $newID: $name\n";
             my $qual = int(($cmplt + 1.06 * $fine - 10 * $contam) * 100) / 100;

@@ -43,7 +43,7 @@ use BinningReports;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('binDir outDir', BinningReports::template_options(), EvalCon::role_options(),
-        ['checkDir=s', 'completeness data directory', { default => "$FIG_Config::global/CheckG" }],
+        ['checkDir=s', 'completeness data directory', { default => "$FIG_Config::p3data/CheckG" }],
         ['clear', 'erase output directory']
         );
 # Get the incoming directories.

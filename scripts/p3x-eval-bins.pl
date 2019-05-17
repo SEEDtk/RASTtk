@@ -72,7 +72,7 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), EvalCon::role_options(),
         ['recursive', 'process all samples in subdirectories'],
-        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::global/CheckG" }],
+        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::p3data/CheckG" }],
         ['missing', 'skip processed samples'],
         ['deep', 'show full details'],
         ['editURL=s', 'URL to use for editing contigs']
