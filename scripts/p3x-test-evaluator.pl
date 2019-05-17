@@ -93,7 +93,14 @@ for my $file (@files) {
     $geoHash->{$genome} = $geo;
 }
 # Map the GEOs by name.
-my %nameMap = map { $geoHash->{$_}->name => $_ } keys %$geoHash;
+my %nameMap;
+for my $genome (keys %$geoHash) {
+    my $name = $geoHash->{$genome}->name;
+    if ($name =~ /^(.+clonal population) cleaned/) {
+        $name = $1;
+    }
+    $nameMap{$name} = $genome;
+}
 # We will save the GEOs to evaluate in this list.
 my @evalGeos;
 # Now we must link the bins to the reference genomes. We use the bins.json file for this.

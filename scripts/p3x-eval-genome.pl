@@ -38,7 +38,7 @@ checking. The default is C<FunctionPredictors> in the SEEDtk global data directo
 
 =item template
 
-The name of the template file. The default is C<RASTtk/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
+The name of the template file. The default is C<p3_code/lib/BinningReports/webdetails.tt> in the SEEDtk module directory.
 
 =item external
 
@@ -65,7 +65,7 @@ my $opt = P3Utils::script_opts('genome outFile outHtml',
         ['deep', 'if specified, the genome is compared to a reference genome for more detailed analysis'],
         ['checkDir=s', 'completeness data directory', { default => "$FIG_Config::p3data/CheckG" }],
         ['predictors=s', 'function predictors directory', { default => "$FIG_Config::p3data/FunctionPredictors" }],
-        ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/RASTtk/lib/BinningReports/webdetails.tt" }],
+        ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/p3_code/lib/BinningReports/webdetails.tt" }],
         ['external', 'the genome is not currently installed in PATRIC'],
         ['binned', 'the genome contig IDs are user-suppled, not PATRIC-generated'],
         );
