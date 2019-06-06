@@ -165,7 +165,7 @@ for my $sample (@samples) {
         my %nameMap;
         for my $geoID (keys %$geoHash) {
             my $geo = $geoHash->{$geoID};
-            my ($name) = ($geo->name =~ /^(.+clonal population)/);
+            my ($name) = ($geo->name =~ /^(.+) cleaned/);
             $name //= $geo->name;
             $nameMap{$name} = $geoID;
         }

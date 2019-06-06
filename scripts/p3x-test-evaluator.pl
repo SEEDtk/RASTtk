@@ -96,7 +96,7 @@ for my $file (@files) {
 my %nameMap;
 for my $genome (keys %$geoHash) {
     my $name = $geoHash->{$genome}->name;
-    if ($name =~ /^(.+clonal population) cleaned/) {
+    if ($name =~ /^(.+) cleaned/) {
         $name = $1;
     }
     $nameMap{$name} = $genome;
