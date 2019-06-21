@@ -50,6 +50,7 @@ input.
 use strict;
 use P3DataAPI;
 use P3Utils;
+use URI::Escape;
 
 $| = 1;
 # Get the command-line options.
@@ -59,6 +60,7 @@ my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options
 
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
+$p3->set_raw(1);
 my $fields = ($opt->fields ? 1 : 0);
 if ($fields) {
     my $fieldList = P3Utils::list_object_fields($p3, 'subsystem');
@@ -74,6 +76,12 @@ if (! $opt->nohead) {
     push @$outHeaders, 'role';
     P3Utils::print_cols($outHeaders);
 }
+# This is used for escaping problematic characters.
+my %encode = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
+              '+' => '%43', '/' => '%47', ':' => '%58', '{' => '%7B', '|' => '%7C', '}' => '%7D',
+              '^' => '%94', '`' => '%96', '&' => '%26', "'" => '%27', '(' => '%28', ')' => '%29',
+              ',' => '%2C');
+
 # Loop through the input.
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
@@ -83,6 +91,10 @@ while (! eof $ih) {
         for my $couplet (@$couplets) {
             $couplet->[0] =~ tr/ /_/;
         }
+    }
+    # Insure we eliminate ampersands.
+    for my $couplet (@$couplets) {
+        $couplet->[0] =~ s/([<=>"#%+\/:{|}\^`&'\(\)\,])/$encode{$1}/gs;
     }
     # Get the output rows for these input couplets.
     my $resultList = P3Utils::get_data_batch($p3, subsystem => [], ['role_name'], $couplets);
