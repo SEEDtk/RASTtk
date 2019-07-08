@@ -82,14 +82,16 @@ if (! -d $outDir) {
 }
 # Get the missing-files-only option.
 my $missing = $opt->missing;
+my ($count, $total) = (0, scalar @genomes);
 # Loop through the genome IDs.
 for my $genome (@genomes) {
     my $outFile = "$outDir/$genome.gto";
+    $count++;
     if ($missing && -s $outFile) {
         print "$outFile already exists. Skipping.\n";
         $stats->Add(genomesSkipped => 1);
     } else {
-        print "Processing $genome.\n";
+        print "Processing $genome ($count of $total).\n";
         my $gto = $p3->gto_of($genome);
         if ($gto) {
             $gto->destroy_to_file($outFile);
