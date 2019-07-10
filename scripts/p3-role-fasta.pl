@@ -22,6 +22,12 @@ If specified, the output will be DNA sequences.  The default is protein sequence
 
 =item verbose
 
+Progress messages will be displayed on STDERR.
+
+=noDups
+
+If specified, roles that occur multiple times in the same genome will be discarded.
+
 =back
 
 =cut
@@ -35,10 +41,12 @@ use SeedUtils;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::col_options(), P3Utils::ih_options(),
         ['dna', 'output DNA sequences'],
-        ['debug|verbose|v', 'display progress on STDERR']
+        ['debug|verbose|v', 'display progress on STDERR'],
+        ['noDups', 'suppress sequences from genomes with multiple copies of the role'],
         );
-# Get the debug option.
+# Get the options.
 my $debug = $opt->debug;
+my $noDups = $opt->nodups;
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Determine the FASTA type.
@@ -60,6 +68,7 @@ my $results = P3Utils::get_data($p3, feature => [['eq', 'product', $role2]],
 print STDERR scalar(@$results) . " found for $role.\n" if $debug;
 # Loop through the results.  We filter by genome (if requested) and by the role checksum, then write the output
 # if it passes.
+my %badGenomes;
 my %triples;
 my ($count, $rCount) = (0, 0, 0);
 for my $result (@$results) {
@@ -70,6 +79,9 @@ for my $result (@$results) {
         $rCount++;
         my $fcheck = RoleParse::Checksum($foundR);
         if ($fcheck eq $checksum) {
+            if (exists $triples{$genomeID} && $noDups) {
+                $badGenomes{$genomeID} = 1;
+            }
             $triples{$genomeID} = [$fid, $gName, $seq];
             $count++;
         }
@@ -84,10 +96,12 @@ my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 my $genomes = P3Utils::get_col($ih, $keyCol);
 print STDERR scalar(@$genomes) . " genomes read from input.\n" if $debug;
 for my $genome (@$genomes) {
-    my $triplet = $triples{$genome};
-    if (! $triplet) {
-        print STDERR "WARNING: no sequence found for $genome.\n" if $debug;
-    } else {
-        print ">$triplet->[0] $triplet->[1]\n$triplet->[2]\n";
+    if (! $badGenomes{$genome}) {
+        my $triplet = $triples{$genome};
+        if (! $triplet) {
+            print STDERR "WARNING: no sequence found for $genome.\n" if $debug;
+        } else {
+            print ">$triplet->[0] $triplet->[1]\n$triplet->[2]\n";
+        }
     }
 }
