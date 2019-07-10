@@ -48,7 +48,7 @@ use constant RULES => { downstream => { '+' => '+', '-' => '-' },
                         upstream => { '+' => '-', '-' => '+'} };
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(), P3Utils::ih_options(),
+my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(10), P3Utils::ih_options(),
         ['downstream|down|d', 'display downstream rather than upstream'],
         ['length|l=i', 'length to display', { default => 100 }]
         );
