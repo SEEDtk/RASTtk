@@ -68,7 +68,6 @@ my $results = P3Utils::get_data($p3, feature => [['eq', 'product', $role2]],
 print STDERR scalar(@$results) . " found for $role.\n" if $debug;
 # Loop through the results.  We filter by genome (if requested) and by the role checksum, then write the output
 # if it passes.
-my %badGenomes;
 my %triples;
 my ($count, $rCount) = (0, 0, 0);
 for my $result (@$results) {
@@ -79,10 +78,7 @@ for my $result (@$results) {
         $rCount++;
         my $fcheck = RoleParse::Checksum($foundR);
         if ($fcheck eq $checksum) {
-            if (exists $triples{$genomeID} && $noDups) {
-                $badGenomes{$genomeID} = 1;
-            }
-            $triples{$genomeID} = [$fid, $gName, $seq];
+            push @{$triples{$genomeID}}, [$fid, $gName, $seq];
             $count++;
         }
         print STDERR "$count features kept. $rCount roles checked.\n" if $count % 5000 == 0 && $debug;
@@ -96,11 +92,13 @@ my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 my $genomes = P3Utils::get_col($ih, $keyCol);
 print STDERR scalar(@$genomes) . " genomes read from input.\n" if $debug;
 for my $genome (@$genomes) {
-    if (! $badGenomes{$genome}) {
-        my $triplet = $triples{$genome};
-        if (! $triplet) {
-            print STDERR "WARNING: no sequence found for $genome.\n" if $debug;
-        } else {
+    my $triplets = $triples{$genome};
+    if (! $triplets) {
+        print STDERR "WARNING: no sequence found for $genome.\n" if $debug;
+    } elsif (scalar(@$triplets) > 1 && $noDups) {
+        print STDERR "WARNING: duplicate sequences found for $genome.\n" if $debug;
+    } else {
+        for my $triplet (@$triplets) {
             print ">$triplet->[0] $triplet->[1]\n$triplet->[2]\n";
         }
     }
