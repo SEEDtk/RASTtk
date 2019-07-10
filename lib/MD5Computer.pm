@@ -225,7 +225,7 @@ sub new_from_gto {
     $descriptor->StartContig($contigID);
 
 Start processing a contig. The DNA of the contig should be passed in via L</AddChunk>
-calls.
+calls.  Any previous contig already in progress will be closed automatically.
 
 =over 4
 
