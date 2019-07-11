@@ -27,6 +27,10 @@ Specifies the length to display upstream. The default is C<100>.
 
 Specifies the length to display inside the feature.  The default is C<0>, indicating none.
 
+=item verbose
+
+Show data API trace messages on STDERR.
+
 =back
 
 =head3 Example
@@ -55,7 +59,8 @@ use constant RULES => { downstream => { '+' => '+', '-' => '-' },
 my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(10), P3Utils::ih_options(),
         ['downstream|down|d', 'display downstream rather than upstream'],
         ['length|l=i', 'length outside the feature to display', { default => 100 }],
-        ['in=i', 'length inside the feature to display', {default => 0}]
+        ['in=i', 'length inside the feature to display', {default => 0}],
+        ['debug|verbose|v', 'show data API trace messages on STDERR']
         );
 # Get the options.
 my $type = ($opt->downstream ? 'downstream' : 'upstream');
@@ -63,6 +68,9 @@ my $len = $opt->length;
 my $inLen = $opt->in;
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
+if ($opt->debug) {
+    $p3->debug_on(\*STDERR);
+}
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
