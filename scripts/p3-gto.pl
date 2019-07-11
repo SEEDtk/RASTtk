@@ -24,6 +24,10 @@ Name of the directory in which to put the output files. (The default is the curr
 
 Only process genomes for which files do not yet exist in the output directory. The default is to replace existing files.
 
+=item verbose
+
+Display data API status messages in the standard output.
+
 =back
 
 =cut
@@ -39,11 +43,15 @@ $| = 1;
 my $opt = P3Utils::script_opts('genome1 genome2 ... genomeN', P3Utils::ih_options(), P3Utils::col_options(),
         ['outDir|o=s', 'output directory name', { default => '.'} ],
         ['missing|safe|m', 'only process new genomes without replacing files'],
+        ['debug|verbose|v', 'display data API status messages in the standard output']
         );
 # Create a statistics object.
 my $stats = Stats->new();
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
+if ($opt->debug) {
+    $p3->debug_on(\*STDOUT);
+}
 # Get the genome list.
 print "Processing genome list.\n";
 my @genomes;
