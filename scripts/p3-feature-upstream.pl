@@ -23,6 +23,10 @@ Display downstream instead of upstream regions.
 
 Specifies the length to display upstream. The default is C<100>.
 
+=item in
+
+Specifies the length to display inside the feature.  The default is C<0>, indicating none.
+
 =back
 
 =head3 Example
@@ -50,11 +54,13 @@ use constant RULES => { downstream => { '+' => '+', '-' => '-' },
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::data_options(), P3Utils::col_options(10), P3Utils::ih_options(),
         ['downstream|down|d', 'display downstream rather than upstream'],
-        ['length|l=i', 'length to display', { default => 100 }]
+        ['length|l=i', 'length outside the feature to display', { default => 100 }],
+        ['in=i', 'length inside the feature to display', {default => 0}]
         );
 # Get the options.
 my $type = ($opt->downstream ? 'downstream' : 'upstream');
 my $len = $opt->length;
+my $inLen = $opt->in;
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Open the input file.
@@ -72,10 +78,9 @@ my %contigs;
 while (! eof $ih) {
     my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
     # Get the location information for each feature.
-    my $fidClause = '(' . join(',', map { $_->[0] } @$couplets) . ')';
-    my @locData =  $p3->query(genome_feature => [qw(select patric_id sequence_id start end strand)], ['in', 'patric_id', $fidClause]);
+    my $locData =  P3Utils::get_data_keyed($p3, feature => [], [qw(patric_id sequence_id start end strand na_sequence)], [map { $_->[0] } @$couplets]);
     # Compute the sequences that we don't know yet.
-    my @newSeqs = grep { ! $contigs{$_} } map { $_->{sequence_id} } @locData;
+    my @newSeqs = grep { ! $contigs{$_} } map { $_->[1] } @$locData;
     if (@newSeqs) {
         my $seqClause = '(' . join(',', @newSeqs) . ')';
         my @seqData = $p3->query(genome_sequence => [qw(select sequence_id sequence)], ['in', 'sequence_id', $seqClause]);
@@ -84,30 +89,36 @@ while (! eof $ih) {
         }
     }
     # Convert the location data into a hash.
-    my %locs = map { $_->{patric_id} => $_ } @locData;
-    undef @locData;
+    my %locs = map { $_->[0] => $_ } @$locData;
+    undef $locData;
     # Now we need to find the upstream DNA for each feature.
     for my $couplet (@$couplets) {
         my ($fid, $line) = @$couplet;
         my $locDatum = $locs{$fid};
-        my $strand = $locDatum->{strand};
+        my $strand = $locDatum->[4];
         my $rule = RULES->{$type}{$strand};
         # Get the length of the sequence.
-        my $seqLen = length($contigs{$locDatum->{sequence_id}});
+        my $seqLen = length($contigs{$locDatum->[1]});
         # The rule now tells us where to find the DNA.
         my ($x0, $n);
         if ($rule eq '-') {
-            my $end = $locDatum->{start} - 1;
+            my $end = $locDatum->[2] - 1;
             $x0 = ($end < $len ? 0 : $end - $len);
             $n = $end - $x0;
         } else {
-            $x0 = $locDatum->{end};
+            $x0 = $locDatum->[3];
             my $end = $x0 + $len;
             $n = ($end > $seqLen ? $seqLen - $x0 : $len);
         }
-        my $dna = substr($contigs{$locDatum->{sequence_id}}, $x0, $n);
+        my $dna = lc substr($contigs{$locDatum->[1]}, $x0, $n);
         if ($strand eq '-') {
             $dna = SeedUtils::rev_comp($dna);
+        }
+        # Now append the instream data.
+        if ($opt->downstream) {
+            $dna = (uc substr($locDatum->[5], -$inLen)) . $dna;
+        } else {
+            $dna .= uc substr($locDatum->[5], 0, $inLen);
         }
         push @$line, $dna;
         P3Utils::print_cols($line, opt => $opt);
