@@ -40,6 +40,10 @@ Additional command-line options are the following.
 Restart after a run that ended in error.  No headers will be output, and all genomes up to and including the one
 identified by this parameter will be skipped.
 
+=item verbose
+
+Display debug information on STDERR.
+
 =back
 
 =cut
@@ -52,10 +56,14 @@ use MD5Computer;
 $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::col_options(), P3Utils::ih_options(),
-    ['restart=s', 'Restart after the specified genome']);
+    ['restart=s', 'Restart after the specified genome'],
+    ['verbose|debug|v', 'display debug information on STDERR']);
 
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
+if ($opt->verbose) {
+    $p3->debug_on(\*STDERR);
+}
 # Check for restart.
 my $restart = $opt->restart;
 # Open the input file.
