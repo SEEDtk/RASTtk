@@ -35,7 +35,11 @@ If specified, records with at least one empty key field will be discarded.
 
 =item unique
 
-Only include one output line for each key value.
+Only include one output line for each key value.  This option is mutually exclusive with C<--dups>.
+
+=item dups
+
+Only include lines with duplicate keys in the output.  This option is mutually exclusive with C<--unique>.
 
 =back
 
@@ -49,7 +53,8 @@ use SeedUtils qw(by_fig_id);
 my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
         ['count|K', 'count instead of sorting'],
         ['nonblank|V', 'discard records with empty keys'],
-        ['unique|u', 'discard records with duplicate keys']
+        ['unique|u', 'discard records with duplicate keys'],
+        ['dups|D', 'only output records with duplicate keys']
         );
 # Verify the parameters. We need to separate the column names from the sort types.
 my @sortCols;
@@ -73,6 +78,10 @@ if (! @ARGV) {
 my $count = $opt->count;
 my $valued = $opt->nonblank;
 my $unique = $opt->unique;
+my $dupsOnly = $opt->dups;
+if ($unique && $dupsOnly) {
+    die "Cannot specify both --unique and --dups.";
+}
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers and compute the key columns.
@@ -101,17 +110,21 @@ while (! eof $ih) {
 for my $key (sort { tab_cmp($a, $b) } keys %sorter) {
     # Sort the items.
     my $subList = $sorter{$key};
+    my $counter = scalar @$subList;
     if (! $count) {
         # Print the sorted items.
         if ($unique) {
             print $subList->[0];
+        } elsif ($dupsOnly) {
+            if ($counter > 1) {
+                print @$subList;
+            }
         } else {
             print @$subList;
         }
     } else {
         # Count the items for each key combination and print them.
-        my $count = scalar @$subList;
-        print "$key\t$count\n";
+        print "$key\t$counter\n";
     }
 }
 
