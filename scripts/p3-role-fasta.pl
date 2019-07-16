@@ -1,13 +1,13 @@
 =head1 Create Fasta File for a Role
 
-    p3-role-fasta.pl [options] roleName
+    p3-role-fasta.pl [options] roleDesc
 
 This script takes as input a list of genome IDs and outputs a FASTA file containing the features in those
 genomes possessing a specified role.
 
 =head2 Parameters
 
-The position parameter is the name of the role to use.
+The positional parameter is the name of the role to use.
 
 The standard input can be overridden using the options in L<P3Utils/ih_options>.  It should contain a genome ID in
 the key column identified by the L<P3Utils/col_options>.
@@ -15,6 +15,11 @@ the key column identified by the L<P3Utils/col_options>.
 Additional command-line options are as follows.
 
 =over 4
+
+=item binning
+
+The output file is for a binning database.  The comment will be a genome ID and the name.  Implies both C<--dna> and
+C<--nodups>.
 
 =item dna
 
@@ -24,7 +29,7 @@ If specified, the output will be DNA sequences.  The default is protein sequence
 
 Progress messages will be displayed on STDERR.
 
-=noDups
+=item noDups
 
 If specified, roles that occur multiple times in the same genome will be discarded.
 
@@ -39,7 +44,8 @@ use RoleParse;
 use SeedUtils;
 
 # Get the command-line options.
-my $opt = P3Utils::script_opts('', P3Utils::col_options(), P3Utils::ih_options(),
+my $opt = P3Utils::script_opts('roleDesc', P3Utils::col_options(), P3Utils::ih_options(),
+        ['binning', 'format or use as a binning BLAST database'],
         ['dna', 'output DNA sequences'],
         ['debug|verbose|v', 'display progress on STDERR'],
         ['noDups', 'suppress sequences from genomes with multiple copies of the role'],
@@ -47,10 +53,15 @@ my $opt = P3Utils::script_opts('', P3Utils::col_options(), P3Utils::ih_options()
 # Get the options.
 my $debug = $opt->debug;
 my $noDups = $opt->nodups;
+my $dna = $opt->dna;
+my $binning = $opt->binning;
+if ($binning) {
+    $dna = 1; $noDups = 1;
+}
 # Get access to PATRIC.
 my $p3 = P3DataAPI->new();
 # Determine the FASTA type.
-my $seqField = ($opt->dna ? 'na_sequence' : 'aa_sequence');
+my $seqField = ($dna ? 'na_sequence' : 'aa_sequence');
 # Parse the incoming role.
 my $checksum;
 my ($role) = @ARGV;
@@ -72,6 +83,10 @@ my %triples;
 my ($count, $rCount) = (0, 0, 0);
 for my $result (@$results) {
     my ($genomeID, $function, $fid, $gName, $seq) = @$result;
+    # Reformat the genome name in binning mode.
+    if ($binning) {
+        $gName = join("\t", $genomeID, $gName);
+    }
     # Process all the roles, looking for ours.
     my @foundR = SeedUtils::roles_of_function($function);
     for my $foundR (@foundR) {
@@ -89,6 +104,7 @@ my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
 # Get all the genomes.
+my $gCount = 0;
 my $genomes = P3Utils::get_col($ih, $keyCol);
 print STDERR scalar(@$genomes) . " genomes read from input.\n" if $debug;
 for my $genome (@$genomes) {
@@ -98,8 +114,10 @@ for my $genome (@$genomes) {
     } elsif (scalar(@$triplets) > 1 && $noDups) {
         print STDERR "WARNING: duplicate sequences found for $genome.\n" if $debug;
     } else {
+        $gCount++;
         for my $triplet (@$triplets) {
             print ">$triplet->[0] $triplet->[1]\n$triplet->[2]\n";
         }
     }
 }
+print STDERR "$gCount genomes output.\n" if $debug;
