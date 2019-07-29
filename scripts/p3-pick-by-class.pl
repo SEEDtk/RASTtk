@@ -42,6 +42,10 @@ Display progress messages on the standard error output.
 Margin of error.  The maximum number of records associated with any key value is number times the count of the least
 frequent key.  The default is 1.2.  This number must be between 1 and 2 inclusive.
 
+=item max
+
+The maximum number of data lines to output.  The default (X<-1>) is to output as many as possible.
+
 =back
 
 =cut
@@ -53,6 +57,7 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('', P3Utils::col_options(1000), P3Utils::ih_options(),
     ['verbose|debug|v', 'show progress on STDERR'],
+    ['max|m=i', 'maximum number of output lines', { default => -1 }],
     ['fuzz=f', 'error multiplier', { default => 1.2 }]);
 # Get the options.
 my $debug = $opt->verbose;
@@ -117,7 +122,12 @@ for my $class (keys %classes) {
     }
 }
 print STDERR "Writing output.\n" if $debug;
-for (my $i = 0; $i < $smallest; $i++) {
+my $maxLines = $opt->max;
+my $lines = 0;
+my $abort;
+my %counts;
+for (my $i = 0; $i < $smallest && ! $abort; $i++) {
+    my @buffer;
     for my $class (keys %classes) {
         my @pos = $i;
         if ($i % $xSpace{$class} == 0) {
@@ -126,8 +136,23 @@ for (my $i = 0; $i < $smallest; $i++) {
         for my $j (@pos) {
             my $line = $classes{$class}[$j];
             if ($line) {
-                print $line;
+                push @buffer, $line;
+                $counts{$class}++;
+                $lines++;
             }
         }
     }
+    if ($maxLines < 0 || $lines <= $maxLines) {
+        print @buffer;
+    } else {
+        $abort = 1;
+    }
+}
+if ($debug) {
+    $lines = 0;
+    for my $class (sort keys %counts) {
+        print STDERR "$counts{$class} lines output for $class.\n";
+        $lines += $counts{$class};
+    }
+    print STDERR "$lines total lines output.\n";
 }
