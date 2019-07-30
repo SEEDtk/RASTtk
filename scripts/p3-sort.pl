@@ -41,6 +41,14 @@ Only include one output line for each key value.  This option is mutually exclus
 
 Only include lines with duplicate keys in the output.  This option is mutually exclusive with C<--unique>.
 
+=item nohead
+
+If specified, the input file has no headers.
+
+=item verbose
+
+Write progress messages to STDERR.
+
 =back
 
 =cut
@@ -54,7 +62,9 @@ my $opt = P3Utils::script_opts('col1 col2 ... colN', P3Utils::ih_options(),
         ['count|K', 'count instead of sorting'],
         ['nonblank|V', 'discard records with empty keys'],
         ['unique|u', 'discard records with duplicate keys'],
-        ['dups|D', 'only output records with duplicate keys']
+        ['dups|D', 'only output records with duplicate keys'],
+        ['nohead', 'input file has no headers'],
+        ['verbose|debug|v', 'write progress messages to STDERR']
         );
 # Verify the parameters. We need to separate the column names from the sort types.
 my @sortCols;
@@ -79,25 +89,35 @@ my $count = $opt->count;
 my $valued = $opt->nonblank;
 my $unique = $opt->unique;
 my $dupsOnly = $opt->dups;
+my $nohead = $opt->nohead;
+my $debug = $opt->verbose;
 if ($unique && $dupsOnly) {
     die "Cannot specify both --unique and --dups.";
 }
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers and compute the key columns.
-my ($headers, $cols) = P3Utils::find_headers($ih, 'sort input' => @sortCols);
-# Write out the headers.
-if ($count) {
-    my @sortHeaders = P3Utils::get_cols($headers, $cols);
-    P3Utils::print_cols([@sortHeaders, 'count']);
+my ($headers, $cols);
+if ($nohead) {
+    $cols = [map { $_ - 1 } @sortCols];
 } else {
-    P3Utils::print_cols($headers);
+    ($headers, $cols) = P3Utils::find_headers($ih, 'sort input' => @sortCols);
+    # Write out the headers.
+    if ($count) {
+        my @sortHeaders = P3Utils::get_cols($headers, $cols);
+        P3Utils::print_cols([@sortHeaders, 'count']);
+    } else {
+        P3Utils::print_cols($headers);
+    }
 }
 # We will use this hash to facilitate the sort. It is keyed on the first column.
 my %sorter;
 # Loop through the input.
+my $progress = 0;
 while (! eof $ih) {
     my $line = <$ih>;
+    $progress++;
+    print STDERR "$progress records read.\n" if $debug && $progress % 10000 == 0;
     my @fields = P3Utils::get_fields($line);
     # Form the key.
     my @key = map { $fields[$_] } @$cols;
@@ -107,7 +127,11 @@ while (! eof $ih) {
     }
 }
 # Now process each group.
+$progress = 0;
+print STDERR "Sorting keys.\n" if $debug;
 for my $key (sort { tab_cmp($a, $b) } keys %sorter) {
+    $progress++;
+    print STDERR "$progress keys processed.\n" if $debug && $progress % 10000 == 0;
     # Sort the items.
     my $subList = $sorter{$key};
     my $counter = scalar @$subList;
