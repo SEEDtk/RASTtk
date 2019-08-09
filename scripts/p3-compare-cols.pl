@@ -31,6 +31,16 @@ rows, and the second will be matrix columns.
 
 The standard input can be overridden using the options in L<P3Utils/ih_options>.
 
+The command-line options are as follows.
+
+=over 4
+
+=item save
+
+The name of a file in which to save lines where the two column values do not match.
+
+=back
+
 =cut
 
 use strict;
@@ -39,7 +49,8 @@ use P3Utils;
 
 $| = 1;
 # Get the command-line options.
-my $opt = P3Utils::script_opts('parms', P3Utils::ih_options(),
+my $opt = P3Utils::script_opts('col1 col2', P3Utils::ih_options(),
+        ['save=s', 'file in which to save mismatches']
         );
 
 # Open the input file.
@@ -48,15 +59,25 @@ my $ih = P3Utils::ih($opt);
 my ($col1, $col2) = @ARGV;
 die "Insufficient input parameters.  Two columns required." if ! defined $col2;
 my ($inHeaders, $keyCols) = P3Utils::find_headers($ih, input => $col1, $col2);
+# Get the save file set up.
+my $vh;
+if ($opt->save) {
+    open($vh, '>', $opt->save) || die "Could not open save file: $!";
+    P3Utils::print_cols($inHeaders, oh => $vh);
+}
 # This 2D hash matrix will contain the counts.
 my %counts;
 # This tracks the column-2 values.
 my %values;
 # Loop through the input.
 while (! eof $ih) {
-    my ($val1, $val2) = P3Utils::get_cols($ih, $keyCols);
+    my $line = <$ih>;
+    my ($val1, $val2) = P3Utils::get_cols($line, $keyCols);
     $counts{$val1}{$val2}++;
     $values{$val2} = 1;
+    if ($vh && $val1 ne $val2) {
+        print $vh $line;
+    }
 }
 # Now produce the output.
 my @values = sort keys %values;
