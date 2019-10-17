@@ -193,7 +193,7 @@ for my $pair (@pairs) {
                   if $debug;
                 $stats->Add( "namelessGroup" => 1 );
             }
-            P3Utils::print_cols( [ $group, $sim, $prots{$group} ] );
+            P3Utils::print_cols( [ $group, $name, $sim, $prots{$group} ] );
 
             # Now all the genomes.
             for my $genome (@$genomes) {
