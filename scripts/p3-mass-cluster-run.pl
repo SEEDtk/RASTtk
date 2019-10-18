@@ -48,7 +48,7 @@ use P3DataAPI;
 use P3Utils;
 use POSIX qw(ceil);
 use File::Copy::Recursive;
-use SeedAware;
+use SeedTkRun;
 
 $| = 1;
 # Get the command-line options.

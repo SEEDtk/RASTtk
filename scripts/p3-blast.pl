@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use P3Utils;
 use gjoseqlib;
-use BlastInterface;
+use BlastUtils;
 use Data::Dumper;
 use P3DataAPI;
 use Hsp;
@@ -158,7 +158,7 @@ if (! $blastdb) {
     }
 }
 # Now run the BLAST.
-my $matches = BlastInterface::blast(\@query, $blastDatabase, $blastProg, \%blast);
+my $matches = BlastUtils::blast(\@query, $blastDatabase, $blastProg, \%blast);
 my $lastQuery = '';
 # Format the output.
 for my $match (@$matches) {

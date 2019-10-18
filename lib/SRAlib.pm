@@ -25,7 +25,7 @@ package SRAlib;
     use Stats;
     use File::Copy::Recursive;
     use FastQ;
-    use SeedAware;
+    use SeedTkRun;
     use IO::Compress::Gzip;
 
 =head1 Library for Downloading SRA Entries
@@ -403,7 +403,7 @@ sub download_runs {
     # Count singletons here.
     my $singles = 0;
     # Find the FASTQ-DUMP command.
-    my $cmdPath = SeedAware::executable_for('fastq-dump');
+    my $cmdPath = SeedTkRun::executable_for('fastq-dump');
     # Create the FASTQ output files.  Note the singleton file is not allowed in gzip mode.
     my ($lh, $rh, $sh);
     my ($lfile, $rfile, $sfile) = ("$outDir/${name}_1.fastq", "$outDir/${name}_2.fastq", "$outDir/${name}_s.fastq");
