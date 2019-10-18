@@ -12,12 +12,12 @@ as positional parameters.
 use strict;
 use warnings;
 no warnings 'uninitialized';
+use File::Temp;
 use Data::Dumper;
 use File::Copy;
 use SeedUtils;
 use gjoseqlib;
 use Date::Parse;
-use POSIX;
 use DB_File;
 
 use JSON::XS;
@@ -33,7 +33,6 @@ use Bio::Location::Split;
 use Bio::Location::Simple;
 use Bio::SeqFeature::Generic;
 use Getopt::Long::Descriptive;
-use File::Temp;
 
 my $temp_dir;
 my ($inFile, $outFile) = @ARGV;
