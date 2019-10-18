@@ -3,9 +3,9 @@
     p3-uni-roles.pl [options] outFile
 
 Given an input list of genome IDs, this program produces a list of the roles that are singly-occurring. The output file will contain a genome
-ID in the first column, the seed protein sequence in the second column, and the additional columns will contain the IDs of the singly-occurring
-roles. The roles are taken from a typical B<roles.in.subsystems> file, which
-contains a role ID in the first column, a role checksum in the second, and a role name in the third.
+ID in the first column, the domain in the second column, the seed protein sequence in the third column, and the additional columns will contain
+the IDs of the singly-occurring roles. The roles are taken from a typical B<roles.in.subsystems> file, which contains a role ID in the first
+column, a role checksum in the second, and a role name in the third.
 
 Status is displayed on the standard output.
 
@@ -23,7 +23,7 @@ The following additional command-line options are supported.
 =item roleFile
 
 The C<roles.in.subsystems> file containing the roles to process. This is a tab-delimited file with no headers. Each line contains
-(0) a role ID, (1) a role checksum, and (2) a role name. The default is C<roles.in.subsystems> in the SEEDtk global data directory.
+(0) a role ID, (1) a role checksum, and (2) a role name. The default is C<roles.unified> in the SEEDtk global data directory.
 
 =item resume
 
@@ -46,7 +46,7 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('outFile', P3Utils::col_options(), P3Utils::ih_options(),
         ['roleFile|rolefile|r=s', 'roles.in.subsystems file containing the roles of interest',
-                { default => "$FIG_Config::p3data/roles.in.subsystems" }],
+                { default => "$FIG_Config::p3data/roles.unified" }],
         ['resume', 'restart an interrupted job']
         );
 # Get the output file.
@@ -60,8 +60,9 @@ my $stats = Stats->new();
 my $p3 = P3DataAPI->new();
 # This hash maps a checksum to a role ID.
 my %checksums;
-# This is an initial role list used for output column headers.
-my @roles;
+# This tracks unique roles, an issue due to aliases.
+my %roles;
+my $nRoles;
 # Verify that we have the role file.
 my $roleFile = $opt->rolefile;
 if (! -s $roleFile) {
@@ -76,16 +77,19 @@ if (! -s $roleFile) {
         $stats->Add(roleIn => 1);
         # Record this role.
         $checksums{$checksum} = $role;
-        push @roles, $role;
+        $roles{$role} = 1;
     }
-    print scalar(@roles) . " roles found in role file.\n";
+    $nRoles = scalar keys %roles;
+    print "$nRoles roles found in role file.\n";
 }
-# Remember the role count.
-my $nRoles = scalar @roles;
 # Open the input file.
 my $ih = P3Utils::ih($opt);
 # Read the incoming headers.
 my (undef, $keyCol) = P3Utils::process_headers($ih, $opt);
+# This will count how many times each role occurs singly.
+my %totals;
+# This will count the total number of genomes.
+my $gCount = 0;
 # Here we do the resume processing. We must get all the genome IDs to process and we must open
 # the output file.
 my $resume = $opt->resume;
@@ -98,7 +102,7 @@ if (! $resume) {
     $oh = IO::File->new(">$outFile") || die "Could not open $outFile: $!";
     # Form the full header set and write it out.
     if (! $opt->nohead) {
-        P3Utils::print_cols(['genome', 'seed_prot', 'roles'], oh => $oh);
+        P3Utils::print_cols(['genome', 'domain', 'seed_prot', 'roles'], oh => $oh);
     }
 } else {
     # First, read the old file.
@@ -110,8 +114,13 @@ if (! $resume) {
     my %skip;
     while (! eof $xh) {
         $line = <$xh>;
-        my ($genome) = split /\t/, $line;
+        chomp $line;
+        my ($genome, undef, undef, @roles) = split /\t/, $line;
         $skip{$genome} = 1;
+        $gCount++;
+        for my $role (@roles) {
+            $totals{$role}++;
+        }
     }
     print scalar(keys %skip) . " genomes already processed.\n";
     close $xh;
@@ -131,10 +140,12 @@ print "Reading genome data.\n";
 my $gHash = get_genome_data($genomes);
 $genomes = [sort keys %$gHash];
 my $total = scalar @$genomes;
+$gCount += $total;
 my $count = 0;
 # Now we need to process the genomes one at a time. This is a slow process.
 for my $genome (@$genomes) {
-    my $name = $gHash->{$genome};
+    my $domain = $gHash->{$genome}[0];
+    my $name = $gHash->{$genome}[1];
     $count++;
     print "Processing $genome ($count of $total): $name\n";
     # This will hold the seed protein sequence.
@@ -172,19 +183,32 @@ for my $genome (@$genomes) {
     }
     # Now %rCounts contains the number of occurrences of each role in this genome. We mark as found the roles that occur
     # exactly once.
-    my @cols = grep { ($rCounts{$_} && $rCounts{$_} == 1) } @roles;
-    P3Utils::print_cols([$genome, $seedProt, @cols], oh => $oh);
+    my @cols;
+    for my $role (keys %rCounts) {
+        if ($rCounts{$role} == 1) {
+            $totals{$role}++;
+            push @cols, $role;
+        }
+    }
+    P3Utils::print_cols([$genome, $domain, $seedProt, @cols], oh => $oh);
     $stats->Add(genomesProcessed => 1);
     $stats->Add(seedProtOut => 1) if $seedProt;
 }
+print "Best roles.\n--------------------------------------------\n";
+my $min = int($gCount * 0.90);
+my @best = sort { $totals{$b} <=> $totals{$a} } grep { $totals{$_} >= $min } keys %totals;
+for my $role (@best) {
+    print "$role\t$totals{$role}\n";
+}
+print "\n";
 print "All done.\n" . $stats->Show();
 
 ##
-## Read the name of each genome and return a hash.
+## Read the name of each genome and return a hash of id => [domain, name]
 sub get_genome_data {
     my ($genomes) = @_;
-    my $genomeData = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'genome_name'], $genomes, 'genome_id');
+    my $genomeData = P3Utils::get_data_keyed($p3, genome => [], ['genome_id', 'kingdom', 'genome_name'], $genomes, 'genome_id');
     print scalar(@$genomeData) . " genomes found in PATRIC.\n";
-    my %retVal = map { $_->[0] => $_->[1] } @$genomeData;
+    my %retVal = map { $_->[0] => [$_->[1], $_->[2]] } @$genomeData;
     return \%retVal;
 }

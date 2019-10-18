@@ -49,9 +49,7 @@ The memory footprint of this process is very high.
 
 The positional parameters are presented in pairs, each pair consisting of a similarity threshold followed by the name of a repgen
 analysis file.  Each analysis file is tab-delimited with headers, and contains in each record (0) a genome ID, (1) a genome name,
-(2) a representative genome ID, and (3) a score.  The score is ignored. A similarity threshold of 0
-is used for a file based on taxonomic groupings rather than similarity.  These are required for the inevitable
-genomes that are too far from the rest to produce a sufficiently large group.
+(2) a representative genome ID, and (3) a score.  The score is ignored.
 
 The standard input should be a role profile file.  This is tab-delimited with headers, the first column containing a genome ID, the
 second column the seed protein sequence, and the third and all subsequent columns (the number can vary from 150 to 2500) containing
@@ -122,6 +120,9 @@ my %names = ( 2 => 'Bacteria', 2157 => 'Archaea' );
 my %roles;
 print STDERR "Reading input file.\n";
 
+# This will track the group genomes selected for the last group.
+my $kept = {};
+
 # Skip the header line.
 my $line   = <$ih>;
 my $gCount = 0;
@@ -129,8 +130,8 @@ while ( !eof $ih ) {
     my $line = <$ih>;
     $line =~ s/[\r\n]+$//;
 
-    # The "3" here insures all the roles are included in the third field.
-    my ( $genome, $prot, $roles ) = split /\t/, $line, 3;
+    # The "4" here insures all the roles are included in the fourth field.
+    my ( $genome, $domain, $prot, $roles ) = split /\t/, $line, 4;
     $stats->Add( roleProfileIn => 1 );
     $gCount++;
     $prots{$genome} = $prot;
@@ -153,6 +154,8 @@ for my $pair (@pairs) {
 
     # Skip the header line.
     $line = <$gh>;
+    # Clear the group-genome tracker.
+    $kept = {};
 
     # Process all the data lines.
     while ( !eof $gh ) {
@@ -179,6 +182,7 @@ for my $pair (@pairs) {
     # Now we loop through the groups, writing each group of 20 or more.
     for my $group ( keys %groups ) {
         my $genomes = $groups{$group};
+        $kept->{$group} = 1;
         $stats->Add( "group$sim-found" => 1 );
         my $size = scalar @$genomes;
         if ( $size >= $min ) {
@@ -205,5 +209,15 @@ for my $pair (@pairs) {
             P3Utils::print_cols( ['//'] );
         }
     }
+
 }
+
+# Build a group of the remains.
+P3Utils::print_cols( [ '0', 'root', 0, '']);
+for my $genome (keys %$kept) {
+    P3Utils::print_cols( [ $genome, $roles{$genome} ] );
+    $stats->Add(remainderGenome => 1);
+}
+P3Utils::print_cols( ['//']);
+
 print STDERR "All done.\n" . $stats->Show() if $debug;
