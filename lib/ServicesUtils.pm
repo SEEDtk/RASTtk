@@ -421,9 +421,43 @@ sub log_print {
     }
 }
 
+=head3 contig_tuples
+
+    my $contigTuples = ServicesUtils::contig_tuples($jsonObject);
+
+Extract the contigs from a genome type object. The object can be a workspace object, a real
+L<GenomeTypeObject>, or a kBase contigs object. The fields of the object are examined in order
+to determine the type of object and the method for extraction.
+
+=over 4
+
+=item jsonObject
+
+A L<GenomeTypeObject>, a kBase contigs object, or a kBase workspace contigs object.
+
+
+=item RETURN
+
+Returns a reference to a list of tuples, each consisting of a contig ID, an empty string, and
+a sequence.
+
+=back
+
+=cut
+
+sub contig_tuples {
+    my ($jsonObject) = @_;
+    # Get the contig list.
+    my $contigList = json_field($jsonObject, 'contigs');
+    # This will contain the tuples to return.
+    my @retVal = map { [$_->{id}, '', ($_->{dna} // $_->{sequence}) ] } @$contigList;
+    # Return the result.
+    return \@retVal;
+}
+
 =head3 json_field
 
-    my $value = json_field($object, $name, %options);
+    my $value = P3Utils::json_field($object, $name, %options);
 
 Get the value of a field from an object that is believed to have been read from JSON format. If the
 object is a workspace object, it is dereferenced. If the field is not found, an error is thrown.
@@ -485,38 +519,5 @@ sub json_field {
     return $retVal;
 }
 
-=head3 contig_tuples
-
-    my $contigTuples = ServicesUtils::contig_tuples($jsonObject);
-
-Extract the contigs from a genome type object. The object can be a workspace object, a real
-L<GenomeTypeObject>, or a kBase contigs object. The fields of the object are examined in order
-to determine the type of object and the method for extraction.
-
-=over 4
-
-=item jsonObject
-
-A L<GenomeTypeObject>, a kBase contigs object, or a kBase workspace contigs object.
-
-
-=item RETURN
-
-Returns a reference to a list of tuples, each consisting of a contig ID, an empty string, and
-a sequence.
-
-=back
-
-=cut
-
-sub contig_tuples {
-    my ($jsonObject) = @_;
-    # Get the contig list.
-    my $contigList = json_field($jsonObject, 'contigs');
-    # This will contain the tuples to return.
-    my @retVal = map { [$_->{id}, '', ($_->{dna} // $_->{sequence}) ] } @$contigList;
-    # Return the result.
-    return \@retVal;
-}
 
 1;
