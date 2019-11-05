@@ -199,6 +199,7 @@ my ($nMap, $cMap) = $evalCon->roleHashes;
 my %evalOptions = (logH => \*STDERR, stats => $stats);
 my $evalCom;
 my $checkDir = $opt->checkdir;
+print STDERR "Reading completeness data from $checkDir.\n";
 if (-s "$checkDir/REP") {
     open(my $xh, '<', "$checkDir/REP") || die "Could not open REP file: $!";
     my $k = <$xh>;
@@ -207,6 +208,7 @@ if (-s "$checkDir/REP") {
 } else {
     $evalCom = EvalCom::Tax->new($checkDir, %evalOptions, roleHashes=> [$nMap, $cMap]);
 }
+print STDERR "Completeness data read.\n";
 my $timer = Math::Round::round(time - $start);
 $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
@@ -229,7 +231,7 @@ if ($opt->resume) {
     print STDERR "$skipped lines skipped.\n";
 } elsif (! $opt->nohead) {
     # Not resuming. Form the full header set and write it out.
-    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Good Seed';
+    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Completeness Group', 'Good Seed';
     P3Utils::print_cols($outHeaders);
 }
 # If an error occurs, we still display stats.
@@ -354,7 +356,7 @@ eval {
             # Compute the consistency and completeness. This also writes the output file.
             my ($complete, $contam, $taxon, $seedFlag) = $evalCom->Check2($geo, $oh);
             # Store the evaluation results.
-            $results{$genome} = [0, 0, $complete, $contam, ($seedFlag ? 'Y' : '')];
+            $results{$genome} = [0, 0, $complete, $contam, $taxon, ($seedFlag ? 'Y' : '')];
             # Add this genome to the evalCon matrix.
             $evalCon->AddGeoToMatrix($geo);
         }
