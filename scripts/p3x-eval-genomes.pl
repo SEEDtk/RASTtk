@@ -75,6 +75,13 @@ Specifies a file containing the reference genome mapping. This is a tab-delimite
 ID and (1) the corresponding reference genome. The groupings are usually genus or species. If no reference genome is specified
 and one can be computed from this file, it will be used. The default is C<ref.genomes.tbl> in the C<--checkDir> directory.
 
+=item modDir
+
+If specified, the name of a modification directory.  If a genome has been modified, there should be a file in the
+directory with the same name as the genome ID.  The file should be tab-delimited, with a feature ID in the first
+column, a three-digit code in the second column, and a functional assignment in the third.  If the first digit in
+the second column is C<1>, the third column contains a corrected functional assignment.
+
 =back
 
 =cut
@@ -106,7 +113,8 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['gtoCol=s', 'index (1-based) or name of column containing GTO file names'],
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
         ['resume=s', 'resume after error with specified genome'],
-        ['refTable=s', 'reference genome file']
+        ['refTable=s', 'reference genome file'],
+        ['modDir=s', 'name of modification directory']
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -212,6 +220,9 @@ $stats->Add(timeLoading => $timer);
 # Set up the options for creating the GEOs.
 my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, detail => $detailLevel,
         logH => \*STDERR);
+if ($opt->moddir) {
+    $geoOptions{modDir} = $opt->moddir;
+}
 # Process the resume option.
 my $skipped = 0;
 if ($opt->resume) {
