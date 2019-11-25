@@ -67,7 +67,7 @@ $| = 1;
 my $opt = P3Utils::script_opts('genomeFastaFile closeProteinsFile workDir',
         ["verbose|debug|v", "display progress on STDERR"],
         ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.90 }],
-        ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-5 }]
+        ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-30 }]
     );
 my $debug = $opt->verbose;
 my $minlen = $opt->minlen;
@@ -95,7 +95,8 @@ print STDERR "Reading proteins.\n" if $debug;
 open(my $ph, '<', $closeProteinsFile) || die "Could not open protein file: $!";
 my ($headers, $cols) = P3Utils::find_headers($ph, "protein file" => qw(genome_id patric_id pgfam_id product aa_sequence));
 # Process the protein file.  Here we will build the database of genomes and protein families.
-my $closeAnno = CloseAnno->new(stats => $stats, maxE => $maxE, minlen => $minlen);
+my $closeAnno = CloseAnno->new(stats => $stats, maxE => $maxE, minlen => $minlen,
+    workDir => $workDir);
 my $protCount = 0;
 my $oldGenome = '';
 while (! eof $ph) {
@@ -113,14 +114,15 @@ while (! eof $ph) {
 print STDERR "$protCount proteins stored for processing.\n" if $debug;
 my $familyH = $closeAnno->families();
 my $familyL = [ keys %$familyH ];
-my $famCount = 0;
+my ($famCount, $keptCount) = (0,0);
 print STDERR scalar(@$familyL) . " protein families found.\n" if $debug;
 for my $family (@$familyL) {
-    my $hspList = $closeAnno->findHit($family, $genomeFastaFile);
-    for my $hsp (@$hspList) {
-        P3Utils::print_cols($hsp);
+    my $hspHash = $closeAnno->findHit($family, $genomeFastaFile);
+    if ($hspHash->{1}) {
+        P3Utils::print_cols($hspHash->{1});
+        $keptCount++;
     }
     $famCount++;
-    print STDERR "$famCount families processed.\n" if $debug && $famCount % 50 == 0;
+    print STDERR "$famCount families processed. $keptCount kept.\n" if $debug && $famCount % 50 == 0;
 }
 print STDERR "All done.\n" . $stats->Show() if $debug;

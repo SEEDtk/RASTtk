@@ -25,6 +25,7 @@ package CloseAnno;
     use Stats;
     use SeedUtils;
     use Hsp;
+    use FIG_Config;
 
 =head1 Close-Genome Annotation Object
 
@@ -56,6 +57,10 @@ The maximum acceptable E-value for a BLAST hit.
 
 The minimum fraction of the query length that must be found in the target genome.
 
+=item workDir
+
+The name of a working directory for temporary files.
+
 =back
 
 =head2 Special Methods
@@ -86,6 +91,10 @@ The maximum acceptable E-value for a BLAST hit.  The default is C<1e-5>.
 
 The minimum fraction of the query length that must be found in the target genome.  The default is C<0.75>, indicating 75% of the length.
 
+=item workDir
+
+The name of a temporary directory for working files.  The default is the SEEDtk temporary directory.
+
 =back
 
 =back
@@ -97,8 +106,10 @@ sub new {
     my $stats = $options{stats} // Stats->new();
     my $maxE = $options{maxE} // 1e-5;
     my $minlen = $options{minlen} // 0.75;
+    my $workDir = $options{workDir} // $FIG_Config::temp;
     my $retVal = { genomes => {}, families => {},
-        stats => $stats, maxE => $maxE, minlen => $minlen };
+        stats => $stats, maxE => $maxE, minlen => $minlen,
+        workDir => $workDir };
     bless $retVal, $class;
     return $retVal;
 }
@@ -202,9 +213,9 @@ sub families {
 
 =head3 findHit
 
-    my $hspL = $closeAnno->findHit($family, $genomeFastaFile);
+    my $hspH = $closeAnno->findHit($family, $genomeFastaFile);
 
-Find the best hit for the specified protein family.
+Find the best hits for the specified protein family.
 
 =over 4
 
@@ -218,7 +229,7 @@ The name of a BLAST database for the target genome.
 
 =item RETURN
 
-Returns a reference to a list L<Hsp> objects for the acceptable hits.
+Returns a reference to a hash mapping each bin name to an L<Hsp> object for the best hit.
 
 =back
 
@@ -227,8 +238,9 @@ Returns a reference to a list L<Hsp> objects for the acceptable hits.
 sub findHit {
     my ($self, $family, $genomeFastaFile) = @_;
     my $stats = $self->stats;
+    my $genomes = $self->{genomes};
     # This will be the return value.
-    my @retVal;
+    my %retVal;
     # Get the minimum length fraction.
     my $minlen = $self->{minlen};
     # Get the query sequences.
@@ -236,43 +248,30 @@ sub findHit {
     if ($triples) {
         # Find all the matches.
         $stats->Add(familyFound => 1);
-        my $matches = BlastUtils::blast($triples, $genomeFastaFile, 'tblastn', { maxE => $self->{maxE}, outForm => 'hsp' });
-        # Sort them by location.
-        $matches = [ sort { ($a->sid cmp $b->sid) or ($a->s1 <=> $b->s1) } @$matches ];
-        # We want to keep the matches that exceed a certain length.  If, however, the hit locations overlap, we only keep the long one.
-        # The following variables are used for the overlap check.
-        my ($oldContig, $oldRight, $oldLen) = ('', 0, 0);
+        my $matches = BlastUtils::blast($triples, $genomeFastaFile, 'tblastn', { maxE => $self->{maxE}, outForm => 'hsp',
+            tmp_dir => $self->{workDir} });
+        # We will keep the best hit for each genome group that is of sufficient length.  The hits are already in
+        # order from best to worst.
         for my $hit (@$matches) {
             $stats->Add(match => 1);
-            my $newLen = $hit->n_mat - $hit->n_gap;
-            if ($newLen >= $minlen * $hit->qlen) {
-                # Here the match is long enough.  Check for overlap.
-                my ($newLeft, $newRight) = ($hit->s1, $hit->s2);
-                if ($hit->dir eq '-') {
-                    ($newLeft, $newRight) = ($newRight, $newLeft);
-                }
-                if ($hit->sid eq $oldContig && $newLeft <= $oldRight) {
-                    $stats->Add(matchOverlap => 1);
-                    # We have overlap.  Keep the longest.
-                    if ($oldLen < $newLen) {
-                        pop @retVal;
-                        push @retVal, $hit;
-                        ($oldContig, $oldRight, $oldLen) = ($hit->sid, $newRight, $newLen);
-                    }
-                } else {
-                    # No overlap.  Keep the new match.
-                    push @retVal, $hit;
-                    ($oldContig, $oldRight, $oldLen) = ($hit->sid, $newRight, $newLen);
-                    $stats->Add(matchNew => 1);
-                }
+            my $matchLen = $hit->n_mat - $hit->n_gap;
+            if ($matchLen < $minlen * $hit->qlen) {
+                $stats->Add(matchShort => 1);
             } else {
-                # Here the match was too short.
-                $stats->Add(matchRejected => 1);
+                # Here the match is long enough.  Compute the bin.
+                my $fid = $hit->qid;
+                my $bin = $genomes->{SeedUtils::genome_of($fid)};
+                if (exists $retVal{$bin}) {
+                    $stats->Add(matchDuplicate => 1);
+                } else {
+                    $retVal{$bin} = $hit;
+                    $stats->Add(matchKept => 1);
+                }
             }
         }
     }
     # Return the matches found.
-    return \@retVal;
+    return \%retVal;
 }
 
 1;
