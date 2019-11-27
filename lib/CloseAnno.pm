@@ -23,43 +23,63 @@ package CloseAnno;
     use GenomeTypeObject;
     use BlastUtils;
     use Stats;
-    use SeedUtils;
+    use SeedUtils qw();
     use Hsp;
     use FIG_Config;
+    use FastA;
 
 =head1 Close-Genome Annotation Object
 
-This object maintains data structures used to annotate a genome using close-strain comparison.  A close-strain comparison annotation relies on a set
-of protein families restricted to reference genomes.  Each family is BLASTED against the target FASTA file, and a solid hit is used to call a protein
-with the same function as the family.
+This object is used to manage close-genome annotation.  Close-genome annotation is
+performed by BLASTing pegs from close genomes against a target.  Each target hit
+is identified by its stop codon, and the longest hit with the same stop codon is
+taken as the best one.  The start is then identified and the location is annotated
+with the role of the best hit.
 
 The fields in this object are as follows.
 
 =over 4
 
-=item genomes
+=item workDir
 
-Reference to a hash mapping each genome ID to a bin name.
+The name of a working directory used for temporary files.
 
-=item families
+=item hits
 
-Reference to a hash that maps each protein family ID to a list of triples, each triple containing (0) a feature ID, (1) a functional assignment, and (2) a protein sequence.
-
-=item stats
-
-A L<Stats> object containing statistics about the operation.
+Reference to a hash mapping each stop location found to a 2-tuple containing (0) the
+start location and (1) the L<Hsp> of its best hit.
 
 =item maxE
 
-The maximum acceptable E-value for a BLAST hit.
+The maximum allowable e-value on a blast hit.
 
 =item minlen
 
-The minimum fraction of the query length that must be found in the target genome.
+The minimum fraction of the query sequence length that must be found in the blast
+hit.
 
-=item workDir
+=item maxHits
 
-The name of a working directory for temporary files.
+The maximum number of BLAST hits to return for each query sequence.
+
+=item target
+
+The blast database for the target.  This is a FASTA file name.  If the ancillary
+blast files do not exist, they will be created in the same directory location.
+
+=item stats
+
+A L<Stats> object for tracking statistics.
+
+=item log
+
+An open file handle for progress message output, or C<undef> if no progress
+message output is desired.
+
+=item contigs
+
+Reference to a hash that contains the DNA sequence of each contig in the target
+FASTA, keyed by contig ID.
 
 =back
 
@@ -67,33 +87,48 @@ The name of a working directory for temporary files.
 
 =head3 new
 
-    my $closeAnno = CloseAnno->new(%options);
+    my $closeAnno = CloseAnno->new($target, %options);
 
-Create a new, blank close-genome annotation object.
+Create a new close-annotation object for a specified target FASTA file.
 
 =over 4
 
+=item target
+
+The name of the FASTA file containing the target DNA contigs.
+
 =item options
 
-A hash containing zero or more of the following keys.
+A hash containing zero or more of the following options.
 
 =over 8
 
-=item stats
+=item workDir
 
-A L<Stats> object for creating statistics.  If none is specified, one will be generated internally.
+The name of a working directory used for temporary files.  The default is
+the SEEDtk temporary directory..
 
 =item maxE
 
-The maximum acceptable E-value for a BLAST hit.  The default is C<1e-5>.
+The maximum allowable e-value on a blast hit.  The default is C<1e-40>.
 
 =item minlen
 
-The minimum fraction of the query length that must be found in the target genome.  The default is C<0.75>, indicating 75% of the length.
+The minimum fraction of the query sequence length that must be found in the blast
+hit.  The default is C<0.90>.
 
-=item workDir
+=item maxHits
 
-The name of a temporary directory for working files.  The default is the SEEDtk temporary directory.
+The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
+
+=item stats
+
+A L<Stats> object for tracking statistics.  The default is to create one internally.
+
+=item log
+
+An open file handle for progress message output.  The default is to have no
+progress message output.
 
 =back
 
@@ -102,85 +137,116 @@ The name of a temporary directory for working files.  The default is the SEEDtk 
 =cut
 
 sub new {
-    my ($class, %options) = @_;
+    my ($class, $target, %options) = @_;
+    # Compute the options.
+    my $log = $options{log};
     my $stats = $options{stats} // Stats->new();
-    my $maxE = $options{maxE} // 1e-5;
-    my $minlen = $options{minlen} // 0.75;
+    my $minlen = $options{minlen} // 0.90;
+    my $maxE = $options{maxE} // 1e-40;
     my $workDir = $options{workDir} // $FIG_Config::temp;
-    my $retVal = { genomes => {}, families => {},
-        stats => $stats, maxE => $maxE, minlen => $minlen,
-        workDir => $workDir };
+    my $maxHits = $options{maxHits} // 5;
+    # Now we read the target file and assemble the contigs.
+    my %contigs;
+    my $fastA = FastA->new($target);
+    while ($fastA->next()) {
+        $contigs{$fastA->id} = $fastA->left;
+    }
+    # Create the object.
+    my $retVal = {
+        hits => {},
+        target => $target,
+        workDir => $workDir,
+        stats => $stats,
+        minlen => $minlen,
+        maxE => $maxE,
+        contigs => \%contigs,
+        maxHits => $maxHits,
+        log => $log,
+    };
+    # Bless and return it.
     bless $retVal, $class;
     return $retVal;
 }
 
+=head2 Public Manipulation Methods
 
-=head2 Definition Methods
+=head3	findHits
 
-=head3 DefineGenome
+    $closeAnno->findHits($qFile, $gc);
 
-    $closeAnno->DefineGenome($genomeID, $bin);
-
-Associate a genome with a bin name.
+Find hits from the specified protein query file.  The hits will be stored in the
+object, and can be retrieved late by query methods.
 
 =over 4
 
-=item genomeID
+=item qFile
 
-ID of the relevant genome.
+Name of the FASTA file containing the query sequences.
 
-=item bin
+=item gc
 
-Name of the genome's bin.
+Genetic code to use for proten translations.
 
 =back
 
 =cut
 
-sub DefineGenome {
-    my ($self, $genomeID, $bin) = @_;
-    $self->{genomes}{$genomeID} = $bin;
-    $self->{stats}->Add(genomeIn => 1);
-}
-
-=head3 StoreProtein
-
-    $closeAnno->StoreProtein($pgfamID, $fid, $function, $sequence);
-
-Store a protein in the object to use for annotation.
-
-=over 4
-
-=item pgfamID
-
-ID of the protein's family.
-
-=item fid
-
-ID of the feature containing the protein.
-
-=item function
-
-Functional assignment of the protein.
-
-=item sequence
-
-Amino acid sequence of the protein.
-
-=back
-
-=cut
-
-sub StoreProtein {
-    my ($self, $pgfamID, $fid, $function, $sequence) = @_;
-    my $families = $self->{families};
+sub findHits {
+    my ($self, $qFile, $gc) = @_;
+    # Get the log and the statistics objects.
+    my $log = $self->{log};
     my $stats = $self->{stats};
-    if (! $families->{$pgfamID}) {
-        $families->{$pgfamID} = [];
-        $stats->Add(protFamilyIn => 1);
+    # Extract the minimum-length fraction.
+    my $minlen = $self->{minlen};
+    # Get the hit hash.
+    my $hitH = $self->{hits};
+    # Blast the query file against the target.
+    print $log "Blasting against $qFile.\n" if $log;
+    $stats->Add(blastRuns => 1);
+    my $matches = BlastUtils::blast($qFile, $self->{target},
+            tblastn => { maxE => $self->{maxE}, outForm => 'hsp',
+                maxHitsPerQuery => $self->{maxHits},
+                dbGenCode => $gc, tmp_dir => $self->{workDir} });
+    print $log scalar(@$matches) . " hits found.\n" if $log;
+    # Loop through the matches, keeping ones that qualify.
+    my $kept = 0;
+    for my $match (@$matches) {
+        $stats->Add(matchFound => 1);
+        # First, filter on the length.
+        my $newLen = $match->n_mat - $match->n_gap;
+        if ($newLen < $minlen * $match->qlen) {
+            $stats->Add(matchTooShort => 1);
+        } else {
+            # Now, find the stop location.
+            my $stopLoc = $self->_find_stop($match, $gc);
+            if (! $stopLoc) {
+                $stats->Add(matchNoStop => 1);
+            } else {
+                # Check for a previous hit.  If we find one we have to compare lengths.
+                my $oldMatchSpec = $hitH->{$stopLoc};
+                if (! $oldMatchSpec) {
+                    # This is the first match for this coding region.
+                    my $ok = $self->_storeMatch($match, $stopLoc, $gc);
+                    if ($ok) {
+                        $kept++;
+                        $stats->Add(matchNew => 1);
+                    }
+                } else {
+                    # Here we have to check the length.
+                    my ($startLoc, $oldMatch) = @$oldMatchSpec;
+                    if ($newLen < $oldMatch->n_mat - $oldMatch->n_gap) {
+                        # This match is shorter, so it is not as good as the old one.
+                        $stats->Add(matchDuplicate => 1);
+                    } else {
+                        # Here we have a better match.
+                         my $ok = $self->_storeMatch($match, $stopLoc, $gc);
+                         $stats->Add(matchBetter => 1) if $ok;
+                    }
+                }
+            }
+        }
     }
-    my $pgfamL = $families->{$pgfamID};
-    push @$pgfamL, [$fid, $function, $sequence];
+    print $log "$kept new coding regions found.\n" if $log;
 }
 
 =head2 Query Methods
@@ -198,81 +264,260 @@ sub stats {
     return $self->{stats};
 }
 
-=head3 families
+=head3 all_stops
 
-    my $familiesH = $closeAnno->families;
+    my $stopList = $closeAnno->all_stops();
 
-Return the protein family hash table.
+Return a reference to a list of all the stops found.
 
 =cut
 
-sub families {
+sub all_stops {
     my ($self) = @_;
-    return $self->{families};
+    my $hitsH = $self->{hits};
+    return [keys %$hitsH];
 }
 
-=head3 findHit
+=head3 feature_at
 
-    my $hspH = $closeAnno->findHit($family, $genomeFastaFile);
+    my ($contig, $start, $dir, $stop, $function) = $closeAnno->feature_at($stopLoc);
 
-Find the best hits for the specified protein family.
+Return the description of the feature found at the specified stop location.
 
 =over 4
 
-=item family
+=item stopLoc
 
-The ID of a protein family stored in this object.
-
-=item genomeFastaFile
-
-The name of a BLAST database for the target genome.
+The stop-location specifier for the feature in question.
 
 =item RETURN
 
-Returns a reference to a hash mapping each bin name to an L<Hsp> object for the best hit.
+Returns a five-element list consisting of (0) the contig ID, (1) the start position, (2) the strand, (3) the stop
+position, and (4) the functional assignment.  If the stop location is invalid, the start will be undefined.
 
 =back
 
 =cut
 
-sub findHit {
-    my ($self, $family, $genomeFastaFile) = @_;
-    my $stats = $self->stats;
-    my $genomes = $self->{genomes};
+sub feature_at {
+    my ($self, $stopLoc) = @_;
+    # Initialize the stop information.
+    my ($contig, $dir, $stop) = ($stopLoc =~ /^(.+)([+-])(\d+)/);
+    # Declare the start and function.
+    my ($start, $function);
+    # Check for a match.
+    my $matchSpec = $self->{hits}{$stopLoc};
+    if ($matchSpec) {
+        ($start, $function) = ($matchSpec->[0], $matchSpec->[1]->qdef);
+    }
+    # Return the results.
+    return ($contig, $start, $dir, $stop, $function);
+}
+
+
+=head2 Internal Methods
+
+=cut
+
+use constant STARTS => {
+        1 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1},
+        2 => { 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        3 => { 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        4 => { 'tta' => 1, 'taa' => -1, 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        5 => { 'ttg' => 1, 'caa' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        6 => { 'atg' => 1, 'cat' => -1},
+        9 => { 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        10 => { 'atg' => 1, 'cat' => -1},
+        11 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        12 => { 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1},
+        13 => { 'ttg' => 1, 'caa' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        14 => { 'atg' => 1, 'cat' => -1},
+        15 => { 'atg' => 1, 'cat' => -1},
+        16 => { 'atg' => 1, 'cat' => -1},
+        21 => { 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        22 => { 'atg' => 1, 'cat' => -1},
+        23 => { 'att' => 1, 'aat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        24 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        25 => { 'ttg' => 1, 'caa' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        26 => { 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1},
+        27 => { 'atg' => 1, 'cat' => -1},
+        28 => { 'atg' => 1, 'cat' => -1},
+        29 => { 'atg' => 1, 'cat' => -1},
+        30 => { 'atg' => 1, 'cat' => -1},
+        31 => { 'atg' => 1, 'cat' => -1},
+        32 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+        33 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+    };
+use constant STOPS => {
+        1 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        2 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'aga' => 1, 'tct' => -1, 'agg' => 1, 'cct' => -1},
+        3 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        4 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        5 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        6 => { 'tga' => 1, 'tca' => -1},
+        9 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        10 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        11 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        12 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        13 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        14 => { 'tag' => 1, 'cta' => -1},
+        15 => { 'taa' => 1, 'tta' => -1, 'tga' => 1, 'tca' => -1},
+        16 => { 'taa' => 1, 'tta' => -1, 'tga' => 1, 'tca' => -1},
+        21 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        22 => { 'tca' => 1, 'tga' => -1, 'taa' => 1, 'tta' => -1, 'tga' => 1, 'tca' => -1},
+        23 => { 'tta' => 1, 'taa' => -1, 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        24 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        25 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        26 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        27 => { 'tga' => 1, 'tca' => -1},
+        28 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1, 'tga' => 1, 'tca' => -1},
+        29 => { 'tga' => 1, 'tca' => -1},
+        30 => { 'tga' => 1, 'tca' => -1},
+        31 => { 'taa' => 1, 'tta' => -1, 'tag' => 1, 'cta' => -1},
+        32 => { 'taa' => 1, 'tta' => -1, 'tga' => 1, 'tca' => -1},
+        33 => { 'tag' => 1, 'cta' => -1},
+    };
+
+
+=head3 _find_stop
+
+    my $stopLoc = $closeAnno->_find_stop($match, $gc);
+
+Return the stop location in the target sequence for the specified match.
+
+=over 4
+
+=item match
+
+The L<Hsp> object for the match in question.
+
+=item gc
+
+The genetic code relevant to the target sequences.
+
+=item RETURN
+
+Returns a stop location, coded as a string of the form I<seqID>I<dir>I<pos> where I<seqID> is the sequence ID of
+the target sequence, I<dir> is the strand, and I<pos> is the 1-based location of the left edge of the stop.
+
+=back
+
+=cut
+
+sub _find_stop {
+    my ($self, $match, $gc) = @_;
     # This will be the return value.
-    my %retVal;
-    # Get the minimum length fraction.
-    my $minlen = $self->{minlen};
-    # Get the query sequences.
-    my $triples = $self->{families}{$family};
-    if ($triples) {
-        # Find all the matches.
-        $stats->Add(familyFound => 1);
-        my $matches = BlastUtils::blast($triples, $genomeFastaFile, 'tblastn', { maxE => $self->{maxE}, outForm => 'hsp',
-            tmp_dir => $self->{workDir} });
-        # We will keep the best hit for each genome group that is of sufficient length.  The hits are already in
-        # order from best to worst.
-        for my $hit (@$matches) {
-            $stats->Add(match => 1);
-            my $matchLen = $hit->n_mat - $hit->n_gap;
-            if ($matchLen < $minlen * $hit->qlen) {
-                $stats->Add(matchShort => 1);
-            } else {
-                # Here the match is long enough.  Compute the bin.
-                my $fid = $hit->qid;
-                my $bin = $genomes->{SeedUtils::genome_of($fid)};
-                if (exists $retVal{$bin}) {
-                    $stats->Add(matchDuplicate => 1);
-                } else {
-                    $retVal{$bin} = $hit;
-                    $stats->Add(matchKept => 1);
-                }
-            }
+    my $retVal;
+    # Get the stops for the genetic code.
+    my $stopH = STOPS->{$gc};
+    # Get the direction and the endpoint of the match.
+    my $dir = $match->dir;
+    my $pos = $match->s2;
+    # Get the sequence to search.
+    my $seq = $self->{contigs}{$match->sid};
+    # Get the first and last feasible search locations and the desired indication value.
+    # The locations are expressed as actual PERL offsets.
+    my ($s1, $s2, $incr, $want, $adjust);
+    if ($dir eq '+') {
+        $s1 = $pos;
+        $s2 = length $seq;
+        $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
+        $incr = 3;
+        $want = 1;
+        $adjust = 3;
+    } else {
+        $s1 = $pos - 4;
+        $s2 = $s1 % 3;
+        $incr = -3;
+        $want = -1;
+        $adjust = 1
+    }
+    # Search for the stop.
+    while (! $retVal && $s1 != $s2) {
+        my $codon = substr($seq, $s1, 3);
+        if ($stopH->{$codon} // 0 == $want) {
+            $retVal = $match->sid . $dir . ($s1 + $adjust);
+        } else {
+            $s1 += $incr;
         }
     }
-    # Return the matches found.
-    return \%retVal;
+    # Return the result.
+    return $retVal;
 }
+
+=head3 _storeMatch
+
+    my $ok = $closeAnno->_storeMatch($match, $stopLoc, $gc);
+
+Store the specified match for the indicated stop location.  We find the associated start location and store both
+it and the match's L<Hsp> object in the hit hash for that stop location.
+
+=over 4
+
+=item match
+
+The L<Hsp> object for the match to store.
+
+=item stopLoc
+
+The specification of the match's stop location, which is of the form I<seqID>I<dir>I<pos>.
+
+=item gc
+
+The genetic code to use for finding the start.
+
+=item RETURN
+
+Returns TRUE if successful, FALSE if the match could not be stored.
+
+=back
+
+=cut
+
+sub _storeMatch {
+    my ($self, $match, $stopLoc, $gc) = @_;
+    # This will be set to TRUE if we find the start.
+    my $retVal;
+    # Get the starts for the specified genetic code.
+    my $startH = STARTS->{$gc};
+    # Get the direction and the startpoint of the match.
+    my $dir = $match->dir;
+    my $pos = $match->s1;
+    # Get the sequence to search.
+    my $seq = $self->{contigs}{$match->sid};
+    # Get the first and last feasible search locations and the desired indication value.
+    # The locations are expressed as actual PERL offsets.
+    my ($s1, $s2, $incr, $want, $adjust);
+    if ($dir eq '+') {
+        $s1 = $pos - 1;
+        $s2 = $s1 % 3;
+        $incr = -3;
+        $want = 1;
+        $adjust = 1;
+    } else {
+        $s1 = $pos - 2;
+        $s2 = length $seq;
+        $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
+        $incr = 3;
+        $want = -1;
+        $adjust = 2;
+    }
+    # Search for the start.
+    while (! $retVal && $s1 != $s2) {
+        my $codon = substr($seq, $s1, 3);
+        if ($startH->{$codon} // 0 == $want) {
+            $retVal = 1;
+            $self->{hits}{$stopLoc} = [$s1+$adjust, $match];
+        } else {
+            $s1 += $incr;
+        }
+    }
+    $self->{stats}->Add(startNotFound => 1) if ! $retVal;
+    # Return the result.
+    return $retVal;
+}
+
+
 
 1;
 
