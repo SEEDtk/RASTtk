@@ -107,11 +107,18 @@ my $stats = Stats->new();
 # Is the input a GTO file?
 my $gto;
 if ($gtoFile) {
+    # Load the GTO file.
     print STDERR "GTO mode in effect.\n" if $debug;
-    my $gto = GenomeTypeObject->create_from_file($genomeFastaFile);
+    $gto = GenomeTypeObject->create_from_file($genomeFastaFile);
     $genomeFastaFile = "$workDir/target.fa";
+    # Make sure there is no residual blast database.
+    for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
+        if (-f "$workDir/$file") {
+            unlink "$workDir/$file";
+        }
+    }
     print STDERR "Creating FASTA file $genomeFastaFile from input GTO.\n" if $debug;
-    $gto->write_fasta($genomeFastaFile);
+    $gto->write_contigs_to_file($genomeFastaFile);
 }
 # Create the annotation object.
 my $closeAnno = CloseAnno->new($genomeFastaFile, stats => $stats, maxE => $maxE, minlen => $minlen,
@@ -137,11 +144,15 @@ while (! eof $ih) {
 # Now unspool the output.
 my $all_stops = $closeAnno->all_stops;
 print STDERR scalar(@$all_stops) . " features found.\n" if $debug;
-# Write the header.
 print "contig\tstart\tdir\tstop\tfunction\n";
-for my $stop (@$all_stops) {
-    my ($contig, $start, $dir, $stop, $function) = $closeAnno->feature_at($stop);
+for my $stopLoc (@$all_stops) {
+    my ($contig, $start, $dir, $stop, $function) = $closeAnno->feature_at($stopLoc);
     print "$contig\t$start\t$dir\t$stop\t$function\n";
-    ## TODO add feature to GTO.
+    if ($gto) {
+        $closeAnno->add_feature_at($gto, $stopLoc);
+    }
+}
+if ($gto) {
+    $gto->destroy_to_file($gtoFile);
 }
 print STDERR "All done.\n" . $stats->Show() if $debug;

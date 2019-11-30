@@ -81,6 +81,14 @@ message output is desired.
 Reference to a hash that contains the DNA sequence of each contig in the target
 FASTA, keyed by contig ID.
 
+=item gcTable
+
+A hash of translation tables for the genetic codes to use in output proteins.
+
+=item pegCounts
+
+Reference to a hash mapping each GTO name to the number of pegs inserted for it.
+
 =back
 
 =head2 Special Methods
@@ -145,12 +153,14 @@ sub new {
     my $maxE = $options{maxE} // 1e-40;
     my $workDir = $options{workDir} // $FIG_Config::temp;
     my $maxHits = $options{maxHits} // 5;
+    my $genetic_code = $options{genetic_code} // 11;
     # Now we read the target file and assemble the contigs.
     my %contigs;
     my $fastA = FastA->new($target);
     while ($fastA->next()) {
         $contigs{$fastA->id} = $fastA->left;
     }
+    my %codes = map { $_ => SeedUtils::genetic_code($_) } qw(1 2 3 4 11);
     # Create the object.
     my $retVal = {
         hits => {},
@@ -162,6 +172,8 @@ sub new {
         contigs => \%contigs,
         maxHits => $maxHits,
         log => $log,
+        gcTable => \%codes,
+        pegCounts => {},
     };
     # Bless and return it.
     bless $retVal, $class;
@@ -275,7 +287,7 @@ Return a reference to a list of all the stops found.
 sub all_stops {
     my ($self) = @_;
     my $hitsH = $self->{hits};
-    return [keys %$hitsH];
+    return [sort { _cmp_stop($a, $b) } keys %$hitsH];
 }
 
 =head3 feature_at
@@ -302,7 +314,7 @@ position, and (4) the functional assignment.  If the stop location is invalid, t
 sub feature_at {
     my ($self, $stopLoc) = @_;
     # Initialize the stop information.
-    my ($contig, $dir, $stop) = ($stopLoc =~ /^(.+)([+-])(\d+)/);
+    my ($contig, $dir, $stop) = _parse_stop($stopLoc);
     # Declare the start and function.
     my ($start, $function);
     # Check for a match.
@@ -312,6 +324,61 @@ sub feature_at {
     }
     # Return the results.
     return ($contig, $start, $dir, $stop, $function);
+}
+
+=head3 add_feature_at
+
+    $closeAnno->add_feature_at($gto, $stopLoc);
+
+Add the feature at the specified stop location to the specified L<GenomeTypeObject>.
+
+=over 4
+
+=item gto
+
+L<GenomeTypeObject> to receive the new feature.
+
+=item stopLoc
+
+The stop-location specifier for the feature in question.
+
+=back
+
+=cut
+
+sub add_feature_at {
+    my ($self, $gto, $stopLoc) = @_;
+    # Get the genome ID.
+    my $genomeID = $gto->{id};
+    # Get the genetic code.
+    my $gc = $self->{gcTable}{$gto->{genetic_code}};
+    # Compute the feature ID.
+    my $pegNum = $self->{pegCounts}{$genomeID};
+    if (! $pegNum) {
+        $self->{pegCounts}{$genomeID} = 2;
+        $pegNum = 1;
+    } else {
+        $self->{pegCounts}{$genomeID}++;
+    }
+    my $fid = "fig|$genomeID.peg.$pegNum";
+    # Get the data for the feature at this stop.
+    my ($contig, $start, $dir, $stop, $function) = $self->feature_at($stopLoc);
+    # Get the DNA and location for this feature.
+    my $contigH = $self->{contigs};
+    my ($seq, $len);
+    if ($dir eq '+') {
+        $len = $stop + 1 - $start;
+        $seq = substr($contigH->{$contig}, $start - 1, $len);
+    } else {
+        $len = $start + 1 - $stop;
+        $seq = SeedUtils::rev_comp(substr($contigH->{$contig}, $stop - 1, $len));
+    }
+    my @loc = ([$contig, $start, $dir, $len]);
+    # Compute the resultant protein sequence.  Note we fix the start.
+    my $prot = SeedUtils::translate($seq, $gc, 1);
+    # Add the feature to the GTO.
+    $gto->add_feature({-id => $fid, -function => $function, -protein_translation => $prot,
+        -annotator => 'CloseAnno', -location => \@loc, -type => 'CDS' });
 }
 
 
@@ -517,7 +584,62 @@ sub _storeMatch {
     return $retVal;
 }
 
+=head3 _cmp_stop
 
+    my $cmp = CloseAnno::_cmp_stop($a, $b);
+
+Compare two stop locations for sorting.  We sort by contig ID then by location offset and strand.
+
+=over 4
+
+=item a
+
+First stop location.
+
+=item b
+
+Second stop location.
+
+=item RETURN
+
+Return a positive value if the first stop should sort last, a negative value if it should sort first, and 0 if the stops are equal.
+
+=back
+
+=cut
+
+sub _cmp_stop {
+    my ($a, $b) = @_;
+    my ($aContig, $aStrand, $aloc) = _parse_stop($a);
+    my ($bContig, $bStrand, $bloc) = _parse_stop($b);
+    return ($aContig cmp $bContig) || ($aloc <=> $bloc) || ($aStrand cmp $bStrand);
+}
+
+=head3 _parse_stop
+
+    my ($contig, $dir, $loc) = _parse_stop($stop);
+
+Parse a stop location into the contig ID, direction, and position.
+
+=over 4
+
+=item stop
+
+A stop location.
+
+=item RETURN
+
+Returns a list containing the contig ID, direction, and position of the stop.
+
+=back
+
+=cut
+
+sub _parse_stop {
+    my ($stop) = @_;
+    my ($contig, $dir, $loc) = ($stop =~ /(.+)([+-])(\d+)/);
+    return ($contig, $dir, $loc);
+}
 
 1;
 
