@@ -229,30 +229,27 @@ sub findHits {
         if ($newLen < $minlen * $match->qlen) {
             $stats->Add(matchTooShort => 1);
         } else {
-            # Now, find the stop location.
+            # Now, find the start and stop locations.
+            my $start = $self->_find_start($match, $gc);
             my $stopLoc = $self->_find_stop($match, $gc);
-            if (! $stopLoc) {
-                $stats->Add(matchNoStop => 1);
-            } else {
+            if ($stopLoc && $start) {
                 # Check for a previous hit.  If we find one we have to compare lengths.
                 my $oldMatchSpec = $hitH->{$stopLoc};
                 if (! $oldMatchSpec) {
                     # This is the first match for this coding region.
-                    my $ok = $self->_storeMatch($match, $stopLoc, $gc);
-                    if ($ok) {
-                        $kept++;
-                        $stats->Add(matchNew => 1);
-                    }
+                    $kept++;
+                    $stats->Add(matchNew => 1);
+                    $self->{hits}{$stopLoc} = [$start, $match];
                 } else {
                     # Here we have to check the length.
-                    my ($startLoc, $oldMatch) = @$oldMatchSpec;
+                    my (undef, $oldMatch) = @$oldMatchSpec;
                     if ($newLen < $oldMatch->n_mat - $oldMatch->n_gap) {
                         # This match is shorter, so it is not as good as the old one.
                         $stats->Add(matchDuplicate => 1);
                     } else {
                         # Here we have a better match.
-                         my $ok = $self->_storeMatch($match, $stopLoc, $gc);
-                         $stats->Add(matchBetter => 1) if $ok;
+                        $self->{hits}{$stopLoc} = [$start, $match];
+                        $stats->Add(matchBetter => 1);
                     }
                 }
             }
@@ -374,8 +371,11 @@ sub add_feature_at {
         $seq = SeedUtils::rev_comp(substr($contigH->{$contig}, $stop - 1, $len));
     }
     my @loc = ([$contig, $start, $dir, $len]);
-    # Compute the resultant protein sequence.  Note we fix the start.
+    # Compute the resultant protein sequence.  Note we fix the start and chop off the stop.
     my $prot = SeedUtils::translate($seq, $gc, 1);
+    if ($prot =~ /\*$/) {
+        chop $prot;
+    }
     # Add the feature to the GTO.
     $gto->add_feature({-id => $fid, -function => $function, -protein_translation => $prot,
         -annotator => 'CloseAnno', -location => \@loc, -type => 'CDS' });
@@ -390,12 +390,14 @@ use constant STARTS => {
         1 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1},
         2 => { 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
         3 => { 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+#        4 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'gtg' => 1, 'cac' => -1},
         4 => { 'tta' => 1, 'taa' => -1, 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
         5 => { 'ttg' => 1, 'caa' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
         6 => { 'atg' => 1, 'cat' => -1},
         9 => { 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
         10 => { 'atg' => 1, 'cat' => -1},
         11 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'att' => 1, 'aat' => -1, 'atc' => 1, 'gat' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
+#        11 => { 'ttg' => 1, 'caa' => -1, 'ctg' => 1, 'cag' => -1, 'gtg' => 1, 'cac' => -1},
         12 => { 'ctg' => 1, 'cag' => -1, 'atg' => 1, 'cat' => -1},
         13 => { 'ttg' => 1, 'caa' => -1, 'ata' => 1, 'tat' => -1, 'atg' => 1, 'cat' => -1, 'gtg' => 1, 'cac' => -1},
         14 => { 'atg' => 1, 'cat' => -1},
@@ -473,6 +475,7 @@ the target sequence, I<dir> is the strand, and I<pos> is the 1-based location of
 
 sub _find_stop {
     my ($self, $match, $gc) = @_;
+    my $stats = $self->stats;
     # This will be the return value.
     my $retVal;
     # Get the stops for the genetic code.
@@ -480,54 +483,64 @@ sub _find_stop {
     # Get the direction and the endpoint of the match.
     my $dir = $match->dir;
     my $pos = $match->s2;
-    # Get the sequence to search.
-    my $seq = $self->{contigs}{$match->sid};
-    # Get the first and last feasible search locations and the desired indication value.
-    # The locations are expressed as actual PERL offsets.
-    my ($s1, $s2, $incr, $want, $adjust);
-    if ($dir eq '+') {
-        $s1 = $pos;
-        $s2 = length $seq;
-        $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
-        $incr = 3;
-        $want = 1;
-        $adjust = 3;
+    my $begin = $match->s1;
+    my $slen = ($dir eq '+' ? $pos + 1 - $begin : $begin + 1 - $pos);
+    if ($slen % 3 != 0) {
+        $stats->Add(badMatchPhase => 1);
+    } elsif ($match->sseq =~ /\*/) {
+        $stats->Add(internalStop => 1);
     } else {
-        $s1 = $pos - 4;
-        $s2 = $s1 % 3;
-        $incr = -3;
-        $want = -1;
-        $adjust = 1
-    }
-    # Search for the stop.
-    while (! $retVal && $s1 != $s2) {
-        my $codon = substr($seq, $s1, 3);
-        if ($stopH->{$codon} // 0 == $want) {
-            $retVal = $match->sid . $dir . ($s1 + $adjust);
+        # Get the sequence to search.
+        my $seq = $self->{contigs}{$match->sid};
+        my $done;
+        # Get the first and last feasible search locations and the desired indication value.
+        # The locations are expressed as actual PERL offsets.
+        my ($s1, $s2, $incr, $want, $adjust);
+        if ($dir eq '+') {
+            $s1 = $pos;
+            $s2 = length($seq) - 2;
+            $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
+            $incr = 3;
+            $want = 1;
+            $adjust = 3;
+            $done = ($s1 > $s2);
         } else {
-            $s1 += $incr;
+            $s1 = $pos - 4;
+            $s2 = $s1 % 3;
+            $incr = -3;
+            $want = -1;
+            $adjust = 1;
+            $done = ($s2 > $s1);
+        }
+        # Search for the stop.
+        while (! $done && $s1 != $s2) {
+            my $codon = substr($seq, $s1, 3);
+            if (($stopH->{$codon} // 0) == $want) {
+                $retVal = $match->sid . $dir . ($s1 + $adjust);
+                $done = 1;
+            } else {
+                $s1 += $incr;
+            }
+        }
+        if (! $retVal) {
+            $stats->Add(stopNotFound => 1);
         }
     }
     # Return the result.
     return $retVal;
 }
 
-=head3 _storeMatch
+=head3 _find_start
 
-    my $ok = $closeAnno->_storeMatch($match, $stopLoc, $gc);
+    my $start = $closeAnno->_find_start($match, $gc);
 
-Store the specified match for the indicated stop location.  We find the associated start location and store both
-it and the match's L<Hsp> object in the hit hash for that stop location.
+Find a start for the specified match.
 
 =over 4
 
 =item match
 
-The L<Hsp> object for the match to store.
-
-=item stopLoc
-
-The specification of the match's stop location, which is of the form I<seqID>I<dir>I<pos>.
+The L<Hsp> object for the match.
 
 =item gc
 
@@ -541,12 +554,13 @@ Returns TRUE if successful, FALSE if the match could not be stored.
 
 =cut
 
-sub _storeMatch {
-    my ($self, $match, $stopLoc, $gc) = @_;
-    # This will be set to TRUE if we find the start.
+sub _find_start {
+    my ($self, $match, $gc) = @_;
+    # This will be set to the start if we find it.
     my $retVal;
     # Get the starts for the specified genetic code.
     my $startH = STARTS->{$gc};
+    my $stopH = STOPS->{$gc};
     # Get the direction and the startpoint of the match.
     my $dir = $match->dir;
     my $pos = $match->s1;
@@ -562,24 +576,34 @@ sub _storeMatch {
         $want = 1;
         $adjust = 1;
     } else {
-        $s1 = $pos - 2;
-        $s2 = length $seq;
+        $s1 = $pos - 3;
+        $s2 = length($seq) - 2;
         $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
         $incr = 3;
         $want = -1;
-        $adjust = 2;
+        $adjust = 3;
     }
     # Search for the start.
-    while (! $retVal && $s1 != $s2) {
+    my $done;
+    while (! $done && $s1 != $s2) {
         my $codon = substr($seq, $s1, 3);
-        if ($startH->{$codon} // 0 == $want) {
-            $retVal = 1;
-            $self->{hits}{$stopLoc} = [$s1+$adjust, $match];
+        if (($startH->{$codon} // 0) == $want) {
+            $done = 1;
+            $retVal = $s1 + $adjust;
+        } elsif (($stopH->{$codon} // 0) == $want) {
+            $done = 1;
         } else {
             $s1 += $incr;
         }
     }
-    $self->{stats}->Add(startNotFound => 1) if ! $retVal;
+    if (! $retVal) {
+        my $stats = $self->{stats};
+        if (! $done) {
+            $stats->Add(startNotFound => 1);
+        } else {
+            $stats->Add(startBlocked => 1);
+        }
+    }
     # Return the result.
     return $retVal;
 }

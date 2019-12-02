@@ -76,7 +76,7 @@ $| = 1;
 my $opt = P3Utils::script_opts('genomeFastaFile controlFile workDir',
         ["gto=s", "input is a GTO, produce an annotated GTO file as output"],
         ["verbose|debug|v", "display progress on STDERR"],
-        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.90 }],
+        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.75 }],
         ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
         ["maxHits=i", "maximum hits for each query peg", { default => 5 }]
     );
