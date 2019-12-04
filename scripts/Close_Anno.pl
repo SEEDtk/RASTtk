@@ -23,7 +23,7 @@
 This is a preliminary script for performing close-genome annotation.
 
 The program uses a control file, tab-delimited with no headers.  Each record contains the name of a FASTA file and a
-genetic code number.  The incoming file should contain protein sequences with a FIG feature ID as the sequence ID, the
+genetic code number.  The FASTA file should contain protein sequences with a FIG feature ID as the sequence ID, the
 functional assignment as the comment, and the protein sequence as the sequence.  Each such file will be blasted against
 the target genome FASTA file using the specified genetic code.  The best match for any ORF will be output.
 
@@ -59,6 +59,10 @@ The minimum fraction of the query length that must be found in the target genome
 
 The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
 
+=item log
+
+Specifies a file to contain progress messsages (in addition to STDERR).
+
 =back
 
 =cut
@@ -76,17 +80,17 @@ $| = 1;
 my $opt = P3Utils::script_opts('genomeFastaFile controlFile workDir',
         ["gto=s", "input is a GTO, produce an annotated GTO file as output"],
         ["verbose|debug|v", "display progress on STDERR"],
-        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.75 }],
+        ["log=s", "log progress messages to a file (implies verbose)"],
+        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.80 }],
         ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
         ["maxHits=i", "maximum hits for each query peg", { default => 5 }]
     );
-my $log;
-my $debug = $opt->verbose;
-$log = \*STDERR if $debug;
 my $minlen = $opt->minlen;
 my $maxE = $opt->maxe;
 my $maxHits = $opt->maxhits;
 my $gtoFile = $opt->gto;
+my $logFile = $opt->log;
+my $debug = $opt->verbose || $opt->log;
 # Get the positional parameters.
 my ($genomeFastaFile, $controlFile, $workDir) = @ARGV;
 if (! $genomeFastaFile) {
@@ -122,7 +126,7 @@ if ($gtoFile) {
 }
 # Create the annotation object.
 my $closeAnno = CloseAnno->new($genomeFastaFile, stats => $stats, maxE => $maxE, minlen => $minlen,
-    workDir => $workDir, log => $log, maxHits => $maxHits);
+    workDir => $workDir, verbose => $debug, logFile => $logFile, maxHits => $maxHits);
 # Loop through the input.
 open(my $ih, '<', $controlFile) || die "Could not open $controlFile: $!";
 while (! eof $ih) {
@@ -132,7 +136,7 @@ while (! eof $ih) {
     if ($line =~ /^([^\t]+)\t(\d+)/) {
         my ($fastaFile, $gc) = ($1, $2);
         if (! -s $fastaFile) {
-            print STDERR "WARNING: $fastaFile not found or empty.\n" if $debug;
+            $closeAnno->log("WARNING: $fastaFile not found or empty.\n") if $debug;
             $stats->Add(queryFileNotFound => 1);
         } else {
             # Look for hits in the file.
@@ -143,7 +147,7 @@ while (! eof $ih) {
 }
 # Now unspool the output.
 my $all_stops = $closeAnno->all_stops;
-print STDERR scalar(@$all_stops) . " features found.\n" if $debug;
+$closeAnno->log(scalar(@$all_stops) . " features found.\n") if $debug;
 print "contig\tstart\tdir\tstop\tfunction\n";
 for my $stopLoc (@$all_stops) {
     my ($contig, $start, $dir, $stop, $function) = $closeAnno->feature_at($stopLoc);
@@ -155,4 +159,4 @@ for my $stopLoc (@$all_stops) {
 if ($gto) {
     $gto->destroy_to_file($gtoFile);
 }
-print STDERR "All done.\n" . $stats->Show() if $debug;
+$closeAnno->log("All done.\n" . $stats->Show()) if $debug;

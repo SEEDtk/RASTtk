@@ -89,6 +89,16 @@ A hash of translation tables for the genetic codes to use in output proteins.
 
 Reference to a hash mapping each GTO name to the number of pegs inserted for it.
 
+=item logFile
+
+An open file handle for progress message output.  The default is to only send
+progress message output to the standard error output.
+
+=item verbose
+
+If TRUE, progress messages will be set to the standard error output (and optionally
+the log file).
+
 =back
 
 =head2 Special Methods
@@ -133,10 +143,15 @@ The maximum number of BLAST hits to return for each query sequence.  The default
 
 A L<Stats> object for tracking statistics.  The default is to create one internally.
 
-=item log
+=item logFile
 
-An open file handle for progress message output.  The default is to have no
-progress message output.
+The name of a file for copies of the progress message output.  The default is to
+only send progress message output to the standard error output.
+
+=item verbose
+
+If TRUE, progress messages will be set to the standard error output (and optionally
+the log file).
 
 =back
 
@@ -147,18 +162,23 @@ progress message output.
 sub new {
     my ($class, $target, %options) = @_;
     # Compute the options.
-    my $log = $options{log};
+    my $debug = $options{verbose};
     my $stats = $options{stats} // Stats->new();
     my $minlen = $options{minlen} // 0.90;
     my $maxE = $options{maxE} // 1e-40;
     my $workDir = $options{workDir} // $FIG_Config::temp;
     my $maxHits = $options{maxHits} // 5;
     my $genetic_code = $options{genetic_code} // 11;
+    # Handle the logfile.
+    my $lh;
+    if ($options{logFile}) {
+        open($lh, '>', $options{logFile}) || die "Could not open log file: $!";
+    }
     # Now we read the target file and assemble the contigs.
     my %contigs;
     my $fastA = FastA->new($target);
     while ($fastA->next()) {
-        $contigs{$fastA->id} = $fastA->left;
+        $contigs{$fastA->id} = lc $fastA->left;
     }
     my %codes = map { $_ => SeedUtils::genetic_code($_) } qw(1 2 3 4 11);
     # Create the object.
@@ -171,7 +191,8 @@ sub new {
         maxE => $maxE,
         contigs => \%contigs,
         maxHits => $maxHits,
-        log => $log,
+        verbose => $debug,
+        logFile => $lh,
         gcTable => \%codes,
         pegCounts => {},
     };
@@ -180,9 +201,71 @@ sub new {
     return $retVal;
 }
 
+=head3 cmp_stop
+
+    my $cmp = CloseAnno::cmp_stop($a, $b);
+
+Compare two stop locations for sorting.  We sort by contig ID then by location offset and strand.
+
+=over 4
+
+=item a
+
+First stop location.
+
+=item b
+
+Second stop location.
+
+=item RETURN
+
+Return a positive value if the first stop should sort last, a negative value if it should sort first, and 0 if the stops are equal.
+
+=back
+
+=cut
+
+sub cmp_stop {
+    my ($a, $b) = @_;
+    my ($aContig, $aStrand, $aloc) = parse_stop($a);
+    my ($bContig, $bStrand, $bloc) = parse_stop($b);
+    return ($aContig cmp $bContig) || ($aloc <=> $bloc) || ($aStrand cmp $bStrand);
+}
+
+=head3 parse_stop
+
+    my ($contig, $dir, $loc) = parse_stop($stop);
+
+Parse a stop location into the contig ID, direction, and position.
+
+=over 4
+
+=item stop
+
+A stop location.
+
+=item RETURN
+
+Returns a list containing the contig ID, direction, and position of the stop.
+
+=back
+
+=cut
+
+sub parse_stop {
+    my ($stop) = @_;
+    my ($contig, $dir, $loc) = ($stop =~ /(.+)([+-])(\d+)/);
+    return ($contig, $dir, $loc);
+}
+
+
 =head2 Public Manipulation Methods
 
-=head3	findHits
+=head3 readGto
+
+
+
+=head3 findHits
 
     $closeAnno->findHits($qFile, $gc);
 
@@ -206,22 +289,22 @@ Genetic code to use for proten translations.
 sub findHits {
     my ($self, $qFile, $gc) = @_;
     # Get the log and the statistics objects.
-    my $log = $self->{log};
+    my $debug = $self->{verbose};
     my $stats = $self->{stats};
     # Extract the minimum-length fraction.
     my $minlen = $self->{minlen};
     # Get the hit hash.
     my $hitH = $self->{hits};
     # Blast the query file against the target.
-    print $log "Blasting against $qFile.\n" if $log;
+    $self->log("Blasting against $qFile.\n") if $debug;
     $stats->Add(blastRuns => 1);
     my $matches = BlastUtils::blast($qFile, $self->{target},
             tblastn => { maxE => $self->{maxE}, outForm => 'hsp',
                 maxHitsPerQuery => $self->{maxHits},
                 dbGenCode => $gc, tmp_dir => $self->{workDir} });
-    print $log scalar(@$matches) . " hits found.\n" if $log;
+    $self->log(scalar(@$matches) . " hits found.\n") if $debug;
     # Loop through the matches, keeping ones that qualify.
-    my $kept = 0;
+    my ($kept, $updated, $processed) = (0, 0, 0);
     for my $match (@$matches) {
         $stats->Add(matchFound => 1);
         # First, filter on the length.
@@ -250,12 +333,14 @@ sub findHits {
                         # Here we have a better match.
                         $self->{hits}{$stopLoc} = [$start, $match];
                         $stats->Add(matchBetter => 1);
+                        $updated++;
                     }
                 }
             }
         }
+        $processed++;
     }
-    print $log "$kept new coding regions found.\n" if $log;
+    $self->log("$kept new coding regions found of $processed, $updated updated.\n") if $debug;
 }
 
 =head2 Query Methods
@@ -284,7 +369,7 @@ Return a reference to a list of all the stops found.
 sub all_stops {
     my ($self) = @_;
     my $hitsH = $self->{hits};
-    return [sort { _cmp_stop($a, $b) } keys %$hitsH];
+    return [sort { cmp_stop($a, $b) } keys %$hitsH];
 }
 
 =head3 feature_at
@@ -311,7 +396,7 @@ position, and (4) the functional assignment.  If the stop location is invalid, t
 sub feature_at {
     my ($self, $stopLoc) = @_;
     # Initialize the stop information.
-    my ($contig, $dir, $stop) = _parse_stop($stopLoc);
+    my ($contig, $dir, $stop) = parse_stop($stopLoc);
     # Declare the start and function.
     my ($start, $function);
     # Check for a match.
@@ -379,6 +464,31 @@ sub add_feature_at {
     # Add the feature to the GTO.
     $gto->add_feature({-id => $fid, -function => $function, -protein_translation => $prot,
         -annotator => 'CloseAnno', -location => \@loc, -type => 'CDS' });
+}
+
+=head3 log
+
+    $closeAnno->log($msg);
+
+Write a message to the standard error output and the log file (if any).
+
+=over 4
+
+=item msg
+
+Message to write.
+
+=back
+
+=cut
+
+sub log {
+    my ($self, $msg) = @_;
+    print STDERR $msg;
+    if ($self->{logFile}) {
+        my $lh = $self->{logFile};
+        print $lh $msg;
+    }
 }
 
 
@@ -493,33 +603,38 @@ sub _find_stop {
         # Get the sequence to search.
         my $seq = $self->{contigs}{$match->sid};
         my $done;
-        # Get the first and last feasible search locations and the desired indication value.
-        # The locations are expressed as actual PERL offsets.
-        my ($s1, $s2, $incr, $want, $adjust);
+        # Search for the stop in the appropriate direction.
         if ($dir eq '+') {
-            $s1 = $pos;
-            $s2 = length($seq) - 2;
-            $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
-            $incr = 3;
-            $want = 1;
-            $adjust = 3;
-            $done = ($s1 > $s2);
+            # The incoming location is a position, but this is the offset of the space
+            # after the end, where we want to start searching.
+            my $s1 = $pos;
+            # Compute the offset past the last possible location for the stop in the contig
+            # and search.
+            my $s2 = length($seq) - 2;
+            while (! $retVal && $s1 < $s2) {
+                my $codon = substr($seq, $s1, 3);
+                if (($stopH->{$codon} // 0) == 1) {
+                    # The stop location is the position of the last base pair, which is 2
+                    # forward of our current position, plus 1 to convert to a location.
+                    $retVal = $match->sid . $dir . ($s1 + 3);
+                } else {
+                    $s1 += 3;
+                }
+            }
         } else {
-            $s1 = $pos - 4;
-            $s2 = $s1 % 3;
-            $incr = -3;
-            $want = -1;
-            $adjust = 1;
-            $done = ($s2 > $s1);
-        }
-        # Search for the stop.
-        while (! $done && $s1 != $s2) {
-            my $codon = substr($seq, $s1, 3);
-            if (($stopH->{$codon} // 0) == $want) {
-                $retVal = $match->sid . $dir . ($s1 + $adjust);
-                $done = 1;
-            } else {
-                $s1 += $incr;
+            # The incoming location is a position, and we want to start at an offset three
+            # base pairs before it.
+            my $s1 = $pos - 4;
+            # Search backward toward the beginning of the contig.
+            while (! $retVal && $s1 >= 0) {
+                my $codon = substr($seq, $s1, 3);
+                if (($stopH->{$codon} // 0) == -1) {
+                    # The stop location is the position of the first base pair, which must
+                    # be converted to a location.
+                    $retVal = $match->sid . $dir . ($s1 + 1);
+                } else {
+                    $s1 -= 3;
+                }
             }
         }
         if (! $retVal) {
@@ -558,6 +673,8 @@ sub _find_start {
     my ($self, $match, $gc) = @_;
     # This will be set to the start if we find it.
     my $retVal;
+    # This will be set to TRUE to abort the search loop early.
+    my $done;
     # Get the starts for the specified genetic code.
     my $startH = STARTS->{$gc};
     my $stopH = STOPS->{$gc};
@@ -566,34 +683,44 @@ sub _find_start {
     my $pos = $match->s1;
     # Get the sequence to search.
     my $seq = $self->{contigs}{$match->sid};
-    # Get the first and last feasible search locations and the desired indication value.
-    # The locations are expressed as actual PERL offsets.
-    my ($s1, $s2, $incr, $want, $adjust);
     if ($dir eq '+') {
-        $s1 = $pos - 1;
-        $s2 = $s1 % 3;
-        $incr = -3;
-        $want = 1;
-        $adjust = 1;
+        # Begin searching at the first position of the match, which we must
+        # convert to an offset.
+        my $s1 = $pos - 1;
+        # Loop backward.  If we hit a stop first, we abort.
+        while (! $done && $s1 >= 0) {
+            my $codon = substr($seq, $s1, 3);
+            if (($startH->{$codon} // 0) == 1) {
+                $done = 1;
+                # The start is here, so we convert back to a location.
+                $retVal = $s1 + 1;
+            } elsif (($stopH->{$codon} // 0) == 1) {
+                # Abort.  We have found the start of the ORF, but no start.
+                $done = 1;
+            } else {
+                $s1 -= 3;
+            }
+        }
     } else {
-        $s1 = $pos - 3;
-        $s2 = length($seq) - 2;
-        $s2 = $s2 - ($s2 % 3) + $s1 % 3 - 3;
-        $incr = 3;
-        $want = -1;
-        $adjust = 3;
-    }
-    # Search for the start.
-    my $done;
-    while (! $done && $s1 != $s2) {
-        my $codon = substr($seq, $s1, 3);
-        if (($startH->{$codon} // 0) == $want) {
-            $done = 1;
-            $retVal = $s1 + $adjust;
-        } elsif (($stopH->{$codon} // 0) == $want) {
-            $done = 1;
-        } else {
-            $s1 += $incr;
+        # Begin searching at the last codon of the match.  This is location - 2,
+        # Which we then convert to an offset.
+        my $s1 = $pos - 3;
+        # Compute the offset past the last possible position for a codon in this contig.
+        my $s2 = length($seq) - 2;
+        # Loop forward.  If we hit a stop first, we abort.
+        while (! $done && $s1 < $s2) {
+            my $codon = substr($seq, $s1, 3);
+            if (($startH->{$codon} // 0) == -1) {
+                $done = 1;
+                # The start position is the rightmost base pair on the contig, which is
+                # 2 forward of our current position.  We add 1 to convert to a location.
+                $retVal = $s1 + 3;
+            } elsif (($stopH->{$codon} // 0) == -1) {
+                # Abort.  We've hit a stop before we found our start.
+                $done = 1;
+            } else {
+                $s1 += 3;
+            }
         }
     }
     if (! $retVal) {
@@ -606,63 +733,6 @@ sub _find_start {
     }
     # Return the result.
     return $retVal;
-}
-
-=head3 _cmp_stop
-
-    my $cmp = CloseAnno::_cmp_stop($a, $b);
-
-Compare two stop locations for sorting.  We sort by contig ID then by location offset and strand.
-
-=over 4
-
-=item a
-
-First stop location.
-
-=item b
-
-Second stop location.
-
-=item RETURN
-
-Return a positive value if the first stop should sort last, a negative value if it should sort first, and 0 if the stops are equal.
-
-=back
-
-=cut
-
-sub _cmp_stop {
-    my ($a, $b) = @_;
-    my ($aContig, $aStrand, $aloc) = _parse_stop($a);
-    my ($bContig, $bStrand, $bloc) = _parse_stop($b);
-    return ($aContig cmp $bContig) || ($aloc <=> $bloc) || ($aStrand cmp $bStrand);
-}
-
-=head3 _parse_stop
-
-    my ($contig, $dir, $loc) = _parse_stop($stop);
-
-Parse a stop location into the contig ID, direction, and position.
-
-=over 4
-
-=item stop
-
-A stop location.
-
-=item RETURN
-
-Returns a list containing the contig ID, direction, and position of the stop.
-
-=back
-
-=cut
-
-sub _parse_stop {
-    my ($stop) = @_;
-    my ($contig, $dir, $loc) = ($stop =~ /(.+)([+-])(\d+)/);
-    return ($contig, $dir, $loc);
 }
 
 1;
