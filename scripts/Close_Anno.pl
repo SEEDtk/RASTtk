@@ -76,6 +76,7 @@ use File::Copy::Recursive;
 use GenomeTypeObject;
 
 $| = 1;
+my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('genomeFastaFile controlFile workDir',
         ["gto=s", "input is a GTO, produce an annotated GTO file as output"],
@@ -159,4 +160,5 @@ for my $stopLoc (@$all_stops) {
 if ($gto) {
     $gto->destroy_to_file($gtoFile);
 }
+$stats->Add(duration => time - $start);
 $closeAnno->log("All done.\n" . $stats->Show()) if $debug;
