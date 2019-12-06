@@ -67,6 +67,10 @@ An ID number to assign to the next query sequence.
 
 Number of batches processed.
 
+=item found
+
+A hash containing the subject sequence IDs found and the number of times they were hit.
+
 =back
 
 =head2 Special Methods
@@ -133,6 +137,7 @@ sub new {
         stats => $stats,
         seqID => 1,
         batchCount => 0,
+        found => {}
     };
     # Bless and return it.
     bless $retVal, $class;
@@ -189,6 +194,8 @@ sub BlastReads {
     # Get the minimum match length and the stats object.
     my $stats = $self->{stats};
     my $minlen = $self->{minlen};
+    # Get the found-sequence hash.
+    my $foundH = $self->{found};
     # Count the BLAST call.
     ++$self->{batchCount};
     $stats->Add(batchBlasted => 1);
@@ -207,6 +214,7 @@ sub BlastReads {
                 # Here we have a new match for this query.
                 $stats->Add(matchNew => 1);
                 $retHash->{$query} = [$mlen, $match->sid, $match->sdef];
+                $foundH->{$match->sid}++;
             } else {
                 # Here we have an existing match already in place.  Keep the new one if it is better.
                 if ($retHash->{$query}[0] >= $mlen) {
@@ -220,6 +228,20 @@ sub BlastReads {
     }
     # Return the results.
     return $retHash;
+}
+
+=head3 Reset
+
+    $readBlaster->Reset();
+
+Denote we have not processed any batches yet.
+
+=cut
+
+sub Reset {
+    my ($self) = @_;
+    $self->{found} = {};
+    $self->{batchCount} = 0;
 }
 
 
@@ -259,6 +281,11 @@ sub BlastSample {
     my $queries = [];
     # This will be our return hash.
     $retHash //= {};
+    # Initialize the counters.
+    $self->Reset();
+    # Get the found-sequence hash.
+    my $foundH = $self->{found};
+    # Start the timer.
     my $start = time;
     # Loop through the reads, forming batches.
     while ($fq->next()) {
@@ -268,8 +295,8 @@ sub BlastSample {
         if (scalar(@$queries) >= $batchSize) {
             # Process this batch.
             $self->BlastReads($queries, $retHash);
-            my $hits = scalar %$retHash;
-            print STDERR "Batch $self->{batchCount} processed. " . (time - $start) . " seconds, $hits hits.\n";
+            my $hits = scalar keys %$foundH;
+            print STDERR "Batch $self->{batchCount} processed. " . (time - $start) . " seconds, $hits found.\n";
             $queries = [];
         }
     }
