@@ -268,7 +268,8 @@ sub BlastSample {
         if (scalar(@$queries) >= $batchSize) {
             # Process this batch.
             $self->BlastReads($queries, $retHash);
-            print STDERR "Batch $self->{batchCount} processed. " . (time - $start) . " seconds.\n";
+            my $hits = scalar %$retHash;
+            print STDERR "Batch $self->{batchCount} processed. " . (time - $start) . " seconds, $hits hits.\n";
             $queries = [];
         }
     }

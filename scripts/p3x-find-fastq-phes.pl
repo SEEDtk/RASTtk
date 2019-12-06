@@ -91,7 +91,7 @@ my $readBlaster = ReadBlaster->new($opt->seedfasta, maxE => $opt->refmaxe, minle
         minqual => $opt->minqual, batchSize => $opt->batchsize,
         stats => $stats);
 # Set up the options hash for FASTQ;
-my $fqOpt = { old_illumina => $opt->old_illumina };
+my $fqOpt = { old_illumina => $opt->old_illumina, unsafe => 1 };
 # Connect to the FASTQ files.
 my ($file1, $file2, $file3) = @ARGV;
 my $fq;
