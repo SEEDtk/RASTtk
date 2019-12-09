@@ -61,7 +61,11 @@ use a different format.
 
 =item batchSize
 
-Batch size for BLAST calls. The default is C<100>.
+Batch size for BLAST calls. The default is C<4000>.
+
+=item minHits
+
+The minimum number of hits for a matched sequence to be output.  The default is C<60>.
 
 =back
 
@@ -82,7 +86,8 @@ my $opt = P3Utils::script_opts('file1 file2 file3',
                 ['minlen|l=i', 'minimum acceptable match length', { default => 80 }],
                 ['minqual|q=i', 'minimum acceptable read quality', { default => 0.50 }],
                 ['old_illumina', 'TRUE if the quality strings are in old Illumina format'],
-                ['batchSize|b=i', 'BLAST batch size', { default => 100 }],
+                ['batchSize|b=i', 'BLAST batch size', { default => 4000 }],
+                ['minHits|m=i', 'minimum number of hits for an acceptable match', { default => 60 }]
         );
 my $stats = Stats->new();
 # Create the ReadBlaster.
@@ -91,38 +96,28 @@ my $readBlaster = ReadBlaster->new($opt->seedfasta, maxE => $opt->refmaxe, minle
         minqual => $opt->minqual, batchSize => $opt->batchsize,
         stats => $stats);
 # Set up the options hash for FASTQ;
-my $fqOpt = { old_illumina => $opt->old_illumina, unsafe => 1 };
-# Connect to the FASTQ files.
-my ($file1, $file2, $file3) = @ARGV;
-my $fq;
-if (! $file1) {
-    die "No input FASTQ specified.";
-} elsif (! $file2) {
-    print STDERR "Using interlaced mode.\n";
-    $fq = FastQ->new($file1, $fqOpt);
-} else {
-    print STDERR "Using paired-end mode.\n";
-    $fq = FastQ->new($file1, $file2, $fqOpt);
-}
-# Blast the FastQ file.
-my $mapping = $readBlaster->BlastSample($fq);
-# If there is a singleton file, blast that, too.
-if ($file3) {
-    print STDERR "Processing singleton file.\n";
-    $fqOpt->{singleton} = 1;
-    $fq = FastQ->new($file3, $fqOpt);
+my $fqOpt = { old_illumina => $opt->old_illumina, unsafe => 1, singleton => 1 };
+my $minHits = $opt->minhits;
+# Loop through the FASTQ files.
+my @files = @ARGV;
+my $mapping = {};
+for my $file (@files) {
+    print "Processing $file.\n";
+    # Blast the FastQ file.
+    my $fq = FastQ->new($file, $fqOpt);
     $readBlaster->BlastSample($fq, $mapping);
 }
 # Count the hits.
 my %gNames;
 my %gHits;
 for my $queryID (keys %$mapping) {
-    my (undef, $genome, $name) = @{$mapping->{$queryID}};
+    my (undef, undef, $label) = @{$mapping->{$queryID}};
+    my ($genome, $name) = split /\t/, $label;
     $gNames{$genome} = $name;
     $gHits{$genome}++;
 }
 # Now write the output.
-my @genomes = sort { $gHits{$b} <=> $gHits{$a} } keys %gHits;
+my @genomes = sort { $gHits{$b} <=> $gHits{$a} } grep { $gHits{$_} >= $minHits } keys %gHits;
 P3Utils::print_cols([qw(genome_id hits genome_name)]);
 for my $genome (@genomes) {
     P3Utils::print_cols([$genome, $gHits{$genome}, $gNames{$genome}]);

@@ -159,6 +159,19 @@ sub stats {
     return $self->{stats};
 }
 
+=head3 found
+
+    my $foundH = $self->found;
+
+Return a hash mapping the IDs of the sequences found to the number of times
+they were hit.
+
+=cut
+
+sub found {
+    my ($self) = @_;
+    return $self->{found};
+}
 
 =head2 Public Manipulation Methods
 
@@ -307,7 +320,6 @@ sub BlastSample {
     # Return the results.
     return $retHash;
 }
-1;
 
 
 =head2 Internal Methods
@@ -354,3 +366,5 @@ sub _check_seq {
         push @$queries, [$readID, $seqID, $dna];
     }
 }
+
+1;
