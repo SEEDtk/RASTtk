@@ -22,6 +22,7 @@ package ReadBlaster;
     use warnings;
     use BlastUtils;
     use Stats;
+    use FastQ::Out;
 
 =head1 BLAST Control Object for FastQ BLASTing
 
@@ -144,6 +145,74 @@ sub new {
     return $retVal;
 }
 
+=head3 new_from_patric
+
+    my $readBlaster = ReadBlaster->new_from_patric($p3, $workDir, \@genomes, %options);
+
+Create a BLAST database from the specified PATRIC genomes in the given work directory and set up to blast
+reads against it.
+
+=over 4
+
+=item p3
+
+A L<P3DataAPI> object for accessing the PATRIC database.
+
+=item workDir
+
+Working directory to contain the BLAST database.
+
+=item genomes
+
+Reference to a list of genome IDs.
+
+=item options
+
+A hash containing zero or more of the following options.
+
+=over 8
+
+=item maxE
+
+The maximum permissible e-value for a BLAST hit.  The default is 1e-20.
+
+=item minlen
+
+The minimum permissible length for a BLAST hit.  The default is C<80>.
+
+=item minqual
+
+The minimum acceptable quality fraction for a read.  The default is C<0.50>.
+
+=item batchSize
+
+The target batch size when a whole file is being processed.  The default is C<100>.
+
+=item stats
+
+A L<Stats> object for processing statistics.  If none is provided, one will be created internally.
+
+=back
+
+=back
+
+=cut
+
+sub new_from_patric {
+    my ($class, $p3, $workDir, $genomes, %options) = @_;
+    # First we must build the BLAST database in the working directory.
+    my $fileName = "$workDir/contigs.fasta";
+    open(my $fh, '>', $fileName) || die "Could not open FASTA output file: $!";
+    # Loop through the genomes, downloading contigs.
+    for my $genome (@$genomes) {
+        print STDERR "Downloading $genome.\n";
+        my $triples = $p3->fasta_of($genome);
+        print $fh map { ">$_->[0] $genome\n$_->[2]\n" } @$triples;
+    }
+    close $fh;
+    return ReadBlaster::new($class, $fileName, %options);
+}
+
 =head2 Query Methods
 
 =head3 stats
@@ -161,7 +230,7 @@ sub stats {
 
 =head3 found
 
-    my $foundH = $self->found;
+    my $foundH = $readBlaster->found;
 
 Return a hash mapping the IDs of the sequences found to the number of times
 they were hit.
@@ -174,6 +243,106 @@ sub found {
 }
 
 =head2 Public Manipulation Methods
+
+=head3 ConfigureBins
+
+    my $binHash = $readBlaster->ConfigureBins($workDir, \@refIds);
+
+Set up the output files for a binning operation.  For each incoming reference genome ID, a FASTQ output
+object will be created and linked to that ID.
+
+=over 4
+
+=item workDir
+
+The name of a working directory to contain the bin files.
+
+=item refIds
+
+Reference to a list of reference genome IDs.
+
+=item RETURN
+
+Returns a reference to a hash mapping each reference genome ID to an open L<FastQ::Out> object for the
+binning output file.
+
+=back
+
+=cut
+
+sub ConfigureBins {
+    my ($self, $workDir, $refIds) = @_;
+    my $stats = $self->{stats};
+    # This will be the return hash.
+    my %retVal;
+    # Loop through the reference genome IDs.
+    for my $refId (@$refIds) {
+        my $fh = FastQ::Out->new("$workDir/bin.$refId");
+        $stats->Add(binFastQCreated => 1);
+        $retVal{$refId} = $fh;
+    }
+    return \%retVal;
+}
+
+=head3 BinSample
+
+    $readBlaster->BinSample($fq, \%binHash);
+
+Split a FASTQ file into bins.  Each read is blasted against the main BLAST database and the reads collated into
+the appropriate bins.  Note that some reads will be completely lost by this process.
+
+=over 4
+
+=item fq
+
+An open L<FastQ> object for the input reads.
+
+=item binHash
+
+Reference to a hash mapping each reference genome ID to an open L<FastQ::Out> object for the binning output
+file.  In the reference genome BLAST database, the genome ID is the comment.
+
+=back
+
+=cut
+
+sub BinSample {
+    my ($self, $fq, $binHash) = @_;
+    # Get the options.
+    my $batchSize = $self->{batchSize};
+    my $stats = $self->{stats};
+    # This will be the current input batch.
+    my $queries = [];
+    # Reset the counters.
+    $self->Reset();
+    # Get the found-sequence hash.
+    my $foundH = $self->{found};
+    # This will be used to save the reads for later output.
+    my $savedQ = [];
+    # Start the timer.
+    my $start = time;
+    # Loop through the reads, forming batches.
+    while ($fq->next()) {
+        # Save the read.
+        $fq->Save($savedQ);
+        # Test the incoming sequences to see if they qualify.
+        $self->_check_seq($queries, $fq->id, $fq->left, $fq->lq_mean);
+        $self->_check_seq($queries, $fq->id, $fq->right, $fq->rq_mean);
+        if (scalar(@$queries) >= $batchSize) {
+            # Process this batch.
+            my $readHash = $self->BlastReads($queries);
+            $self->_bin_reads($fq, $savedQ, $readHash, $binHash);
+            my $hits = scalar keys %$foundH;
+            print STDERR "Batch $self->{batchCount} processed. " . (time - $start) . " seconds, $hits found.\n";
+            $queries = [];
+        }
+    }
+    # Process any residual.
+    if (scalar @$queries) {
+        my $readHash = $self->BlastReads($queries);
+        $self->_bin_reads($fq, $savedQ, $readHash, $binHash);
+    }
+}
 
 =head3 BlastReads
 
@@ -323,6 +492,50 @@ sub BlastSample {
 
 
 =head2 Internal Methods
+
+=head3 _bin_reads
+
+    $readBlaster->_bin_reads($fq, $savedQ, $readHash, $binHash);
+
+Write the specified reads to the appropriate bins based on the BLAST results.
+
+=over 4
+
+=item fq
+
+An open L<FastQ> object for managing the reads.
+
+=item savedQ
+
+A list of saved reads that can be read back using L<FastQ/Load>.
+
+=item readHash
+
+Reference to a hash that maps each read ID to a 2-tuple consisting of the match length and the appropriate reference genome ID.
+
+=item binHash
+
+Reference to a hash that maps each reference genome ID to the L<FastQ::Out> object for its output file.
+
+=back
+
+=cut
+
+sub _bin_reads {
+    my ($self, $fq, $savedQ, $readHash, $binHash) = @_;
+    my $stats = $self->{stats};
+    # Loop through the reads.
+    while (scalar @$savedQ) {
+        my $readId = $fq->Load($savedQ);
+        $stats->Add(readProcessed => 1);
+        my $readInfo = $readHash->{$readId};
+        if ($readInfo) {
+            my $fqO = $binHash->{$readInfo->[2]};
+            $fqO->Write($fq);
+            $stats->Add(readBinned => 1);
+        }
+    }
+}
 
 =head3 _check_seq
 
