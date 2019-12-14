@@ -234,7 +234,7 @@ sub cmp_stop {
 
 =head3 parse_stop
 
-    my ($contig, $dir, $loc) = parse_stop($stop);
+    my ($contig, $dir, $loc) = CloseAnno::parse_stop($stop);
 
 Parse a stop location into the contig ID, direction, and position.
 
@@ -258,19 +258,120 @@ sub parse_stop {
     return ($contig, $dir, $loc);
 }
 
+=head genome_name
+
+    my $name = CloseAnno::genome_name($p3, $closeGenome, $nameSuffix);
+
+Compute the name for a genome from its closest relative and a suffix.
+
+=over 4
+
+=item p3
+
+An L<p3DataAPI> object for accessing the PATRIC database.
+
+=item closeGenome
+
+The ID of the closest genome.
+
+=item nameSuffix (optional)
+
+A suffix to add to the name.
+
+=item RETURN
+
+Returns a proposed name for the genome.
+
+=back
+
+=cut
+
+sub genome_name {
+    my ($p3, $closeGenome, $nameSuffix) = @_;
+    my $speciesList = P3Utils::get_data($p3, genome => [['eq', 'genome_id', $closeGenome]], ['species']);
+    my $retVal = "Unknown Species";
+    if ($speciesList->[0] && $speciesList->[0][0]) {
+        $retVal = $speciesList->[0][0];
+    }
+    if ($nameSuffix) {
+        $retVal .= " $nameSuffix";
+    }
+    return $retVal;
+}
 
 =head2 Public Manipulation Methods
 
-=head3 readGto
+=head Reset
 
+    $closeAnno->Reset();
 
+Clear all existing hits from this object.
+
+=cut
+
+sub Reset {
+    my ($self) = @_;
+    $self->{hits} = {};
+}
+
+=head3 findProtein
+
+    my $seedProt = $closeAnno->findProtein($protFile, $gc);
+
+Find the seed protein sequence for this genome.
+
+=over 4
+
+=item protFile
+
+A protein FASTA file containing sample seed protein sequences.
+
+=item gc
+
+The genetic code to use.
+
+=item RETURN
+
+Returns the seed protein sequence.
+
+=back
+
+=cut
+
+sub findProtein {
+    my ($self, $protFile, $gc) = @_;
+    my $retVal;
+    # Find all the hits for this protein.
+    $self->Reset();
+    $self->findHits($protFile, $gc);
+    # Get the hash of hits.  We hope there is only one, but we must find the longest.
+    my $hitsH = $self->{hits};
+    my $bestLen = 0;
+    my $bestHit;
+    for my $stopLoc (keys %$hitsH) {
+        my $hit = $hitsH->{$stopLoc};
+        my ($start, $match) = @$hit;
+        my $len = $match->n_mat - $match->n_gap;
+        if ($len > $bestLen) {
+            $bestHit = $stopLoc;
+            $bestLen = $len;
+        }
+    }
+    # Convert the longest hit to a protein sequence.
+    if ($bestHit) {
+        my ($contig, $start, undef, $stop) = $self->feature_at($bestHit);
+        $retVal = $self->protein_at($contig, $start, $stop, $gc);
+    }
+    # Return the protein.
+    return $retVal;
+}
 
 =head3 findHits
 
     $closeAnno->findHits($qFile, $gc);
 
 Find hits from the specified protein query file.  The hits will be stored in the
-object, and can be retrieved late by query methods.
+object, and can be retrieved later by query methods.
 
 =over 4
 
@@ -433,7 +534,7 @@ sub add_feature_at {
     # Get the genome ID.
     my $genomeID = $gto->{id};
     # Get the genetic code.
-    my $gc = $self->{gcTable}{$gto->{genetic_code}};
+    my $gc = $gto->{genetic_code};
     # Compute the feature ID.
     my $pegNum = $self->{pegCounts}{$genomeID};
     if (! $pegNum) {
@@ -445,25 +546,66 @@ sub add_feature_at {
     my $fid = "fig|$genomeID.peg.$pegNum";
     # Get the data for the feature at this stop.
     my ($contig, $start, $dir, $stop, $function) = $self->feature_at($stopLoc);
-    # Get the DNA and location for this feature.
+    # Compute the protein.
+    my $prot = $self->protein_at($contig, $start, $stop, $gc);
+    # Create the location list.
+    my $len = ($dir eq '+' ? $stop + 1 - $start : $start + 1 - $stop);
+    my @loc = ([$contig, $start, $dir, $len]);
+    # Add the feature to the GTO.
+    $gto->add_feature({-id => $fid, -function => $function, -protein_translation => $prot,
+        -annotator => 'CloseAnno', -location => \@loc, -type => 'CDS' });
+}
+
+=head3 protein_at
+
+    my $prot = $closeAnno->protein_at($contig, $start, $stop, $gc);
+
+Compute the protein sequence at the specified location.
+
+=over 4
+
+=item contig
+
+The ID of the contig containing the protein.
+
+=item start
+
+The position of the first base pair of the protein.
+
+=item stop
+
+The position of the last base pair of the protein.
+
+=item gc
+
+The genetic code of the DNA.
+
+=item RETURN
+
+Returns the specified protein sequence.
+
+=back
+
+=cut
+
+sub protein_at {
+    my ($self, $contig, $start, $stop, $gc) = @_;
+    # Get the DNA for this feature.
     my $contigH = $self->{contigs};
     my ($seq, $len);
-    if ($dir eq '+') {
+    if ($start <= $stop) {
         $len = $stop + 1 - $start;
         $seq = substr($contigH->{$contig}, $start - 1, $len);
     } else {
         $len = $start + 1 - $stop;
         $seq = SeedUtils::rev_comp(substr($contigH->{$contig}, $stop - 1, $len));
     }
-    my @loc = ([$contig, $start, $dir, $len]);
     # Compute the resultant protein sequence.  Note we fix the start and chop off the stop.
-    my $prot = SeedUtils::translate($seq, $gc, 1);
-    if ($prot =~ /\*$/) {
-        chop $prot;
+    my $retVal = SeedUtils::translate($seq, $self->{gcTable}{$gc}, 1);
+    if ($retVal =~ /\*$/) {
+        chop $retVal;
     }
-    # Add the feature to the GTO.
-    $gto->add_feature({-id => $fid, -function => $function, -protein_translation => $prot,
-        -annotator => 'CloseAnno', -location => \@loc, -type => 'CDS' });
+    return $retVal;
 }
 
 =head3 log

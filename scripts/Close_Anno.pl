@@ -18,30 +18,23 @@
 
 =head1 Close-Genome Annotation
 
-    Close_Anno.pl [options] genomeFastaFile controlFile workDir
+    Close_Anno.pl [options] workDir
 
-This is a preliminary script for performing close-genome annotation.
+This is a script for performing close-genome annotation.  It takes as input a L<GenomeTypeObject> with just
+the contigs.  It produces as output a GTO with protein annotations, the genetic code, and a close-genome
+list included.  A dummy genome ID and a possible name will be inserted.  These should be replaced at a later step,
+but doing so will require renaming all the features.
 
-The program uses a control file, tab-delimited with no headers.  Each record contains the name of a FASTA file and a
-genetic code number.  The FASTA file should contain protein sequences with a FIG feature ID as the sequence ID, the
-functional assignment as the comment, and the protein sequence as the sequence.  Each such file will be blasted against
-the target genome FASTA file using the specified genetic code.  The best match for any ORF will be output.
+Each close genome's proteins will be blasted against the target genome FASTA file using the specified genetic code.
+The best match for any ORF will be output.
 
 =head2 Parameters
 
-The positional parameters are the name of the target genome FASTA file, the name of the
-control file, and the name of a working directory for temporary
-files.
+The positional parameter is the name of a working directory for temporary files.
 
-The command-line options are as follows.
+The command-line options are those in L<P3Utils/ih_options> and L<P3Utils/oh_options> plus the following.
 
 =over 4
-
-=item gto
-
-If specified, the target genome is assumed to be a de-annotated L<GenomeTypeObject> instead of a FASTA file.
-The contigs will be copied to a FASTA file in the working directory (C<target.fa>) and a new GTO file will
-be created with the annotations.  The value of the parameter should be the name of the output GTO.
 
 =item verbose
 
@@ -59,9 +52,28 @@ The minimum fraction of the query length that must be found in the target genome
 
 The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
 
-=item log
+=item seedFasta
 
-Specifies a file to contain progress messsages (in addition to STDERR).
+Protein FASTA file used to find the seed protein in the incoming genome.  The default is C<rep10.faa> in the SEEDtk global directory.
+
+=item repDb
+
+Representative-genome database.  This contains the seed proteins for all the possible reference genomes along with other useful information.
+The default is C<repFinder.db> in the SEEDtk global directory.
+
+=item minSim
+
+Minimum acceptable kmer similarity for an acceptable close genome. The default is C<100>.
+
+=item maxClose
+
+The maximum number of close genomes to use.  The default is C<10>.
+
+=item nameSuffix
+
+Suffix to add to the species name in order to form the genome name.
+
+=item
 
 =back
 
@@ -74,91 +86,102 @@ use Stats;
 use CloseAnno;
 use File::Copy::Recursive;
 use GenomeTypeObject;
+use RepDbFile;
 
 $| = 1;
 my $start = time;
 # Get the command-line options.
-my $opt = P3Utils::script_opts('genomeFastaFile controlFile workDir',
-        ["gto=s", "input is a GTO, produce an annotated GTO file as output"],
+my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_options(),
         ["verbose|debug|v", "display progress on STDERR"],
-        ["log=s", "log progress messages to a file (implies verbose)"],
         ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.80 }],
         ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
-        ["maxHits=i", "maximum hits for each query peg", { default => 5 }]
+        ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/rep10.faa" }],
+        ["repDb=s", "representative-genome database", { default => "$FIG_Config::p3data/repFinder.db"}],
+        ["minSim=i", "minimum acceptable similarity for a close genome", { default => 100 }],
+        ["maxClose=i", "maximum number of close genomes", { default => 10 }],
+        ["maxHits=i", "maximum hits for each query peg", { default => 5 }],
+        ["nameSuffix=s", "suffix to give to the genome name"]
     );
 my $minlen = $opt->minlen;
 my $maxE = $opt->maxe;
 my $maxHits = $opt->maxhits;
-my $gtoFile = $opt->gto;
-my $logFile = $opt->log;
-my $debug = $opt->verbose || $opt->log;
+my $debug = $opt->verbose;
+my $ih = P3Utils::ih($opt);
+my $oh = P3Utils::oh($opt);
+my $repDb = $opt->repdb;
+my $minSim = $opt->minsim;
+my $maxClose = $opt->maxclose;
+my $seedFasta = $opt->seedfasta;
+my $nameSuffix = $opt->namesuffix;
+# Connect to PATRIC.
+my $p3 = P3DataAPI->new();
 # Get the positional parameters.
-my ($genomeFastaFile, $controlFile, $workDir) = @ARGV;
-if (! $genomeFastaFile) {
-    die "No genome file specified."
-} elsif (! -s $genomeFastaFile) {
-    die "Invalid or missing genome file $genomeFastaFile.";
-} elsif (! $controlFile) {
-    die "No control file specified.";
-} elsif (! -s $controlFile) {
-    die "Invalid or missing control file $controlFile.";
-} elsif (! $workDir) {
+my ($workDir) = @ARGV;
+if (! $workDir) {
     die "No working directory specified.";
 } elsif (! -d $workDir) {
     print STDERR "Creating work directory $workDir.\n" if $debug;
     File::Copy::Recursive::pathmk($workDir);
 }
 my $stats = Stats->new();
-# Is the input a GTO file?
-my $gto;
-if ($gtoFile) {
-    # Load the GTO file.
-    print STDERR "GTO mode in effect.\n" if $debug;
-    $gto = GenomeTypeObject->create_from_file($genomeFastaFile);
-    $genomeFastaFile = "$workDir/target.fa";
-    # Make sure there is no residual blast database.
-    for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
-        if (-f "$workDir/$file") {
-            unlink "$workDir/$file";
-        }
+# Load the GTO file.
+print STDERR "Loading the GTO for Close-Genome Annotation.\n" if $debug;
+my $gto = GenomeTypeObject->create_from_file($ih);
+# Create a FASTA from the contigs.
+my $genomeFastaFile = "$workDir/target.fa";
+# Make sure there is no residual blast database.
+for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
+    if (-f "$workDir/$file") {
+        unlink "$workDir/$file";
     }
-    print STDERR "Creating FASTA file $genomeFastaFile from input GTO.\n" if $debug;
-    $gto->write_contigs_to_file($genomeFastaFile);
 }
+print STDERR "Creating FASTA file $genomeFastaFile from input GTO.\n" if $debug;
+$gto->write_contigs_to_file($genomeFastaFile);
 # Create the annotation object.
 my $closeAnno = CloseAnno->new($genomeFastaFile, stats => $stats, maxE => $maxE, minlen => $minlen,
-    workDir => $workDir, verbose => $debug, logFile => $logFile, maxHits => $maxHits);
-# Loop through the input.
-open(my $ih, '<', $controlFile) || die "Could not open $controlFile: $!";
-while (! eof $ih) {
-    my $line = <$ih>;
-    $stats->Add(lineIn => 1);
-    # Get the file name and genetic code.
-    if ($line =~ /^([^\t]+)\t(\d+)/) {
-        my ($fastaFile, $gc) = ($1, $2);
-        if (! -s $fastaFile) {
-            $closeAnno->log("WARNING: $fastaFile not found or empty.\n") if $debug;
-            $stats->Add(queryFileNotFound => 1);
-        } else {
-            # Look for hits in the file.
-            $stats->Add(queryFileFound => 1);
-            $closeAnno->findHits($fastaFile, $gc);
-        }
-    }
+    workDir => $workDir, verbose => $debug, maxHits => $maxHits);
+# Locate the seed protein.  The protein that we are using works the same for genetic codes 4 and 11, so we use 11.
+my $seedProt = $closeAnno->findProtein($seedFasta, 11);
+if (! $seedProt) {
+    die "No seed protein found in genome.\n";
+} else {
+    # Clear the seed-protein BLAST results.
+    $closeAnno->Reset();
+}
+# Compute the close genomes and the genetic code.
+print STDERR "Computing close genomes.\n" if $debug;
+my ($gc, $closeGenomes) = RepDbFile::findCloseGenomes($seedProt, $repDb, $minSim, $maxClose);
+$gto->{close_genomes} = $closeGenomes;
+$gto->{gc} = $gc;
+if (! scalar @$closeGenomes) {
+    die "No close genomes found.";
+} else {
+    print STDERR scalar(@$closeGenomes) . " close genomes found.\n" if $debug;
+}
+# Compute the genome name.
+my $name = CloseAnno::genome_name($p3, $closeGenomes->[0]{genome}, $nameSuffix);
+print STDERR "Genome name is $name.\n" if $debug;
+$gto->{scientific_name} = $name;
+# Store a dummy genome ID.
+$gto->{id} = "99.99";
+# Loop through the close genomes.
+for my $closeGenome (@$closeGenomes) {
+    my $genomeID = $closeGenome->{genome};
+    print STDERR "Downloading $genomeID: $closeGenome->{genome_name}.\n";
+    my $fastaFile = "$workDir/$genomeID.fa";
+    P3Utils::protein_fasta($p3, $genomeID, $fastaFile);
+    $stats->Add(closeGenomeIn => 1);
+    # Look for hits in the file.
+    $closeAnno->findHits($fastaFile, $gc);
 }
 # Now unspool the output.
 my $all_stops = $closeAnno->all_stops;
 $closeAnno->log(scalar(@$all_stops) . " features found.\n") if $debug;
-print "contig\tstart\tdir\tstop\tfunction\n";
 for my $stopLoc (@$all_stops) {
     my ($contig, $start, $dir, $stop, $function) = $closeAnno->feature_at($stopLoc);
-    print "$contig\t$start\t$dir\t$stop\t$function\n";
-    if ($gto) {
-        $closeAnno->add_feature_at($gto, $stopLoc);
-    }
+    $closeAnno->add_feature_at($gto, $stopLoc);
 }
-if ($gto) {
-    $gto->destroy_to_file($gtoFile);
-}
+print STDERR "Storing GTO from Close-Genome Annotation.\n";
+$gto->destroy_to_file($oh);
 $stats->Add(duration => time - $start);
-$closeAnno->log("All done.\n" . $stats->Show()) if $debug;
+print STDERR "All done.\n" . $stats->Show() if $debug;

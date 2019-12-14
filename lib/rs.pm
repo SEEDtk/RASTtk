@@ -10,17 +10,17 @@ sub sim{
     my ($hash1, $hash2) = @_;
     my @keys1 = keys %$hash1;
 
-    my @shared_kmers;
+    my $retVal = 0;
 
     # Check hash2 for entries matching keys of hash1
     for my $key (@keys1){
         if (defined $hash2->{$key}){
-            push @shared_kmers, $key;
+            $retVal++;
         }
     }
 
     # Only interested in number of kmers in common
-    return scalar @shared_kmers;
+    return $retVal;
 }
 
 # Given a path to a table of inputs, return a data structure
