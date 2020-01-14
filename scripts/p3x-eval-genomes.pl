@@ -242,7 +242,7 @@ if ($opt->resume) {
     print STDERR "$skipped lines skipped.\n";
 } elsif (! $opt->nohead) {
     # Not resuming. Form the full header set and write it out.
-    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Completeness Group', 'Good Seed';
+    push @$outHeaders, 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination', 'Completeness Group', 'Good Seed', 'Contigs', 'Pct Hypothetical';
     P3Utils::print_cols($outHeaders);
 }
 # If an error occurs, we still display stats.
@@ -367,7 +367,7 @@ eval {
             # Compute the consistency and completeness. This also writes the output file.
             my ($complete, $contam, $taxon, $seedFlag) = $evalCom->Check2($geo, $oh);
             # Store the evaluation results.
-            $results{$genome} = [0, 0, $complete, $contam, $taxon, ($seedFlag ? 'Y' : '')];
+            $results{$genome} = [0, 0, $complete, $contam, $taxon, ($seedFlag ? 'Y' : ''), $geo->contigCount, $geo->hypoPercent];
             # Add this genome to the evalCon matrix.
             $evalCon->AddGeoToMatrix($geo);
         }

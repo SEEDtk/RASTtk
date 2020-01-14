@@ -44,7 +44,8 @@ my $stats = Stats->new();
 # Get the options.
 my $scoreCol = $opt->score;
 # Read the incoming headers.
-my ($outHeaders, $cols) = P3Utils::find_headers($ih, evalOutput => 'Good Seed', 'Coarse Consistency', 'Fine Consistency', 'Completeness', 'Contamination');
+my ($outHeaders, $cols) = P3Utils::find_headers($ih, evalOutput => 'Good Seed', 'Coarse Consistency', 'Fine Consistency', 'Completeness',
+        'Contamination', 'Contigs', 'Pct Hypothetical');
 push @$outHeaders, 'Score' if $scoreCol;
 push @$outHeaders, 'Good Genome';
 # The input rows will be kept in here. The hash is two-level, {goodness}{qscore};
@@ -55,10 +56,10 @@ while (! eof $ih) {
     $stats->Add(total => 1);
     my @fields = P3Utils::get_fields($line);
     # Pull out the key columns.
-    my ($goodSeed, $coarse, $fine, $complete, $contam) = P3Utils::get_cols(\@fields, $cols);
+    my ($goodSeed, $coarse, $fine, $complete, $contam, $contigs, $hypoPct) = P3Utils::get_cols(\@fields, $cols);
     my $goodness = 1;
     my @qualities = ([$goodSeed, 'goodPheS', 'badPheS'], [GEO::consistX($fine), 'consistent', 'inconsistent'], [GEO::completeX($complete), 'complete', 'incomplete'],
-            [GEO::contamX($contam), 'clean', 'contaminated']);
+            [GEO::contamX($contam), 'clean', 'contaminated'], [GEO::hypoX($hypoPct), 'understood', 'suspicious']);
     for my $quality (@qualities) {
         my ($flag, $good, $bad) = @$quality;
         if ($flag) {
@@ -73,7 +74,7 @@ while (! eof $ih) {
     } else {
         $stats->Add(bad => 1);
     }
-    my $qScore = GEO::qscoreX($coarse, $fine, $complete, $contam);
+    my $qScore = GEO::qscoreX($coarse, $fine, $complete, $contam, $hypoPct, $contigs);
     push @fields, $qScore if $scoreCol;
     push @{$rows{$goodness}{$qScore}}, join("\t", @fields, $goodness) . "\n";
 }
