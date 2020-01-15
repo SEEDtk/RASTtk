@@ -22,19 +22,16 @@ contents are destroyed, but the output directory contents are not, unless C<--cl
 The standard input can be overridden using the options in L<P3Utils/ih_options>. The standard input should contain
 PATRIC genome IDs in the key column (as specified by L<P3Utils/col_options>).
 
-The options in L<EvalCon/role_options> may be used to specify the predictors for doing the consistency checks.
-
 The options in L<BinningReports/template_options> may be used to specify the templates and web helper files.
 
 The following additional command-line options are supported.
 
 =over 4
 
-=item checkDir
+=item eval
 
-The directory containing the completeness-checker input files (see L<EvalCom::Tax> for details). The default is
-C<CheckG> in the SEEDtk globals directory.  If the directory contains a C<REP> file, L<EvalCom::Rep> will be used
-instead, and the REP file must contain the kmer size.
+The evaluation directory containing the completeness files in C<CheckR>, the predictors in C<FunctionPredictors>,
+and the C<roles.in.subsystems> and C<roles.to.use> file.
 
 =item clear
 
@@ -104,8 +101,8 @@ my $exitCode = 0;
 my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils::ih_options(),
-        EvalCon::role_options(), BinningReports::template_options(),
-        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::p3data/CheckG" }],
+        BinningReports::template_options(),
+        ['eval=s', 'evaluation directory', { default => "$FIG_Config::p3data/Eval" }],
         ['clear', 'clear output directory before starting'],
         ['web', 'create web pages as well as output files for evaluations'],
         ['deep', 'perform detailed analysis of missing and redundant proteins (implies web)'],
@@ -199,14 +196,16 @@ if ($web) {
     }
 }
 # Create the consistency helper.
-my $evalCon = EvalCon->new_for_script($opt, \*STDERR);
+my $evalDir = $opt->eval;
+my $evalCon = EvalCon->new(roleFile => "$evalDir/roles.in.subsystems", rolesToUse => "$evalDir/roles.to.use",
+        predictors => "$evalDir/FunctionPredictors", logH => \*STDERR);
 # Get access to the statistics object.
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
 my %evalOptions = (logH => \*STDERR, stats => $stats);
 my $evalCom;
-my $checkDir = $opt->checkdir;
+my $checkDir = "$evalDir/CheckR";
 print STDERR "Reading completeness data from $checkDir.\n";
 if (-s "$checkDir/REP") {
     open(my $xh, '<', "$checkDir/REP") || die "Could not open REP file: $!";
