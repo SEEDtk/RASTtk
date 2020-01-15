@@ -79,6 +79,10 @@ directory with the same name as the genome ID.  The file should be tab-delimited
 column, a three-digit code in the second column, and a functional assignment in the third.  If the first digit in
 the second column is C<1>, the third column contains a corrected functional assignment.
 
+=item gCount
+
+Number of genomes in the input file-- used for progress messages.
+
 =back
 
 =cut
@@ -111,7 +115,8 @@ my $opt = P3Utils::script_opts('workDir outDir', P3Utils::col_options(), P3Utils
         ['refCol=s', 'index (1-based) or name of column containing reference genome IDs'],
         ['resume=s', 'resume after error with specified genome'],
         ['refTable=s', 'reference genome file'],
-        ['modDir=s', 'name of modification directory']
+        ['modDir=s', 'name of modification directory'],
+        ['gCount=i', 'number of input genomes']
         );
 # Get the input directories.
 my ($workDir, $outDir) = @ARGV;
@@ -224,6 +229,8 @@ my %geoOptions = (roleHashes => [$nMap, $cMap], p3 => $p3, stats => $stats, deta
 if ($opt->moddir) {
     $geoOptions{modDir} = $opt->moddir;
 }
+# Prepare for progress computation.
+my $gCount = $opt->gcount;
 # Process the resume option.
 my $skipped = 0;
 if ($opt->resume) {
@@ -419,7 +426,14 @@ eval {
                 $lastGenome = $genome;
             }
             my $count1 = $count0 + $skipped;
-            print STDERR "$count1 genomes processed at " . Math::Round::nearest(0.01, (time - $start0)/$count0) . " seconds/genome.\n";
+            my $time = (time - $start0)/$count0;
+            my $rem = "";
+            if ($gCount) {
+                my $remain = Math::Round::nearest(1, ($gCount - $count1) * $time / 3600);
+                $rem = ", $remain hours remaining";
+            }
+            $time = Math::Round::nearest(0.01, $time);
+            print STDERR "$count1 genomes processed at $time seconds/genome$rem.\n";
         }
     }
     # Here we have processed all the genomes. If we are doing a summary page, we do it now.
