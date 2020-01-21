@@ -20,7 +20,7 @@
 
     Tax_Comp.pl [options] workDir
 
-##TODO detailed description
+Compute genome taxonomy and adjust name.
 
 =head2 Parameters
 
@@ -38,7 +38,9 @@ Additional command-line options are the following.
 
 Display progress messages on STDERR.
 
-##TODO additional options
+=item nameSuffix
+
+Suffix to add to the species name in order to form the genome name.
 
 =back
 
@@ -49,13 +51,15 @@ use P3DataAPI;
 use P3Utils;
 use GenomeTypeObject;
 use Stats;
+use CloseAnno;
 
 $| = 1;
 
 # Get the command-line options.
-my $opt =
-  P3Utils::script_opts( 'workDir', P3Utils::ih_options(), P3Utils::oh_options(),
-    [ 'verbose|v', 'Display progress messages on STDERR' ] );
+my $opt = P3Utils::script_opts( 'workDir', P3Utils::ih_options(), P3Utils::oh_options(),
+        [ 'verbose|v', 'Display progress messages on STDERR' ],
+        ["nameSuffix=s", "suffix to give to the genome name"]
+      );
 my $stats = Stats->new();
 
 # Get access to PATRIC.
@@ -97,20 +101,20 @@ my ($g) = $p3->query(
 if ( !$g ) {
     die "Genome $genomeID not found.";
 }
-
+# Compute the genome name.
+my $name = CloseAnno::genome_name($p3, $genomeID, $opt->namesuffix);
+print STDERR "Genome name is $name.\n";
+$gto->{scientific_name} = $name;
 # Compute the domain.
 my $domain = $g->{taxon_lineage_names}[1];
 if ( !grep { $_ eq $domain } qw(Bacteria Archaea Eukaryota) ) {
     $domain = $g->{taxon_lineage_names}[0];
 }
 
-# Create the initial GTO.
+# Update the GTO metadata.
 $gto->set_metadata(
     {
-        id               => $g->{genome_id},
-        scientific_name  => $g->{genome_name},
         source           => 'RASTng',
-        source_id        => $g->{genome_id},
         ncbi_taxonomy_id => $g->{taxon_id},
         taxonomy         => $g->{taxon_lineage_names},
         domain           => $domain,

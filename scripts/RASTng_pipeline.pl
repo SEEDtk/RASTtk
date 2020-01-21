@@ -28,24 +28,59 @@ output to STDERR.  Clearing the working directory is not allowed.
 
 =head2 COMMANDS
 
-The COMMANDS constant contains a list of the commands to be executed.  The string C<${workDir}> can be used to represent the working directory
-name.  Options to this script are represented by C<${>I<optionName>C<}>.
+The COMMANDS constant contains a list of the commands to be executed.  It is evaluated at run-time after the options have been parsed.
 
 =head2 Parameters
 
-The positional parameters are ##TODO positionals
+The positional parameter is the name of the work directory
 
-The standard input can be overridden using the options in L<P3Utils/ih_options>.
+The standard input can be overridden using the options in L<P3Utils/ih_options>.  It should contain the FASTA file to annotate.
 
-Additional command-line options are those given in L<P3Utils/data_options> and L<P3Utils/col_options> plus the following.
+The standard output can be overridden using the options in L<P3Utils/oh_options>.  It will contain the GTO of the annotated genome.
+
+The standard error output will contain progress messages.
+
+Additional command-line options are the following.
 
 =over 4
 
-=item fields
+=item maxE
 
-List the available field names.
+The maximum acceptable E-value for a BLAST hit.  The default is C<1e-40>.
 
-##TODO additional options
+=item minlen
+
+The minimum fraction of the query length that must be found in the target genome.  The default is C<0.90>, indicating 90% of the length.
+
+=item maxHits
+
+The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
+
+=item seedFasta
+
+Protein FASTA file used to find the seed protein in the incoming genome.  The default is C<rep10.faa> in the SEEDtk global directory.
+
+=item repDb
+
+Representative-genome database.  This contains the seed proteins for all the possible reference genomes along with other useful information.
+The default is C<repFinder.db> in the SEEDtk global directory.
+
+=item minSim
+
+Minimum acceptable kmer similarity for an acceptable close genome. The default is C<100>.
+
+=item maxClose
+
+The maximum number of close genomes to use.  The default is C<10>.
+
+=item nameSuffix
+
+Suffix to add to the species name in order to form the genome name.
+
+=item eval
+
+The name of the directory containing the current evaluation information.  The default is C<Eval> in the SEEDtk global
+directory.
 
 =back
 
@@ -54,41 +89,126 @@ List the available field names.
 use strict;
 use P3DataAPI;
 use P3Utils;
+use CloseAnno;
+use RepDbFile;
+use FastA;
+use IPC::Run3;
 
 $| = 1;
+my $start = time;
 # Get the command-line options.
-my $opt = P3Utils::script_opts('fastaFile workDir',
-    ['fields|f', 'Show available fields']);
-
-# Get access to PATRIC.
-my $p3 = P3DataAPI->new();
-my $fields = ($opt->fields ? 1 : 0);
-if ($fields) {
-    my $fieldList = P3Utils::list_object_fields($p3, 'object');
-    print join("\n", @$fieldList, "");
-    exit();
-}
-# Compute the output columns.
-my ($selectList, $newHeaders) = P3Utils::select_clause($p3, object => $opt);
-# Compute the filter.
-my $filterList = P3Utils::form_filter($opt);
-# Open the input file.
+my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_options(),
+        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.80 }],
+        ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
+        ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/rep10.faa" }],
+        ["repDb=s", "representative-genome database", { default => "$FIG_Config::p3data/repFinder.db"}],
+        ["minSim=i", "minimum acceptable similarity for a close genome", { default => 100 }],
+        ["maxClose=i", "maximum number of close genomes", { default => 10 }],
+        ["maxHits=i", "maximum hits for each query peg", { default => 5 }],
+        ["nameSuffix=s", "suffix to give to the genome name"],
+        ["eval=s", "name of evaluation directory", { default => "$FIG_Config::p3data/Eval" }],
+    );
+my $minlen = $opt->minlen;
+my $maxE = $opt->maxe;
+my $maxHits = $opt->maxhits;
 my $ih = P3Utils::ih($opt);
-# Read the incoming headers.
-my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt);
-# Form the full header set and write it out.
-if (! $opt->nohead) {
-    push @$outHeaders, @$newHeaders;
-    P3Utils::print_cols($outHeaders);
+my $oh = P3Utils::oh($opt);
+my $repDb = $opt->repdb;
+my $minSim = $opt->minsim;
+my $maxClose = $opt->maxclose;
+my $seedFasta = $opt->seedfasta;
+my $nameSuffix = $opt->namesuffix;
+my $eval = $opt->eval;
+# Connect to PATRIC.
+my $p3 = P3DataAPI->new();
+# Get the positional parameters.
+my ($workDir) = @ARGV;
+if (! $workDir) {
+    die "No working directory specified.";
+} elsif (! -d $workDir) {
+    print STDERR "Creating work directory $workDir.\n";
+    File::Copy::Recursive::pathmk($workDir);
 }
-# Loop through the input.
-while (! eof $ih) {
-    my $couplets = P3Utils::get_couplets($ih, $keyCol, $opt);
-    ##TODO process the input to produce the output
-    # Get the output rows for these input couplets.
-    my $resultList = P3Utils::get_data_batch($p3, object => $filterList, $selectList, $couplets);
-    # Print them.
-    for my $result (@$resultList) {
-        P3Utils::print_cols($result, opt => $opt);
+my $stats = Stats->new();
+my @nameSpec;
+if ($nameSuffix) {
+    @nameSpec = ('--nameSuffix', $nameSuffix);
+}
+my @COMMANDS = (
+    [Tax_Comp => '--verbose', @nameSpec, $workDir],
+    [Close_Anno => '--verbose', '--internal', '--maxHits', $maxHits, '--minSim', $minSim, '--maxE', $maxE, $workDir],
+    [Eval_Gto => '--verbose', '--eval', $eval, $workDir],
+);
+# Create the GTO.
+print STDERR "Creating GenomeTypeObject from input FASTA.\n";
+my $gto = GenomeTypeObject->new();
+# Read in the contigs.
+my @contigs;
+my $fastH = FastA->new($ih);
+while ($fastH->next()) {
+    my $contig = { id => $fastH->id, dna => $fastH->left };
+    push @contigs, $contig;
+    $stats->Add(contigIn => 1);
+}
+$gto->{contigs} = \@contigs;
+# Create a disk copy of the FASTA;
+my $genomeFastaFile = "$workDir/target.fa";
+# Make sure there is no residual blast database.
+for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
+    if (-f "$workDir/$file") {
+        unlink "$workDir/$file";
     }
 }
+print STDERR "Creating working FASTA file $genomeFastaFile.\n";
+$gto->write_contigs_to_file($genomeFastaFile);
+# Create the annotation object.
+print STDERR "Creating annotation object.\n";
+my $closeAnno = CloseAnno->new($genomeFastaFile, stats => $stats, maxE => $maxE, minlen => $minlen,
+    workDir => $workDir, verbose => 1, maxHits => $maxHits);
+# Locate the seed protein.  The protein that we are using works the same for genetic codes 4 and 11, so we use 11.
+my $seedProt = $closeAnno->findProtein($seedFasta, 11);
+if (! $seedProt) {
+    die "No seed protein found in genome.\n";
+} else {
+    # Clear the seed-protein BLAST results.
+    $closeAnno->Reset();
+}
+# Compute the close genomes and the genetic code.
+print STDERR "Computing close genomes.\n";
+my ($gc, $closeGenomes) = RepDbFile::findCloseGenomes($seedProt, $repDb, $minSim, $maxClose);
+$gto->{close_genomes} = $closeGenomes;
+$gto->{gc} = $gc;
+if (! scalar @$closeGenomes) {
+    die "No close genomes found.";
+} else {
+    print STDERR scalar(@$closeGenomes) . " close genomes found.\n";
+}
+# Assign the genetic code to the contigs.
+$gto->{genetic_code} = $gc;
+for my $contig (@contigs) {
+    $contig->{genetic_code} = $gc;
+}
+# Store a dummy genome ID.
+$gto->{id} = "99.99";
+# Save the GTO in the working directory.
+print STDERR "Saving initial GTO.\n";
+my $gtoFile = "$workDir/target1.gto";
+$gto->destroy_to_file($gtoFile);
+undef $gto;
+# These variables will hold the names of the input GTO and the output GTO.
+my ($input, $output) = ("$workDir/target1.gto", "$workDir/target2.gto");
+for my $command (@COMMANDS) {
+    # Add the input and output files.
+    my @actual = @$command;
+    splice @actual, 1, 0, '--input', $input, '--output', $output;
+    print STDERR "**** Executing " . join(' ', @actual) . "\n";
+    my $rc = system(@actual);
+    print STDERR "**** Return value from $actual[0] was $rc.\n";
+    ($input, $output) = ($output, $input);
+}
+# Write the final output.  Note that because we swapped after the command, its output is in $input.
+print STDERR "Spooling from $input to output.\n";
+$gto = GenomeTypeObject->create_from_file($input);
+$gto->destroy_to_file($oh);
+my $minutes = int((time - $start) / 60);
+print STDERR "All done in $minutes minutes.\n" . $stats->Show();

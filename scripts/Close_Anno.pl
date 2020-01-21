@@ -52,10 +52,6 @@ The minimum fraction of the query length that must be found in the target genome
 
 The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
 
-=item seedFasta
-
-Protein FASTA file used to find the seed protein in the incoming genome.  The default is C<rep10.faa> in the SEEDtk global directory.
-
 =item repDb
 
 Representative-genome database.  This contains the seed proteins for all the possible reference genomes along with other useful information.
@@ -65,13 +61,9 @@ The default is C<repFinder.db> in the SEEDtk global directory.
 
 Minimum acceptable kmer similarity for an acceptable close genome. The default is C<100>.
 
-=item maxClose
+=item internal
 
-The maximum number of close genomes to use.  The default is C<10>.
-
-=item nameSuffix
-
-Suffix to add to the species name in order to form the genome name.
+If specified, the script is being called internally and the target FASTA file already exists on disk.
 
 =item
 
@@ -86,7 +78,6 @@ use Stats;
 use CloseAnno;
 use File::Copy::Recursive;
 use GenomeTypeObject;
-use RepDbFile;
 
 $| = 1;
 my $start = time;
@@ -95,12 +86,9 @@ my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_opt
         ["verbose|debug|v", "display progress on STDERR"],
         ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.80 }],
         ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
-        ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/rep10.faa" }],
-        ["repDb=s", "representative-genome database", { default => "$FIG_Config::p3data/repFinder.db"}],
         ["minSim=i", "minimum acceptable similarity for a close genome", { default => 100 }],
-        ["maxClose=i", "maximum number of close genomes", { default => 10 }],
         ["maxHits=i", "maximum hits for each query peg", { default => 5 }],
-        ["nameSuffix=s", "suffix to give to the genome name"]
+        ["internal", "target.fa file is already created"]
     );
 my $minlen = $opt->minlen;
 my $maxE = $opt->maxe;
@@ -108,11 +96,7 @@ my $maxHits = $opt->maxhits;
 my $debug = $opt->verbose;
 my $ih = P3Utils::ih($opt);
 my $oh = P3Utils::oh($opt);
-my $repDb = $opt->repdb;
 my $minSim = $opt->minsim;
-my $maxClose = $opt->maxclose;
-my $seedFasta = $opt->seedfasta;
-my $nameSuffix = $opt->namesuffix;
 # Connect to PATRIC.
 my $p3 = P3DataAPI->new();
 # Get the positional parameters.
@@ -129,41 +113,22 @@ print STDERR "Loading the GTO for Close-Genome Annotation.\n" if $debug;
 my $gto = GenomeTypeObject->create_from_file($ih);
 # Create a FASTA from the contigs.
 my $genomeFastaFile = "$workDir/target.fa";
-# Make sure there is no residual blast database.
-for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
-    if (-f "$workDir/$file") {
-        unlink "$workDir/$file";
+if (! $opt->internal || ! -s $genomeFastaFile) {
+    # Make sure there is no residual blast database.
+    for my $file (qw(target.fa.nhr target.fa.nin target.fa.nsq)) {
+        if (-f "$workDir/$file") {
+            unlink "$workDir/$file";
+        }
     }
+    print STDERR "Creating FASTA file $genomeFastaFile from input GTO.\n" if $debug;
+    $gto->write_contigs_to_file($genomeFastaFile);
 }
-print STDERR "Creating FASTA file $genomeFastaFile from input GTO.\n" if $debug;
-$gto->write_contigs_to_file($genomeFastaFile);
 # Create the annotation object.
 my $closeAnno = CloseAnno->new($genomeFastaFile, stats => $stats, maxE => $maxE, minlen => $minlen,
     workDir => $workDir, verbose => $debug, maxHits => $maxHits);
-# Locate the seed protein.  The protein that we are using works the same for genetic codes 4 and 11, so we use 11.
-my $seedProt = $closeAnno->findProtein($seedFasta, 11);
-if (! $seedProt) {
-    die "No seed protein found in genome.\n";
-} else {
-    # Clear the seed-protein BLAST results.
-    $closeAnno->Reset();
-}
-# Compute the close genomes and the genetic code.
-print STDERR "Computing close genomes.\n" if $debug;
-my ($gc, $closeGenomes) = RepDbFile::findCloseGenomes($seedProt, $repDb, $minSim, $maxClose);
-$gto->{close_genomes} = $closeGenomes;
-$gto->{gc} = $gc;
-if (! scalar @$closeGenomes) {
-    die "No close genomes found.";
-} else {
-    print STDERR scalar(@$closeGenomes) . " close genomes found.\n" if $debug;
-}
-# Compute the genome name.
-my $name = CloseAnno::genome_name($p3, $closeGenomes->[0]{genome}, $nameSuffix);
-print STDERR "Genome name is $name.\n" if $debug;
-$gto->{scientific_name} = $name;
-# Store a dummy genome ID.
-$gto->{id} = "99.99";
+# Get the close genomes and the genetic code from the GTO.
+my $gc = $gto->{genetic_code};
+my $closeGenomes = $gto->{close_genomes};
 # Loop through the close genomes.
 for my $closeGenome (@$closeGenomes) {
     my $genomeID = $closeGenome->{genome};
