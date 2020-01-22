@@ -57,6 +57,7 @@ while (! eof $ih) {
     my @fields = P3Utils::get_fields($line);
     # Pull out the key columns.
     my ($goodSeed, $coarse, $fine, $complete, $contam, $contigs, $hypoPct) = P3Utils::get_cols(\@fields, $cols);
+    $hypoPct = 50 if ($hypoPct eq '');
     my $goodness = 1;
     my @qualities = ([$goodSeed, 'goodPheS', 'badPheS'], [GEO::consistX($fine), 'consistent', 'inconsistent'], [GEO::completeX($complete), 'complete', 'incomplete'],
             [GEO::contamX($contam), 'clean', 'contaminated'], [GEO::hypoX($hypoPct), 'understood', 'suspicious']);
