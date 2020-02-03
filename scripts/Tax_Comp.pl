@@ -42,6 +42,10 @@ Display progress messages on STDERR.
 
 Suffix to add to the species name in order to form the genome name.
 
+=item id
+
+Genome ID to assign to the genome.  The default value of C<computed> means the genome ID will be computed.
+
 =back
 
 =cut
@@ -58,7 +62,8 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts( 'workDir', P3Utils::ih_options(), P3Utils::oh_options(),
         [ 'verbose|v', 'Display progress messages on STDERR' ],
-        ["nameSuffix=s", "suffix to give to the genome name"]
+        ["nameSuffix=s", "suffix to give to the genome name"],
+        ["id=s", "genome ID to use", { default => "computed" }]
       );
 my $stats = Stats->new();
 
@@ -68,6 +73,7 @@ my $p3 = P3DataAPI->new();
 # Get the options.
 my $oh    = P3Utils::oh($opt);
 my $debug = $opt->verbose;
+my $idSpec = $opt->id;
 
 # Process the positional parameters.
 my ($workDir) = @ARGV;
@@ -85,44 +91,73 @@ my $gto = GenomeTypeObject->create_from_file($ih);
 # Get the close genome ID.
 my $genomeID = $gto->{close_genomes}[0]{genome};
 
-# At this point, we are doing a dummy process where we copy the taxonomy from the
-# closest genome and leave the genome ID as 99.99.  Later we will do the real
-# stuff.
-my ($g) = $p3->query(
-    "genome",
-    [ "eq", "genome_id", $genomeID ],
-    [ "select", "genome_id", "taxon_id", "taxon_lineage_names",
-        "taxon_lineage_ids", "gc_content"
-    ],
-);
+# Here we need to get the lineage, the genome ID, and the taxon ID.
+my $lineageList;
+my $newID;
+my $taxonID;
+my $lineage;
 
-# Only proceed if we found a genome.
-
-if ( !$g ) {
-    die "Genome $genomeID not found.";
+if ($idSpec ne "computed") {
+    print STDERR "Using pre-specified genome ID $idSpec.\n" if $debug;
+    # Here we have a specified genome ID.  This is useful for testing.
+    ($taxonID) = split /\./, $idSpec;
+    my ($t) = $p3->query("taxonomy",
+        ["eq", "taxon_id", $taxonID],
+        [ "select", "taxon_id", "lineage_names", "lineage_ids"]);
+    # Only proceed if we found the taxonomic lineage.
+    if (! $t) {
+        die "Taxonomic ID $taxonID not found.";
+    }
+    $lineageList = $t->{lineage_names};
+    $lineage = $t->{lineage_ids};
+    $newID = $idSpec;
+} else {
+    # Here we need to compute the ID and the taxon.  We punt on the taxon for now,
+    # and use the closest genome's values.
+    print STDERR "Copying taxonomy from $genomeID.\n" if $debug;
+    my ($g) = $p3->query(
+        "genome",
+        [ "eq", "genome_id", $genomeID ],
+        [ "select", "genome_id", "taxon_id", "taxon_lineage_names", "taxon_lineage_ids"],
+    );
+    # Only proceed if we found a genome.
+    if ( !$g ) {
+        die "Genome $genomeID not found.";
+    }
+    $lineageList = $g->{taxon_lineage_names};
+    $lineage = $g->{taxon_lineage_ids};
+    $taxonID = $g->{taxon_id};
+    # Get a genome ID for this taxon.
+    print STDERR "Computing genome ID from server using $taxonID.\n" if $debug;
+    $newID = CloseAnno::ComputeId($taxonID);
 }
+my $lastItem = scalar(@$lineageList) - 1;
+if ($lastItem < 1) {
+    die "Invalid taxonomic lineage found for $taxonID using $idSpec.";
+}
+my $taxonName = $lineageList->[$lastItem];
 # Compute the genome name.
-my $name = CloseAnno::genome_name($p3, $genomeID, $opt->namesuffix);
-print STDERR "Genome name is $name.\n";
+my $name = CloseAnno::genome_name($taxonName, $opt->namesuffix);
+print STDERR "New genome is $newID $name.\n";
 $gto->{scientific_name} = $name;
 # Compute the domain.
-my $domain = $g->{taxon_lineage_names}[1];
+my $domain = $lineageList->[1];
 if ( !grep { $_ eq $domain } qw(Bacteria Archaea Eukaryota) ) {
-    $domain = $g->{taxon_lineage_names}[0];
+    $domain = $lineageList->[0];
 }
 
 # Update the GTO metadata.
 $gto->set_metadata(
     {
+        id				 => $newID,
         source           => 'RASTng',
-        ncbi_taxonomy_id => $g->{taxon_id},
-        taxonomy         => $g->{taxon_lineage_names},
+        ncbi_taxonomy_id => $taxonID,
+        taxonomy         => $lineageList,
         domain           => $domain,
     }
 );
 
 # Get the taxonomic ranks.
-my $lineage = $g->{taxon_lineage_ids};
 if ($lineage) {
     my %taxMap = map {
         $_->{taxon_id} =>

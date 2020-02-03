@@ -27,6 +27,7 @@ package CloseAnno;
     use Hsp;
     use FIG_Config;
     use FastA;
+    use SOAP::Lite;
 
 =head1 Close-Genome Annotation Object
 
@@ -260,19 +261,15 @@ sub parse_stop {
 
 =head genome_name
 
-    my $name = CloseAnno::genome_name($p3, $closeGenome, $nameSuffix);
+    my $name = CloseAnno::genome_name($species, $nameSuffix);
 
-Compute the name for a genome from its closest relative and a suffix.
+Compute the name for a genome from its species name and a suffix.
 
 =over 4
 
-=item p3
+=item species
 
-An L<p3DataAPI> object for accessing the PATRIC database.
-
-=item closeGenome
-
-The ID of the closest genome.
+The species name.
 
 =item nameSuffix (optional)
 
@@ -287,12 +284,8 @@ Returns a proposed name for the genome.
 =cut
 
 sub genome_name {
-    my ($p3, $closeGenome, $nameSuffix) = @_;
-    my $speciesList = P3Utils::get_data($p3, genome => [['eq', 'genome_id', $closeGenome]], ['species']);
-    my $retVal = "Unknown Species";
-    if ($speciesList->[0] && $speciesList->[0][0]) {
-        $retVal = $speciesList->[0][0];
-    }
+    my ($species, $nameSuffix) = @_;
+    my $retVal = $species;
     if ($nameSuffix) {
         $retVal .= " $nameSuffix";
     }
@@ -874,6 +867,63 @@ sub _find_start {
         }
     }
     # Return the result.
+    return $retVal;
+}
+
+use constant ID_SERVER_URL => "http://clearinghouse.theseed.org/Clearinghouse/clearinghouse_services.cgi";
+
+
+=head3 ComputeId
+
+    my $genomeID = CloseAnno::ComputeId($taxon_id);
+
+Compute a new ID for a genome with the specified taxonomic ID.
+
+=over 4
+
+=item taxon_id
+
+The taxonomic ID for the new genome.
+
+=item RETURN
+
+Returns a unique genome ID that the genome can use.
+
+=back
+
+=cut
+
+sub ComputeId {
+    my($taxon_id) = @_;
+
+    my $proxy = SOAP::Lite->uri('http://www.soaplite.com/Scripts')-> proxy(ID_SERVER_URL);
+
+    #
+    # If we have heavy registration traffic we may fail with messages like
+    #
+    #   Error registering genome via SEED clearinghouse: soap:Server error executing queries: DBD::mysql::db do failed: Deadlock found when trying to get lock; try restarting transaction at /vol/core-seed/Clearinghouse/FIG/CGI/clearinghouse_services.cgi line 162.
+    #
+    # So we will do a backoff and retry here.
+    #
+    my $retVal;
+    my $max_retries = 10;
+    my $try = 0;
+    while ($try++ < $max_retries) {
+        my $r = $proxy->register_genome($taxon_id);
+        if ($r->fault) {
+            warn "Error on try $try registering genome via SEED clearinghouse: " . $r->faultcode . " " . $r->faultstring;
+            sleep(2 + rand(10));
+        } else {
+            my $id = $r->result;
+              $retVal = "$taxon_id.$id";
+          }
+    }
+    #
+    # Retries failed
+    #
+    if (! $retVal) {
+        die "Unable to register genome via SEED clearinghouse after $max_retries tries\n";
+    }
     return $retVal;
 }
 

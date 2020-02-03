@@ -107,7 +107,10 @@ sub findCloseGenomes {
         }
     }
     # Now lop off the top N.
-    my @found = (sort { $b->[1] <=> $a->[1] && $b->[2] <=> $a->[2] } @reps)[0 .. ($maxClose - 1)];
+    my @found = (sort { $b->[1] <=> $a->[1] || $b->[2] <=> $a->[2] } @reps);
+    if (scalar(@found) > $maxClose) {
+        splice @found, $maxClose;
+    }
     my $closeGenomes = [ map { { genome => $_->[0], genome_name => $_->[3], closeness_measure => $_->[1], analysis_method => 'kmers.reps' } } @found ];
     my $gc = (@found ? $found[0][4] : 11);
     # Return the results.

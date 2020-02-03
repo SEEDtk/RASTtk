@@ -56,6 +56,14 @@ The minimum fraction of the query length that must be found in the target genome
 
 The maximum number of BLAST hits to return for each query sequence.  The default is C<5>.
 
+=item minStrength
+
+The minimum strength of a kmer indication.  The default is C<0.2>.
+
+=item kmerSize
+
+The kmer length to use.  The default is C<8>.
+
 =item seedFasta
 
 Protein FASTA file used to find the seed protein in the incoming genome.  The default is C<rep10.faa> in the SEEDtk global directory.
@@ -79,8 +87,16 @@ Suffix to add to the species name in order to form the genome name.
 
 =item eval
 
-The name of the directory containing the current evaluation information.  The default is C<Eval> in the SEEDtk global
-directory.
+The name of the directory containing the current evaluation information.
+
+=item id
+
+If specified, an ID to assign to the genome.  This is also used to infer the low-level taxonomic ID.  The default value
+of C<computed> means the ID will be assigned using the ID server.
+
+=item clear
+
+If specified, the work directory will be cleared before running the script.
 
 =back
 
@@ -98,15 +114,20 @@ $| = 1;
 my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_options(),
-        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.80 }],
-        ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-40 }],
+        ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.60 }],
+        ["algorithm=s", "type of kmer algorithm", { default => "AGGRESSIVE" }],
+        ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-20 }],
         ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/rep10.faa" }],
         ["repDb=s", "representative-genome database", { default => "$FIG_Config::p3data/repFinder.db"}],
-        ["minSim=i", "minimum acceptable similarity for a close genome", { default => 100 }],
+        ["minSim=i", "minimum acceptable similarity for a close genome", { default => 50 }],
         ["maxClose=i", "maximum number of close genomes", { default => 10 }],
         ["maxHits=i", "maximum hits for each query peg", { default => 5 }],
         ["nameSuffix=s", "suffix to give to the genome name"],
         ["eval=s", "name of evaluation directory", { default => "$FIG_Config::p3data/Eval" }],
+        ["id=s", "if specified, an ID to use for the genome", { default => "computed" }],
+        ["minStrength=f", "minimum strength of a kmer indication", { default => 0.2 }],
+        ["clear", "clear the work directory before starting"],
+        ["kmerSize|kmer|K=i", "protein kmer size", { default => 8 }],
     );
 my $minlen = $opt->minlen;
 my $maxE = $opt->maxe;
@@ -119,6 +140,10 @@ my $maxClose = $opt->maxclose;
 my $seedFasta = $opt->seedfasta;
 my $nameSuffix = $opt->namesuffix;
 my $eval = $opt->eval;
+my $genomeID = $opt->id;
+my $minStrength = $opt->minstrength;
+my $kmerSize = $opt->kmersize;
+my $algorithm = $opt->algorithm;
 # Connect to PATRIC.
 my $p3 = P3DataAPI->new();
 # Get the positional parameters.
@@ -127,18 +152,18 @@ if (! $workDir) {
     die "No working directory specified.";
 } elsif (! -d $workDir) {
     print STDERR "Creating work directory $workDir.\n";
-    File::Copy::Recursive::pathmk($workDir);
+    File::Copy::Recursive::pathmk($workDir) || die "Could not create $workDir: $!";
+} elsif ($opt->clear) {
+    print STDERR "Erasing work directory $workDir.\n";
+    File::Copy::Recursive::pathempty($workDir) ||
+        print STDERR "Error clearing work directory: $!\n";
 }
 my $stats = Stats->new();
+# Create the argument list for the name suffix.
 my @nameSpec;
 if ($nameSuffix) {
     @nameSpec = ('--nameSuffix', $nameSuffix);
 }
-my @COMMANDS = (
-    [Tax_Comp => '--verbose', @nameSpec, $workDir],
-    [Close_Anno => '--verbose', '--internal', '--maxHits', $maxHits, '--minSim', $minSim, '--maxE', $maxE, $workDir],
-    [Eval_Gto => '--verbose', '--eval', $eval, $workDir],
-);
 # Create the GTO.
 print STDERR "Creating GenomeTypeObject from input FASTA.\n";
 my $gto = GenomeTypeObject->new();
@@ -189,21 +214,43 @@ for my $contig (@contigs) {
     $contig->{genetic_code} = $gc;
 }
 # Store a dummy genome ID.
-$gto->{id} = "99.99";
+$gto->{id} = ($genomeID ne "computed" ? $genomeID : "99.99");
 # Save the GTO in the working directory.
 print STDERR "Saving initial GTO.\n";
 my $gtoFile = "$workDir/target1.gto";
 $gto->destroy_to_file($gtoFile);
 undef $gto;
+# Compute the closest-genome ID for the reference genome.
+my $refGenome = (@$closeGenomes ? $closeGenomes->[0]{genome} : "computed");
+
+############## COMMAND LIST ############# (* denotes where to insert input and output)
+my @COMMANDS = (
+    [Tax_Comp =>  '*', '--verbose', '--id', $genomeID, @nameSpec, $workDir],
+#    [Close_Anno =>  '*', '--verbose', '--internal', '--maxHits', $maxHits, '--minSim', $minSim, '--maxE', $maxE, $workDir],
+    ["kmers.anno" => 'kmers', '*', '--nGenomes', $maxClose, '--minStrength', $minStrength, "-K", $kmerSize, "--algorithm", $algorithm],
+#    [Eval_Gto =>  '*', '--verbose', '--eval', $eval, $workDir],
+    ["dl4j.eval" =>  'gto', '*', '--verbose', '--format', 'DEEP', '--outDir', $workDir, '--ref', $refGenome, $eval]
+);
+
+
 # These variables will hold the names of the input GTO and the output GTO.
 my ($input, $output) = ("$workDir/target1.gto", "$workDir/target2.gto");
 for my $command (@COMMANDS) {
     # Add the input and output files.
-    my @actual = @$command;
-    splice @actual, 1, 0, '--input', $input, '--output', $output;
+    my @actual;
+    for my $parm (@$command) {
+        if ($parm eq '*') {
+            push @actual, '--input', $input, '--output', $output;
+        } else {
+            push @actual, $parm;
+        }
+    }
     print STDERR "**** Executing " . join(' ', @actual) . "\n";
     my $rc = system(@actual);
     print STDERR "**** Return value from $actual[0] was $rc.\n";
+    if ($rc > 0) {
+        die "Terminating due to bad return from $actual[0].";
+    }
     ($input, $output) = ($output, $input);
 }
 # Write the final output.  Note that because we swapped after the command, its output is in $input.
