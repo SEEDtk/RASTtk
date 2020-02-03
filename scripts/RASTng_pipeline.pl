@@ -220,8 +220,6 @@ print STDERR "Saving initial GTO.\n";
 my $gtoFile = "$workDir/target1.gto";
 $gto->destroy_to_file($gtoFile);
 undef $gto;
-# Compute the closest-genome ID for the reference genome.
-my $refGenome = (@$closeGenomes ? $closeGenomes->[0]{genome} : "computed");
 
 ############## COMMAND LIST ############# (* denotes where to insert input and output)
 my @COMMANDS = (
@@ -229,7 +227,7 @@ my @COMMANDS = (
 #    [Close_Anno =>  '*', '--verbose', '--internal', '--maxHits', $maxHits, '--minSim', $minSim, '--maxE', $maxE, $workDir],
     ["kmers.anno" => 'kmers', '*', '--nGenomes', $maxClose, '--minStrength', $minStrength, "-K", $kmerSize, "--algorithm", $algorithm],
 #    [Eval_Gto =>  '*', '--verbose', '--eval', $eval, $workDir],
-    ["dl4j.eval" =>  'gto', '*', '--verbose', '--format', 'DEEP', '--outDir', $workDir, '--ref', $refGenome, $eval]
+    ["dl4j.eval" =>  'gto', '*', '--verbose', '--format', 'DEEP', '--outDir', $workDir, $eval]
 );
 
 
