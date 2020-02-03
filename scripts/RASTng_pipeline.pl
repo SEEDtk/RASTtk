@@ -127,7 +127,7 @@ my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_opt
         ["id=s", "if specified, an ID to use for the genome", { default => "computed" }],
         ["minStrength=f", "minimum strength of a kmer indication", { default => 0.2 }],
         ["clear", "clear the work directory before starting"],
-        ["kmerSize|kmer|K=i", "protein kmer size", { default => 8 }],
+        ["kmerSize|kmer|K=i", "protein kmer size", { default => 6 }],
     );
 my $minlen = $opt->minlen;
 my $maxE = $opt->maxe;
