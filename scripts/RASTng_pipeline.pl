@@ -18,7 +18,7 @@
 
 =head1 Next-Generation RAST pipeline
 
-    RASTng_pipeline.pl [options] fastaFile workDir
+    RASTng_pipeline.pl [options] workDir
 
 This script takes a FASTA file as input and produces a fully-annotated L<GenomeTypeObject> file.  It works as a pipeline, creating a skeleton GTO
 in the first step and then performing transformations using scripts listed in the COMMANDS constant.  Each command takes a GTO as standard input
