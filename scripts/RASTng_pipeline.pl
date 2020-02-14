@@ -117,7 +117,7 @@ my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_opt
         ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.60 }],
         ["algorithm=s", "type of kmer algorithm", { default => "AGGRESSIVE" }],
         ["maxE=f", "maximum permissible E-value for a successful match", { default => 1e-20 }],
-        ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/seedprot.fa" }],
+        ["seedFasta=s", "seed protein FASTA file", { default => "$FIG_Config::p3data/seedProt.fa" }],
         ["repDb=s", "representative-genome database", { default => "$FIG_Config::p3data/repFinder.db"}],
         ["minSim=i", "minimum acceptable similarity for a close genome", { default => 50 }],
         ["maxClose=i", "maximum number of close genomes", { default => 10 }],
