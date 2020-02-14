@@ -36,11 +36,6 @@ The command-line options include those in L<EvalCon/role_options> and L<BinningR
 
 Compare bin protein sequences to the reference genome.
 
-=item checkDir
-
-The directory containing the completeness-checker input files (see L<EvalCom::Tax> for details). The default is
-C<CheckG> in the SEEDtk globals directory.
-
 =item recursive
 
 If specified, the input directory is considered a directory of samples, rather than a sample directory. All subdirectories will be processed.
@@ -66,7 +61,7 @@ use strict;
 use P3Utils;
 use Bin;
 use EvalCon;
-use EvalCom::Tax;
+use EvalCom::Rep;
 use BinningReports;
 use File::Copy::Recursive;
 use GEO;
@@ -76,7 +71,6 @@ $| = 1;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('binDir', BinningReports::template_options(), EvalCon::role_options(),
         ['recursive', 'process all samples in subdirectories'],
-        ['checkDir=s', 'completeness checker configuration files', { default => "$FIG_Config::p3data/CheckG" }],
         ['missing', 'skip processed samples'],
         ['deep', 'show full details'],
         ['editURL=s', 'URL to use for editing contigs'],
@@ -116,7 +110,8 @@ my $evalCon = EvalCon->new_for_script($opt);
 my $stats = $evalCon->stats;
 # Create the completeness helper.
 my ($nMap, $cMap) = $evalCon->roleHashes;
-my $evalG = EvalCom::Tax->new($opt->checkdir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
+my $checkDir = $opt->eval . "/CheckR";
+my $evalG = EvalCom::Rep->new($checkDir, roleHashes=> [$nMap, $cMap], logH => \*STDOUT, stats => $stats);
 # Set up the options for creating the GEOs.
 my $detail = ($opt->deep ? 2 : 1);
 my $contigOptions = ($opt->noindex ? 'external' : 'binned');

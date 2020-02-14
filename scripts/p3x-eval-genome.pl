@@ -26,15 +26,9 @@ The PATRIC ID of a reference genome to use for comparison.  If specified, the C<
 If specified, the genome is compared to a reference genome in order to provide more details on problematic roles.
 If this option is specified and C<ref> is not specified, a reference genome will be computed.
 
-=item checkDir
+=item eval
 
-The name of the directory containing the reference genome table and the completeness data files. The default
-is C<CheckR> in the SEEDtk evaluation directory.
-
-=item predictors
-
-The name of the directory containing the role definition files and the function predictors for the consistency
-checking. The default is C<FunctionPredictors> in the SEEDtk evaluation directory.
+The name of the directory containing the evaluation data.  The default is C<Eval> in the SEEDtk global directory.
 
 =item template
 
@@ -61,6 +55,7 @@ use File::Copy::Recursive;
 
 # Get the command-line options.
 my $opt = P3Utils::script_opts('genome outFile outHtml',
+        ['eval=s', 'evaluation data directory', { default => "$FIG_Config::p3data/Eval" }],
         ['ref|r=s', 'reference genome ID (implies deep)'],
         ['deep', 'if specified, the genome is compared to a reference genome for more detailed analysis'],
         ['template=s', 'template for web pages', { default => "$FIG_Config::mod_base/p3_code/lib/BinningReports/webdetails.tt" }],
