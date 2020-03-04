@@ -22,7 +22,6 @@ use warnings;
 use FIG_Config;
 use ScriptUtils;
 use Stats;
-##TODO more use clauses
 
 =head1 Compare Binning Runs
 
