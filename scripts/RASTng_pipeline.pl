@@ -114,7 +114,6 @@ use FastA;
 use IPC::Run3;
 
 $| = 1;
-my $start = time;
 # Get the command-line options.
 my $opt = P3Utils::script_opts('workDir', P3Utils::ih_options(), P3Utils::oh_options(),
         ["minlen|min|m=f", "minimum fraction of length for a successful match", { default => 0.60 }],
@@ -193,11 +192,12 @@ if (-d $opt->input) {
     my $oh = P3Utils::oh($opt);
     ProcessGenome($ih, $oh);
 }
-print STDERR "All done.\n";
+print STDERR "All done.\n" . $stats->Show();
 
 # Process a single genome.  Params are input stream and output stream.
 sub ProcessGenome {
     my ($ih, $oh) = @_;
+    my $start = time;
     # Create the GTO.
     print STDERR "Creating GenomeTypeObject from input FASTA.\n";
     my $gto = GenomeTypeObject->new();
@@ -291,5 +291,5 @@ sub ProcessGenome {
     $gto = GenomeTypeObject->create_from_file($input);
     $gto->destroy_to_file($oh);
     my $minutes = int((time - $start) / 60);
-    print STDERR "Genome completed in $minutes minutes.\n" . $stats->Show();
+    print STDERR "Genome completed in $minutes minutes.\n";
 }
