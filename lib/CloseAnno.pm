@@ -908,15 +908,15 @@ sub ComputeId {
     my $retVal;
     my $max_retries = 10;
     my $try = 0;
-    while ($try++ < $max_retries) {
+    while ($try++ < $max_retries && ! $retVal) {
         my $r = $proxy->register_genome($taxon_id);
         if ($r->fault) {
             warn "Error on try $try registering genome via SEED clearinghouse: " . $r->faultcode . " " . $r->faultstring;
             sleep(2 + rand(10));
         } else {
             my $id = $r->result;
-              $retVal = "$taxon_id.$id";
-          }
+            $retVal = "$taxon_id.$id";
+        }
     }
     #
     # Retries failed
