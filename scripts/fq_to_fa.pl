@@ -61,7 +61,7 @@ If specified, the files are treated as interlaced instead of paired.
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('file1 file2 .. fileN',
         ['interlaced|inter|i', 'files are in interlaced format'],
-        ['singleton|s', 'optional singleton file']
+        ['singleton|s=s', 'optional singleton file']
         );
 # Get the file pairs.
 my $files = FastQ::OrganizeFiles($opt->interlaced, @ARGV);
