@@ -60,7 +60,8 @@ If specified, the files are treated as interlaced instead of paired.
 
 # Get the command-line parameters.
 my $opt = ScriptUtils::Opts('file1 file2 .. fileN',
-        ['interlaced|inter|i', 'files are in interlaced format']
+        ['interlaced|inter|i', 'files are in interlaced format'],
+        ['singleton|s', 'optional singleton file']
         );
 # Get the file pairs.
 my $files = FastQ::OrganizeFiles($opt->interlaced, @ARGV);
@@ -69,6 +70,14 @@ my $files = FastQ::OrganizeFiles($opt->interlaced, @ARGV);
 for my $filePair (@$files) {
     my $fqh = FastQ->new(@$filePair);
     # Read through this file set.
+    while ($fqh->next) {
+        $fqh->Echo(\*STDOUT);
+    }
+}
+# Append the singleton, if any.
+my $singletons = $opt->singleton;
+if ($singletons) {
+    my $fqh = FastQ->new($singletons, { singleton => 1});
     while ($fqh->next) {
         $fqh->Echo(\*STDOUT);
     }
