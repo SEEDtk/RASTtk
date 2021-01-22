@@ -88,10 +88,10 @@ for my $binDir (@binDirs) {
     my $rc = 0;
     if (! -s "$binDir/checkv/completeness.tsv") {
         # Here we need to run checkv.
-        $rc = system('checkv', 'completeness', $binDir, "$binDir/checkv");
+        $rc = system('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv");
         $stats->Add(checkvRuns => 1);
     }
-    if ($rc == 0) {
+    if (! -s "$binDir/vbins.tsv" && $rc == 0) {
         # Now we must process the checkv output.
         print "Processing checkV output for $binDir.\n";
         $stats->Add(outputRuns => 1);
