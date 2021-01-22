@@ -94,7 +94,7 @@ for my $binDir (sort @binDirs) {
     my $rc = 0;
     if (! -s "$binDir/checkv/completeness.tsv") {
         # Here we need to run checkv.
-        my @parms = ('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv");
+        my @parms = ('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv", '-d', $checkVdb);
         my $cmd = join(" ", @parms);
         print "Running: $cmd\n";
         $rc = system($cmd);
