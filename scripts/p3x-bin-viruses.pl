@@ -38,6 +38,10 @@ Additional command-line options are the following.
 
 The name of the CheckV database directory.  The default is C<checkv_db> in the SEEDtk data directory.
 
+=item test
+
+If specified, the program will stop on the first error.
+
 =back
 
 =cut
@@ -52,7 +56,9 @@ $| = 1;
 my $stats = Stats->new();
 # Get the command-line options.
 my $opt = P3Utils::script_opts('binDir1 binDir2 ...',
-    ['db=s', 'checkv database directory', { default => "$FIG_Config::data/checkv_db" }]);
+    ['db=s', 'checkv database directory', { default => "$FIG_Config::data/checkv_db" }],
+    ['test', 'if specified, the program will stop on the first error']
+    );
 # Get the checkv database directory.
 my $checkVdb = $opt->db;
 # Get the input directories.
@@ -82,14 +88,19 @@ for my $binDir (@ARGV) {
 # Loop through the directories, processing.
 my $tot = scalar @binDirs;
 my $count = 0;
-for my $binDir (@binDirs) {
+for my $binDir (sort @binDirs) {
     $count++;
     print "Processing sample $count of $tot: $binDir.\n";
     my $rc = 0;
     if (! -s "$binDir/checkv/completeness.tsv") {
         # Here we need to run checkv.
-        $rc = system('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv");
+        my @parms = ('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv");
+        print "Running: " . join(" ", @parms) . "\n";
+        $rc = system(@parms);
         $stats->Add(checkvRuns => 1);
+        if ($rc && $opt->test) {
+            die "Error in CheckV (rc = $rc).\n";
+        }
     }
     if (! -s "$binDir/vbins.tsv" && $rc == 0) {
         # Now we must process the checkv output.
