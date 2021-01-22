@@ -422,7 +422,6 @@ sub download_runs {
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
         my $lCount = 0;
-        my @left;
         my $line = <$ih>;
         while (defined $line) {
             $stats->Add(runLineIn => 1);
@@ -430,7 +429,7 @@ sub download_runs {
             if ($line =~ /^\@(\S+)\.1\s/) {
                 # Found it. Save the data and the quality for the left file.
                 my $id = $1;
-                push @left, $line;
+                my @left = ($line);
                 for my $idx (1,2,3) {
                     $line = <$ih>;
                     push @left, $line;
@@ -463,6 +462,7 @@ sub download_runs {
                 } else {
                     # No valid right read.
                     $stats->Add(noRightRead => 1);
+                    $singles += $self->_write_singleton($sh, \@left);
                     $error++;
                 }
             } else {
@@ -580,7 +580,6 @@ sub _write_singleton {
     my $retVal = 0;
     # Pop off the records one at a time.
     my $n = scalar @$lines;
-    $self->_log("$n lines stacked for singleton write.\n");
     for (my $i = 0; $i < $n; $i += 4) {
          my $header = $lines->[$i];
          if ($i + 3 >= $n) {
