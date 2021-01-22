@@ -95,8 +95,9 @@ for my $binDir (sort @binDirs) {
     if (! -s "$binDir/checkv/completeness.tsv") {
         # Here we need to run checkv.
         my @parms = ('checkv', 'completeness', "$binDir/unbinned.fasta", "$binDir/checkv");
-        print "Running: " . join(" ", @parms) . "\n";
-        $rc = system(@parms);
+        my $cmd = join(" ", @parms);
+        print "Running: $cmd\n";
+        $rc = system($cmd);
         $stats->Add(checkvRuns => 1);
         if ($rc && $opt->test) {
             die "Error in CheckV (rc = $rc).\n";
