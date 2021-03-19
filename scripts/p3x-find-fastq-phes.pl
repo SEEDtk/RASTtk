@@ -102,7 +102,7 @@ my $minHits = $opt->minhits;
 my @files = @ARGV;
 my $mapping = {};
 for my $file (@files) {
-    print "Processing $file.\n";
+    print STDERR "Processing $file.\n";
     # Blast the FastQ file.
     my $fq = FastQ->new($file, $fqOpt);
     $readBlaster->BlastSample($fq, $mapping);
