@@ -1,14 +1,14 @@
 ### OBSOLETE ### Use p3-get-features-by-sequence
 
-=head1  Retrieve the proteins in PATRIC identical to the one provided.
+=head1  Retrieve the proteins in BV-BRC identical to the one provided.
 
     p3-identical-proteins [options] < target-protein-sequence
 
-    Retrieve the proteins in PATRIC identical to the one provided.
+    Retrieve the proteins in BV-BRC identical to the one provided.
 =cut
 
 #
-# Retrieve the proteins in PATRIC identical to the one provided.
+# Retrieve the proteins in BV-BRC identical to the one provided.
 #
 
 use Data::Dumper;

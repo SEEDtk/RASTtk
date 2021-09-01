@@ -1,6 +1,6 @@
 ### OBSOLETE ###
 
-=head1 Return Signature Feature Data From Families in PATRIC
+=head1 Return Signature Feature Data From Families in BV-BRC
 
     p3-signature-peginfo
 
@@ -35,7 +35,7 @@ use P3Utils;
 my $opt = P3Utils::script_opts('', P3Utils::ih_options(),
         ['gs1|g=s', 'name of a file containing genome IDs', { required => 1 }],
         ['batchSize=i', 'recommended input batch size', { default => 100 }]);
-# Get access to PATRIC.
+# Get access to BV-BRC.
 my $p3 = P3DataAPI->new();
 # Compute the output columns.
 my @selectList = qw(patric_id accession start end strand product);
