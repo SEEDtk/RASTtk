@@ -383,7 +383,7 @@ eval {
             print STDERR "No genomes found in batch-- skipping.\n";
         } else {
             $start = time;
-            my $rc = system('eval_matrix', '-p', '1', $evalCon->predictors, $workDir, $outDir);
+            my $rc = system('eval_matrix', $evalCon->predictors, $workDir, $outDir);
             if ($rc) {
                 die "EvalCon returned error code $rc.";
             }
