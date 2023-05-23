@@ -213,19 +213,30 @@ sub get_stats {
     $id = uc $id;
     # Retrieve the web page for this sample.
     $self->_log("Fetching run data for $id.\n");
-    my $url = "http://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?save=efetch&db=sra&rettype=runinfo&term=$id";
+    my $url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=sra&term=$id";
     my $response = $self->{ua}->get($url);
     if (! $response->is_success) {
         $self->_log_error($response);
     } else {
-        # Here we have a valid web page to scrape.
+        # First we need the run's internal ID.
         my $content = $response->decoded_content;
-        my @lines = split /\n/, $content;
-        for my $line (@lines) {
-            my ($run, undef, undef, $spot0, $base0) = split /,/, $line;
-            if ($run && $run =~ /^.RR/) {
-                $spots += $spot0;
-                $bases += $base0;
+        my ($uid) = ($content =~ /<Id>(\d+)<\/Id>/s);
+        if (! $uid) {
+            $self->_log_error("No NCBI ID found for run $id.");
+        } else {
+            # Now get the meta-data for the ID we found.
+            $url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=sra&id=$uid";
+            $response = $self->{ua}->get($url);
+            my $response = $self->{ua}->get($url);
+            if (! $response->is_success) {
+                $self->_log_error($response);
+            } else {
+                # Here we have XML to parse.
+                $content = $response->decoded_content;
+                ($spots) = ($content =~ /total_spots="(\d+)"/s);
+                ($bases) = ($content =~ /total_bases="(\d+)"/s);
+                $spots ||= 0;
+                $bases ||= 0;
             }
         }
     }
@@ -415,9 +426,13 @@ sub download_runs {
         open($rh, '>', $rfile) || die "Could not open right FASTQ for $name: $!";
         open($sh, '>', $sfile) || die "Could not open singleton FASTQ for $name: $!";
     }
+    # Keep a list of the good runs.
+    my @goodRuns;
     # Loop through the runs.
     for my $run (@$runList) {
-        $self->_log("Processing $run.\n");
+        # Get the spot count.
+        my ($spots, $bases) = $self->get_stats($run);
+        $self->_log("Processing $run. $spots spots expected.\n");
         # Create a FastQ object to read the run from NCBI.
         open(my $ih, "$cmdPath --readids --stdout --split-spot --skip-technical --clip --read-filter pass $run |") || die "Could not start fastq dunmp for $run: $!";
         $stats->Add(runFiles => 1);
@@ -480,9 +495,15 @@ sub download_runs {
                 $singles += $self->_write_singleton($sh, \@skip);
             }
         }
-        $good += $lCount;
+        if ($lCount < $spots * 0.8) {
+            $self->_log("Less than 80% of run $run was good.\n");
+            $error += $lCount;
+        } else {
+            $good += $lCount;
+            push @goodRuns, $run;
+        }
     }
-    my $retVal = 1;
+    my $retVal = (scalar @goodRuns > 0);
     # Clean up the files.
     close $lh; close $rh;
     close $sh if $sh;
